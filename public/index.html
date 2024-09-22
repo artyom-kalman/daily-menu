@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>KBU Daily Menu</title>
+        <script
+            src="https://unpkg.com/htmx.org@2.0.2"
+            integrity="sha384-Y7hw+L/jvKeWIRRkqWYfPcvVxHzVzn5REgzbawhxAuQGwX1XWe70vji+VSeHOThJ"
+            crossorigin="anonymous"
+        ></script>
+    </head>
+    <body>
+        <h1>KBU Daily Menu</h1>
+        <div id="peony">
+            {{with .Peony}}
+            <h2>Peony</h2>
+            <div>
+                {{range .Items}}
+                <p>{{.Name}}</p>
+                <p>{{.Description}}</p>
+                {{end}}
+            </div>
+            {{end}}
+        </div>
+        <div id="azilea">
+            {{with .Azilea}}
+            <h2>Azilea</h2>
+            <div>
+                {{range .Items}}
+                <p>{{.Name}}</p>
+                <p>{{.Description}}</p>
+                {{end}}
+            </div>
+            {{end}}
+        </div>
+    </body>
+</html>
