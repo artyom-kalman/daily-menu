@@ -24,7 +24,7 @@ func GetIndex(rw http.ResponseWriter, request *http.Request) {
 		},
 	}
 
-	tmpl := template.Must(template.ParseFiles("public/index.html"))
+	tmpl := template.Must(template.ParseFiles("./index.html"))
 	tmpl.Execute(rw, map[string]entities.Menu{
 		"Peony":  menu,
 		"Azilea": menu,

@@ -6,7 +6,7 @@
   "version": "1.0.0",
   "main": "tailwind.config.js",
   "scripts": {
-    "build:css": "npx tailwindcss -i ./main.css -o ./tailwind.css",
+    "build:css": "npx tailwindcss -i ./dist/main.css -o ./dist/tailwind.css",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

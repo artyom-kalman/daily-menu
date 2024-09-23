@@ -11,10 +11,10 @@ import (
 const API_ROUTE = "/api"
 
 func main() {
-	fs := http.FileServer(http.Dir("./public"))
-	http.Handle("/", fs)
+	fs := http.FileServer(http.Dir("./public/"))
+	http.Handle("/public/", http.StripPrefix("/public/", fs))
 
-	// http.HandleFunc("/", api.GetIndex)
+	http.HandleFunc("/", api.GetIndex)
 
 	http.HandleFunc(API_ROUTE+"/peony", api.GetPeonyHandler)
 	http.HandleFunc(API_ROUTE+"/azilea", api.GetAzileaHandler)
