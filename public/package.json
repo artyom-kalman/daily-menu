@@ -1,0 +1,16 @@
+{
+  "devDependencies": {
+    "tailwindcss": "^3.4.12"
+  },
+  "name": "public",
+  "version": "1.0.0",
+  "main": "tailwind.config.js",
+  "scripts": {
+    "build:css": "npx tailwindcss -i ./main.css -o ./tailwind.css",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}
