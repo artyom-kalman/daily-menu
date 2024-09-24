@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/artyom-kalman/kbu-daily-menu/entities"
+	"github.com/artyom-kalman/kbu-daily-menu/internal/api/entities"
 )
 
 func GetPeonyMenu() (*entities.Menu, error) {
@@ -31,24 +31,24 @@ func GetAzileaMenu() *entities.Menu {
 }
 
 func parseResponse(response string) ([]*entities.MenuItem, error) {
-	response = `															<li class="foodItem">순살돈가스&
-</li><li class="foodItem">국물떡볶이
-</li><li class="foodItem">베이컨계란말이
-</li><li class="foodItem">옥수수밥
-</li><li class="foodItem">미소장국
-</li><li class="foodItem">콩새송이조림
-</li><li class="foodItem">단무지
-</li><li class="foodItem">포기김치
-</li><li class="foodItem">추억의삼각포리커피우유</li>
-</ul>
-</td>`
-	dishes := findDishs(response)
+	// 	response = `															<li class="foodItem">순살돈가스&
+	// </li><li class="foodItem">국물떡볶이
+	// </li><li class="foodItem">베이컨계란말이
+	// </li><li class="foodItem">옥수수밥
+	// </li><li class="foodItem">미소장국
+	// </li><li class="foodItem">콩새송이조림
+	// </li><li class="foodItem">단무지
+	// </li><li class="foodItem">포기김치
+	// </li><li class="foodItem">추억의삼각포리커피우유</li>
+	// </ul>
+	// </td>`
+	dishes := findDishes(response)
 	fmt.Println(dishes)
 
 	return []*entities.MenuItem{}, nil
 }
 
-func findDishs(dom string) []string {
+func findDishes(dom string) []string {
 	dishes := make([]string, 0)
 
 	regex := regexp.MustCompile(`(?Ums)class="foodItem">(.*)<`)

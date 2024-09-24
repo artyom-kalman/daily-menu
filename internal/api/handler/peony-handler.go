@@ -1,10 +1,10 @@
-package api
+package handler
 
 import (
 	"fmt"
 	"net/http"
 
-	"github.com/artyom-kalman/kbu-daily-menu/entities"
+	"github.com/artyom-kalman/kbu-daily-menu/internal/api/entities"
 )
 
 func GetPeonyHandler(rw http.ResponseWriter, request *http.Request) {

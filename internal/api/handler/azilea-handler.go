@@ -1,9 +1,9 @@
-package api
+package handler
 
 import (
 	"net/http"
 
-	"github.com/artyom-kalman/kbu-daily-menu/entities"
+	"github.com/artyom-kalman/kbu-daily-menu/internal/api/entities"
 )
 
 func GetAzileaHandler(rw http.ResponseWriter, request *http.Request) {
