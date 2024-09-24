@@ -9,30 +9,19 @@ import (
 )
 
 func GetIndex(rw http.ResponseWriter, request *http.Request) {
-	// var menu entities.Menu
-	// menu.Items = []*entities.MenuItem{
-	// 	{
-	// 		Name:        "Bulkogi",
-	// 		Description: "Fried meet",
-	// 	},
-	// 	{
-	// 		Name:        "Bulkogi",
-	// 		Description: "Fried meet",
-	// 	},
-	// 	{
-	// 		Name:        "Bulkogi",
-	// 		Description: "Fried meet",
-	// 	},
-	// }
+	peonyMenu, err := service.GetPeonyMenu()
+	if err != nil {
+		http.Error(rw, "Error getting Peony menu", http.StatusInternalServerError)
+	}
 
-	menu, err := service.GetPeonyMenu()
+	azileaMenu, err := service.GetAzileaMenu()
 	if err != nil {
 		http.Error(rw, "Error getting Peony menu", http.StatusInternalServerError)
 	}
 
 	tmpl := template.Must(template.ParseFiles("templates/index.html"))
 	tmpl.Execute(rw, map[string]*entities.Menu{
-		"Peony":  menu,
-		"Azilea": menu,
+		"Peony":  peonyMenu,
+		"Azilea": azileaMenu,
 	})
 }

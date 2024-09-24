@@ -1,7 +1,6 @@
 package service
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 	"regexp"
@@ -11,7 +10,7 @@ import (
 )
 
 func GetPeonyMenu() (*entities.Menu, error) {
-	resp, err := http.Get("https://kbu.ac.kr/kor/CMS/DietMenuMgr/list.do")
+	resp, err := http.Get("https://kbu.ac.kr/kor/CMS/DietMenuMgr/list.do?mCode=MN203&searchDietCategory=4")
 	if err != nil {
 		return nil, err
 	}
@@ -21,34 +20,44 @@ func GetPeonyMenu() (*entities.Menu, error) {
 	if err != nil {
 		return nil, err
 	}
-	parseResponse(string(body))
 
-	return &entities.Menu{}, nil
+	dishes, err := parseResponse(string(body))
+	if err != nil {
+		return nil, err
+	}
+
+	menu := entities.NewMenuFromDishes(dishes)
+	return menu, nil
 }
 
-func GetAzileaMenu() *entities.Menu {
-	return &entities.Menu{}
+func GetAzileaMenu() (*entities.Menu, error) {
+	resp, err := http.Get("https://kbu.ac.kr/kor/CMS/DietMenuMgr/list.do?mCode=MN203&searchDietCategory=5")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.Reader(resp.Body))
+	if err != nil {
+		return nil, err
+	}
+
+	dishes, err := parseResponse(string(body))
+	if err != nil {
+		return nil, err
+	}
+
+	menu := entities.NewMenuFromDishes(dishes)
+	return menu, nil
 }
 
-func parseResponse(response string) ([]*entities.MenuItem, error) {
-	// 	response = `															<li class="foodItem">순살돈가스&
-	// </li><li class="foodItem">국물떡볶이
-	// </li><li class="foodItem">베이컨계란말이
-	// </li><li class="foodItem">옥수수밥
-	// </li><li class="foodItem">미소장국
-	// </li><li class="foodItem">콩새송이조림
-	// </li><li class="foodItem">단무지
-	// </li><li class="foodItem">포기김치
-	// </li><li class="foodItem">추억의삼각포리커피우유</li>
-	// </ul>
-	// </td>`
-	dishes := findDishes(response)
-	fmt.Println(dishes)
+func parseResponse(response string) ([]string, error) {
+	dishes := findTodaysDishes(response)
 
-	return []*entities.MenuItem{}, nil
+	return dishes, nil
 }
 
-func findDishes(dom string) []string {
+func findTodaysDishes(dom string) []string {
 	dishes := make([]string, 0)
 
 	regex := regexp.MustCompile(`(?Ums)class="foodItem">(.*)<`)
@@ -62,5 +71,5 @@ func findDishes(dom string) []string {
 		dishes = append(dishes, dish)
 	}
 
-	return dishes
+	return dishes[len(dishes)-7:]
 }
