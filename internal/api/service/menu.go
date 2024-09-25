@@ -9,29 +9,19 @@ import (
 	"github.com/artyom-kalman/kbu-daily-menu/internal/api/entities"
 )
 
+const PEONY_URL = "https://kbu.ac.kr/kor/CMS/DietMenuMgr/list.do?mCode=MN203&searchDietCategory=4"
+const AZILEA_RUL = "https://kbu.ac.kr/kor/CMS/DietMenuMgr/list.do?mCode=MN203&searchDietCategory=5"
+
 func GetPeonyMenu() (*entities.Menu, error) {
-	resp, err := http.Get("https://kbu.ac.kr/kor/CMS/DietMenuMgr/list.do?mCode=MN203&searchDietCategory=4")
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(io.Reader(resp.Body))
-	if err != nil {
-		return nil, err
-	}
-
-	dishes, err := parseResponse(string(body))
-	if err != nil {
-		return nil, err
-	}
-
-	menu := entities.NewMenuFromDishes(dishes)
-	return menu, nil
+	return getMenu(PEONY_URL)
 }
 
 func GetAzileaMenu() (*entities.Menu, error) {
-	resp, err := http.Get("https://kbu.ac.kr/kor/CMS/DietMenuMgr/list.do?mCode=MN203&searchDietCategory=5")
+	return getMenu(AZILEA_RUL)
+}
+
+func getMenu(url string) (*entities.Menu, error) {
+	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
 	}
@@ -48,6 +38,8 @@ func GetAzileaMenu() (*entities.Menu, error) {
 	}
 
 	menu := entities.NewMenuFromDishes(dishes)
+	AddDescriptionToMenu(menu)
+
 	return menu, nil
 }
 
