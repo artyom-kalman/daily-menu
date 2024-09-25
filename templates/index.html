@@ -5,67 +5,116 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>KBU Daily Menu</title>
         <link rel="stylesheet" href="../public/dist/tailwind.css" />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Pacifico&family=Poppins:wght@400;600&display=swap"
+            rel="stylesheet"
+        />
     </head>
-    <body class="bg-gray-50">
-        <div class="container mx-auto px-6 lg:px-12 py-12">
-            <h1 class="text-5xl font-extrabold text-center mb-12 text-gray-800">
-                KBU Daily Menu
+    <body
+        class="bg-gradient-to-br from-pink-200 to-blue-200 min-h-screen font-['Poppins'] flex items-center justify-center"
+    >
+        <div class="container mx-auto px-4 py-12 max-w-4xl">
+            <h1
+                class="text-5xl font-['Pacifico'] text-center mb-12 text-purple-700 animate-pulse"
+            >
+                Today's Culinary Adventure
             </h1>
 
             <div
-                class="bg-white p-8 rounded-xl shadow-lg mb-12 flex items-center space-x-6"
+                class="mb-16 transform hover:scale-105 transition-transform duration-300"
             >
                 {{with .Peony}}
-                <div class="w-1/3">
-                    <img
-                        src="../public/img/azilea.jpg"
-                        alt="Peony Image"
-                        class="w-full h-64 object-cover rounded-lg transition-transform duration-300 hover:scale-105"
-                    />
-                </div>
-                <div class="w-2/3">
-                    <h2 class="text-3xl font-semibold mb-6 text-gray-700">
-                        Peony
-                    </h2>
-                    <div class="space-y-6">
-                        {{range .Items}}
-                        <div class="bg-gray-50 p-5 rounded-md shadow-sm mb-4">
-                            <p class="text-xl font-medium text-gray-900">
-                                {{.Name}}
-                            </p>
-                            <p class="text-gray-600 mt-2">{{.Description}}</p>
+                <div
+                    class="bg-white bg-opacity-80 rounded-3xl shadow-2xl overflow-hidden"
+                >
+                    <div class="flex flex-col items-center">
+                        <div class="w-full max-w-md p-4">
+                            <div
+                                class="relative rounded-full overflow-hidden aspect-square"
+                            >
+                                <img
+                                    src="../public/img/peony.jpg"
+                                    alt="Peony Image"
+                                    class="w-full h-full object-cover"
+                                />
+                                <div
+                                    class="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-pink-500 to-purple-500 opacity-50"
+                                ></div>
+                            </div>
                         </div>
-                        {{end}}
+                        <div class="p-8 w-full">
+                            <h2
+                                class="text-3xl font-semibold mb-6 text-pink-600 text-center"
+                            >
+                                Peony's Delights
+                            </h2>
+                            <div class="space-y-4">
+                                {{range .Items}}
+                                <div
+                                    class="bg-pink-100 rounded-lg p-4 hover:shadow-md transition-shadow duration-300"
+                                >
+                                    <p
+                                        class="font-medium text-lg text-purple-700 text-center"
+                                    >
+                                        {{.Name}}
+                                    </p>
+                                    <p class="text-gray-600 italic text-center">
+                                        {{.Description}}
+                                    </p>
+                                </div>
+                                {{end}}
+                            </div>
+                        </div>
                     </div>
                 </div>
                 {{end}}
             </div>
 
-            <!-- Azilea Menu (image on right) -->
             <div
-                class="bg-white p-8 rounded-xl shadow-lg mb-12 flex items-center space-x-6 flex-row-reverse"
+                class="transform hover:scale-105 transition-transform duration-300"
             >
                 {{with .Azilea}}
-                <div class="w-1/3">
-                    <img
-                        src="../public/img/peony.jpg"
-                        alt="Azilea Image"
-                        class="w-full h-64 object-cover rounded-lg transition-transform duration-300 hover:scale-105"
-                    />
-                </div>
-                <div class="w-2/3">
-                    <h2 class="text-3xl font-semibold mb-6 text-gray-700">
-                        Azilea
-                    </h2>
-                    <div class="space-y-6">
-                        {{range .Items}}
-                        <div class="bg-gray-50 p-5 rounded-md shadow-sm mb-4">
-                            <p class="text-xl font-medium text-gray-900">
-                                {{.Name}}
-                            </p>
-                            <p class="text-gray-600 mt-2">{{.Description}}</p>
+                <div
+                    class="bg-white bg-opacity-80 rounded-3xl shadow-2xl overflow-hidden"
+                >
+                    <div class="flex flex-col items-center">
+                        <div class="w-full max-w-md p-4">
+                            <div
+                                class="relative rounded-full overflow-hidden aspect-square"
+                            >
+                                <img
+                                    src="../public/img/azilea.jpg"
+                                    alt="Azilea Image"
+                                    class="w-full h-full object-cover"
+                                />
+                                <div
+                                    class="absolute top-0 left-0 w-full h-full bg-gradient-to-l from-blue-500 to-green-500 opacity-50"
+                                ></div>
+                            </div>
                         </div>
-                        {{end}}
+                        <div class="p-8 w-full">
+                            <h2
+                                class="text-3xl font-semibold mb-6 text-blue-600 text-center"
+                            >
+                                Azilea's Specialties
+                            </h2>
+                            <div class="space-y-4">
+                                {{range .Items}}
+                                <div
+                                    class="bg-blue-100 rounded-lg p-4 hover:shadow-md transition-shadow duration-300"
+                                >
+                                    <p
+                                        class="font-medium text-lg text-green-700 text-center"
+                                    >
+                                        {{.Name}}
+                                    </p>
+                                    <p class="text-gray-600 italic text-center">
+                                        {{.Description}}
+                                    </p>
+                                </div>
+                                {{end}}
+                            </div>
+                        </div>
                     </div>
                 </div>
                 {{end}}
@@ -73,3 +122,4 @@
         </div>
     </body>
 </html>
+`

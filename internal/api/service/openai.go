@@ -15,6 +15,12 @@ import (
 const MENU_PROMPT = "Опиши эти корейские блюда. Для каждого блюда напиши одно предложение. Также напиши степень остроты блюда. Вот список блюд: "
 
 func AddDescriptionToMenu(menu *entities.Menu) {
+	// Form a prompt
+	prompt := formMenuPrompt(menu)
+	// Send request
+	sendRequest(prompt)
+	// Parse request
+
 	for _, item := range menu.Items {
 		item.Name = "Токпоки"
 		item.Description = "Суповая версия ттокпокки с острыми рисовыми клецками в бульоне."
@@ -29,14 +35,14 @@ func formMenuPrompt(menu *entities.Menu) string {
 	return question
 }
 
-func sendRequest(question string) (*entities.GPTResponse, error) {
+func sendRequest(prompt string) (*entities.GPTResponse, error) {
 	apiKey := os.Getenv("OPEN_AI_API_KEY")
 
 	reqBody := entities.GPTRequest{
 		Model: "gpt-4",
 		Message: &entities.Message{
 			Role:    "user",
-			Content: question,
+			Content: prompt,
 		},
 	}
 
