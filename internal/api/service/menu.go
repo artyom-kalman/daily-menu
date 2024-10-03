@@ -38,6 +38,12 @@ func getMenu(url string) (*entities.Menu, error) {
 	}
 
 	menu := entities.NewMenuFromDishes(dishes)
+	if len(menu.Items) < 1 {
+		menu.Items = append(menu.Items, &entities.MenuItem{
+			Name: "Сегодня тут пусто",
+		})
+		return menu, nil
+	}
 	AddDescriptionToMenu(menu)
 
 	return menu, nil
@@ -63,5 +69,9 @@ func findTodaysDishes(dom string) []string {
 		dishes = append(dishes, dish)
 	}
 
-	return dishes[len(dishes)-7:]
+	if len(dishes) > 7 {
+		return dishes[len(dishes)-7:]
+	} else {
+		return dishes
+	}
 }
