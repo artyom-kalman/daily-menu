@@ -1,4 +1,4 @@
-package entities
+package chatgpt
 
 type GPTRequest struct {
 	Model   string   `json:"model"`

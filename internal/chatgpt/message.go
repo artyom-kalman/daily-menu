@@ -1,4 +1,4 @@
-package entities
+package chatgpt
 
 type Message struct {
 	Role    string `json:"role"`
