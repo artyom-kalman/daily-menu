@@ -2,25 +2,25 @@ package main
 
 import (
 	"log"
-	"net/http"
+	"os"
 
-	"github.com/artyom-kalman/kbu-daily-menu/internal/api/handler"
+	"github.com/artyom-kalman/kbu-daily-menu/internal/interfaces/rest"
+	"github.com/artyom-kalman/kbu-daily-menu/internal/interfaces/telegram"
 )
 
-const API_ROUTE = "/api"
-
 func main() {
-	fs := http.FileServer(http.Dir("./public/"))
-	http.Handle("/public/", http.StripPrefix("/public/", fs))
+	go func() {
+		rest.SetupRouts()
+		rest.StartServer()
+	}()
 
-	http.HandleFunc("/", handler.GetIndex)
-
-	http.HandleFunc(API_ROUTE+"/peony", handler.GetPeonyHandler)
-	http.HandleFunc(API_ROUTE+"/azilea", handler.GetAzileaHandler)
-
-	log.Print("Server is running on localhost:8000")
-	if err := http.ListenAndServe("localhost:8000", nil); err != nil {
+	token := os.Getenv("KBUDAILYMENU_TGBOT_TOKEN")
+	bot, err := telegram.NewBot(token)
+	if err != nil {
 		log.Fatal(err)
 	}
 
+	bot.HandleMessages("Hello")
+
+	select {}
 }

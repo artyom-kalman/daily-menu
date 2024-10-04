@@ -1,12 +1,7 @@
-package entities
+package cafeteria
 
 type Menu struct {
 	Items []*MenuItem
-}
-
-type MenuItem struct {
-	Name        string
-	Description string
 }
 
 func NewMenuFromDishes(dishes []string) *Menu {

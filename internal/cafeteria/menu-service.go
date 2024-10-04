@@ -1,26 +1,24 @@
-package service
+package cafeteria
 
 import (
 	"io"
 	"net/http"
 	"regexp"
 	"strings"
-
-	"github.com/artyom-kalman/kbu-daily-menu/internal/api/entities"
 )
 
 const PEONY_URL = "https://kbu.ac.kr/kor/CMS/DietMenuMgr/list.do?mCode=MN203&searchDietCategory=4"
 const AZILEA_RUL = "https://kbu.ac.kr/kor/CMS/DietMenuMgr/list.do?mCode=MN203&searchDietCategory=5"
 
-func GetPeonyMenu() (*entities.Menu, error) {
+func GetPeonyMenu() (*Menu, error) {
 	return getMenu(PEONY_URL)
 }
 
-func GetAzileaMenu() (*entities.Menu, error) {
+func GetAzileaMenu() (*Menu, error) {
 	return getMenu(AZILEA_RUL)
 }
 
-func getMenu(url string) (*entities.Menu, error) {
+func getMenu(url string) (*Menu, error) {
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
@@ -37,14 +35,13 @@ func getMenu(url string) (*entities.Menu, error) {
 		return nil, err
 	}
 
-	menu := entities.NewMenuFromDishes(dishes)
+	menu := NewMenuFromDishes(dishes)
 	if len(menu.Items) < 1 {
-		menu.Items = append(menu.Items, &entities.MenuItem{
+		menu.Items = append(menu.Items, &MenuItem{
 			Name: "Сегодня тут пусто",
 		})
 		return menu, nil
 	}
-	AddDescriptionToMenu(menu)
 
 	return menu, nil
 }

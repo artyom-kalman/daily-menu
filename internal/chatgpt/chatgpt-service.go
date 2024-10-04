@@ -1,4 +1,4 @@
-package service
+package chatgpt
 
 import (
 	"bytes"
@@ -9,12 +9,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/artyom-kalman/kbu-daily-menu/internal/api/entities"
+	"github.com/artyom-kalman/kbu-daily-menu/internal/cafeteria"
 )
 
 const MENU_PROMPT = "Опиши эти корейские блюда. Для каждого блюда напиши одно предложение. Также напиши степень остроты блюда. Вот список блюд: "
 
-func AddDescriptionToMenu(menu *entities.Menu) {
+func AddDescriptionToMenu(menu *cafeteria.Menu) error {
 	// Form a prompt
 	prompt := formMenuPrompt(menu)
 	// Send request
@@ -25,9 +25,10 @@ func AddDescriptionToMenu(menu *entities.Menu) {
 		item.Name = "Токпоки"
 		item.Description = "Суповая версия ттокпокки с острыми рисовыми клецками в бульоне."
 	}
+	return nil
 }
 
-func formMenuPrompt(menu *entities.Menu) string {
+func formMenuPrompt(menu *cafeteria.Menu) string {
 	question := strings.Clone(MENU_PROMPT)
 	for _, item := range menu.Items {
 		question += fmt.Sprintf("%s, ", item.Name)
@@ -35,12 +36,12 @@ func formMenuPrompt(menu *entities.Menu) string {
 	return question
 }
 
-func sendRequest(prompt string) (*entities.GPTResponse, error) {
+func sendRequest(prompt string) (*GPTResponse, error) {
 	apiKey := os.Getenv("OPEN_AI_API_KEY")
 
-	reqBody := entities.GPTRequest{
+	reqBody := GPTRequest{
 		Model: "gpt-4",
-		Message: &entities.Message{
+		Message: &Message{
 			Role:    "user",
 			Content: prompt,
 		},
@@ -75,7 +76,7 @@ func sendRequest(prompt string) (*entities.GPTResponse, error) {
 		return nil, err
 	}
 
-	var resBody entities.GPTResponse
+	var resBody GPTResponse
 	err = json.Unmarshal(body, &resBody)
 	if err != nil {
 		return nil, err

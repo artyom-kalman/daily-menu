@@ -1,23 +1,23 @@
-package service
+package telegram
 
 import tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
-type BotService struct {
+type Bot struct {
 	bot *tgbotapi.BotAPI
 }
 
-func NewBotService(token string) (*BotService, error) {
+func NewBot(token string) (*Bot, error) {
 	bot, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
 		return nil, err
 	}
 
-	return &BotService{
+	return &Bot{
 		bot: bot,
 	}, nil
 }
 
-func (b *BotService) SendMessage(text string) error {
+func (b *Bot) HandleMessages(text string) error {
 	updateConf := tgbotapi.NewUpdate(0)
 	updateConf.Timeout = 60
 
