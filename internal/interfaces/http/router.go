@@ -1,20 +1,27 @@
-package rest
+package http
 
 import (
 	"log"
 	"net/http"
+
+	"github.com/artyom-kalman/kbu-daily-menu/internal/application/rest"
 )
 
 const API_ROUTE = "/api"
+
+func Run() {
+	SetupRouts()
+	StartServer()
+}
 
 func SetupRouts() {
 	fs := http.FileServer(http.Dir("./public/"))
 	http.Handle("/public/", http.StripPrefix("/public/", fs))
 
-	http.HandleFunc("/", GetIndex)
+	http.HandleFunc("/", rest.GetIndex)
 
-	http.HandleFunc(API_ROUTE+"/peony", GetPeonyHandler)
-	http.HandleFunc(API_ROUTE+"/azilea", GetAzileaHandler)
+	http.HandleFunc(API_ROUTE+"/peony", rest.GetPeonyHandler)
+	http.HandleFunc(API_ROUTE+"/azilea", rest.GetAzileaHandler)
 }
 
 func StartServer() {

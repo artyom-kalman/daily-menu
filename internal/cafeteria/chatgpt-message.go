@@ -1,4 +1,4 @@
-package chatgpt
+package cafeteria
 
 type Message struct {
 	Role    string `json:"role"`

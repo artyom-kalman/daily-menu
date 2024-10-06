@@ -5,21 +5,19 @@ import (
 	"net/http"
 
 	"github.com/artyom-kalman/kbu-daily-menu/internal/cafeteria"
-	"github.com/artyom-kalman/kbu-daily-menu/internal/chatgpt"
 )
 
 func GetIndex(rw http.ResponseWriter, request *http.Request) {
-	peonyMenu, err := cafeteria.GetPeonyMenu()
+	menuService := cafeteria.NewMenuService()
+	peonyMenu, err := menuService.GetPeonyMenu()
 	if err != nil {
 		http.Error(rw, "Error getting Peony menu", http.StatusInternalServerError)
 	}
-	chatgpt.AddDescriptionToMenu(peonyMenu)
 
-	azileaMenu, err := cafeteria.GetAzileaMenu()
+	azileaMenu, err := menuService.GetAzileaMenu()
 	if err != nil {
 		http.Error(rw, "Error getting Azilean menu", http.StatusInternalServerError)
 	}
-	chatgpt.AddDescriptionToMenu(azileaMenu)
 
 	tmpl, err := template.ParseFiles("templates/index.html")
 	if err != nil {
