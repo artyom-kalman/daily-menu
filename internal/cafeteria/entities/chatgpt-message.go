@@ -1,4 +1,4 @@
-package cafeteria
+package entities
 
 type Message struct {
 	Role    string `json:"role"`

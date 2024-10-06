@@ -21,5 +21,5 @@ func RunBot() {
 	myChatId := 734130728
 	bot.ScheduleDailyMenu(myChatId, "HEllo", "10:00")
 
-	bot.HandleMessages("Hello! I am a menu bot.")
+	go bot.HandleMessages("Hello! I am a menu bot.")
 }

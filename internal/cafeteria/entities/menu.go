@@ -1,4 +1,4 @@
-package cafeteria
+package entities
 
 type Menu struct {
 	Items []*MenuItem

@@ -1,4 +1,4 @@
-package cafeteria
+package entities
 
 type GPTRequest struct {
 	Model   string   `json:"model"`
