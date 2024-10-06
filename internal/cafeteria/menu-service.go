@@ -1,74 +1,19 @@
 package cafeteria
 
-import (
-	"io"
-	"net/http"
-	"regexp"
-	"strings"
-)
-
-const PEONY_URL = "https://kbu.ac.kr/kor/CMS/DietMenuMgr/list.do?mCode=MN203&searchDietCategory=4"
-const AZILEA_RUL = "https://kbu.ac.kr/kor/CMS/DietMenuMgr/list.do?mCode=MN203&searchDietCategory=5"
-
-func GetPeonyMenu() (*Menu, error) {
-	return getMenu(PEONY_URL)
+type MenuService struct {
+	repo *MenuRepository
 }
 
-func GetAzileaMenu() (*Menu, error) {
-	return getMenu(AZILEA_RUL)
+func NewMenuService() *MenuService {
+	return &MenuService{
+		repo: NewMenuRepository(),
+	}
 }
 
-func getMenu(url string) (*Menu, error) {
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(io.Reader(resp.Body))
-	if err != nil {
-		return nil, err
-	}
-
-	dishes, err := parseResponse(string(body))
-	if err != nil {
-		return nil, err
-	}
-
-	menu := NewMenuFromDishes(dishes)
-	if len(menu.Items) < 1 {
-		menu.Items = append(menu.Items, &MenuItem{
-			Name: "Сегодня тут пусто",
-		})
-		return menu, nil
-	}
-
-	return menu, nil
+func (s *MenuService) GetPeonyMenu() (*Menu, error) {
+	return s.repo.getPeonyMenu()
 }
 
-func parseResponse(response string) ([]string, error) {
-	dishes := findTodaysDishes(response)
-
-	return dishes, nil
-}
-
-func findTodaysDishes(dom string) []string {
-	dishes := make([]string, 0)
-
-	regex := regexp.MustCompile(`(?Ums)class="foodItem">(.*)<`)
-	for _, match := range regex.FindAllStringSubmatch(dom, -1) {
-		dish := strings.TrimSpace(match[1])
-
-		if dish == "" {
-			continue
-		}
-
-		dishes = append(dishes, dish)
-	}
-
-	if len(dishes) > 7 {
-		return dishes[len(dishes)-7:]
-	} else {
-		return dishes
-	}
+func (s *MenuService) GetAzileaMenu() (*Menu, error) {
+	return s.repo.getAzileaMenu()
 }

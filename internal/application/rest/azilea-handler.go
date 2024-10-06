@@ -5,16 +5,11 @@ import (
 	"net/http"
 
 	"github.com/artyom-kalman/kbu-daily-menu/internal/cafeteria"
-	"github.com/artyom-kalman/kbu-daily-menu/internal/chatgpt"
 )
 
-func GetPeonyHandler(rw http.ResponseWriter, request *http.Request) {
-	menu, err := cafeteria.GetPeonyMenu()
-	if err != nil {
-		http.Error(rw, "Error getting menu", http.StatusInternalServerError)
-	}
-
-	err = chatgpt.AddDescriptionToMenu(menu)
+func GetAzileaHandler(rw http.ResponseWriter, request *http.Request) {
+	menuService := cafeteria.NewMenuService()
+	menu, err := menuService.GetAzileaMenu()
 	if err != nil {
 		http.Error(rw, "Error getting menu", http.StatusInternalServerError)
 	}

@@ -1,4 +1,4 @@
-package chatgpt
+package cafeteria
 
 import (
 	"bytes"
@@ -8,13 +8,11 @@ import (
 	"net/http"
 	"os"
 	"strings"
-
-	"github.com/artyom-kalman/kbu-daily-menu/internal/cafeteria"
 )
 
 const MENU_PROMPT = "Опиши эти корейские блюда. Для каждого блюда напиши одно предложение. Также напиши степень остроты блюда. Вот список блюд: "
 
-func AddDescriptionToMenu(menu *cafeteria.Menu) error {
+func AddDescriptionToMenu(menu *Menu) error {
 	// Form a prompt
 	prompt := formMenuPrompt(menu)
 	// Send request
@@ -28,7 +26,7 @@ func AddDescriptionToMenu(menu *cafeteria.Menu) error {
 	return nil
 }
 
-func formMenuPrompt(menu *cafeteria.Menu) string {
+func formMenuPrompt(menu *Menu) string {
 	question := strings.Clone(MENU_PROMPT)
 	for _, item := range menu.Items {
 		question += fmt.Sprintf("%s, ", item.Name)

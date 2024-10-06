@@ -1,4 +1,4 @@
-package chatgpt
+package cafeteria
 
 type GPTRequest struct {
 	Model   string   `json:"model"`
