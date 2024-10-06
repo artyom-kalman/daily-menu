@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/artyom-kalman/kbu-daily-menu/internal/cafeteria"
+	"github.com/artyom-kalman/kbu-daily-menu/internal/cafeteria/entities"
 )
 
 func GetIndex(rw http.ResponseWriter, request *http.Request) {
@@ -24,7 +25,7 @@ func GetIndex(rw http.ResponseWriter, request *http.Request) {
 		http.Error(rw, "Error loading the page", http.StatusInternalServerError)
 	}
 
-	tmpl.Execute(rw, map[string]*cafeteria.Menu{
+	tmpl.Execute(rw, map[string]*entities.Menu{
 		"Peony":  peonyMenu,
 		"Azilea": azileaMenu,
 	})

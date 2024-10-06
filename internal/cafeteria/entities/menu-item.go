@@ -1,4 +1,4 @@
-package cafeteria
+package entities
 
 type MenuItem struct {
 	Name        string

@@ -8,11 +8,13 @@ import (
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/artyom-kalman/kbu-daily-menu/internal/cafeteria/entities"
 )
 
 const MENU_PROMPT = "Опиши эти корейские блюда. Для каждого блюда напиши одно предложение. Также напиши степень остроты блюда. Вот список блюд: "
 
-func AddDescriptionToMenu(menu *Menu) error {
+func AddDescriptionToMenu(menu *entities.Menu) error {
 	// Form a prompt
 	prompt := formMenuPrompt(menu)
 	// Send request
@@ -26,7 +28,7 @@ func AddDescriptionToMenu(menu *Menu) error {
 	return nil
 }
 
-func formMenuPrompt(menu *Menu) string {
+func formMenuPrompt(menu *entities.Menu) string {
 	question := strings.Clone(MENU_PROMPT)
 	for _, item := range menu.Items {
 		question += fmt.Sprintf("%s, ", item.Name)
@@ -34,12 +36,12 @@ func formMenuPrompt(menu *Menu) string {
 	return question
 }
 
-func sendRequest(prompt string) (*GPTResponse, error) {
+func sendRequest(prompt string) (*entities.GPTResponse, error) {
 	apiKey := os.Getenv("OPEN_AI_API_KEY")
 
-	reqBody := GPTRequest{
+	reqBody := entities.GPTRequest{
 		Model: "gpt-4",
-		Message: &Message{
+		Message: &entities.Message{
 			Role:    "user",
 			Content: prompt,
 		},
@@ -74,7 +76,7 @@ func sendRequest(prompt string) (*GPTResponse, error) {
 		return nil, err
 	}
 
-	var resBody GPTResponse
+	var resBody entities.GPTResponse
 	err = json.Unmarshal(body, &resBody)
 	if err != nil {
 		return nil, err

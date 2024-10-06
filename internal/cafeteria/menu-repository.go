@@ -5,14 +5,16 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+
+	"github.com/artyom-kalman/kbu-daily-menu/internal/cafeteria/entities"
 )
 
 const PEONY_URL = "https://kbu.ac.kr/kor/CMS/DietMenuMgr/list.do?mCode=MN203&searchDietCategory=4"
 const AZILEA_RUL = "https://kbu.ac.kr/kor/CMS/DietMenuMgr/list.do?mCode=MN203&searchDietCategory=5"
 
 type MenuRepository struct {
-	peonyMenu  *Menu
-	azileaMenu *Menu
+	peonyMenu  *entities.Menu
+	azileaMenu *entities.Menu
 }
 
 func NewMenuRepository() *MenuRepository {
@@ -22,7 +24,7 @@ func NewMenuRepository() *MenuRepository {
 	}
 }
 
-func (r *MenuRepository) getPeonyMenu() (*Menu, error) {
+func (r *MenuRepository) getPeonyMenu() (*entities.Menu, error) {
 	if r.peonyMenu != nil {
 		return r.peonyMenu, nil
 	}
@@ -35,7 +37,7 @@ func (r *MenuRepository) getPeonyMenu() (*Menu, error) {
 	return peonyMenu, nil
 }
 
-func (r *MenuRepository) getAzileaMenu() (*Menu, error) {
+func (r *MenuRepository) getAzileaMenu() (*entities.Menu, error) {
 	if r.peonyMenu != nil {
 		return r.peonyMenu, nil
 	}
@@ -48,7 +50,7 @@ func (r *MenuRepository) getAzileaMenu() (*Menu, error) {
 	return peonyMenu, nil
 }
 
-func (r *MenuRepository) getMenu(url string) (*Menu, error) {
+func (r *MenuRepository) getMenu(url string) (*entities.Menu, error) {
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
@@ -65,9 +67,9 @@ func (r *MenuRepository) getMenu(url string) (*Menu, error) {
 		return nil, err
 	}
 
-	menu := NewMenuFromDishes(dishes)
+	menu := entities.NewMenuFromDishes(dishes)
 	if len(menu.Items) < 1 {
-		menu.Items = append(menu.Items, &MenuItem{
+		menu.Items = append(menu.Items, &entities.MenuItem{
 			Name: "Сегодня тут пусто",
 		})
 		return menu, nil

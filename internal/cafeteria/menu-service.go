@@ -1,5 +1,7 @@
 package cafeteria
 
+import "github.com/artyom-kalman/kbu-daily-menu/internal/cafeteria/entities"
+
 type MenuService struct {
 	repo *MenuRepository
 }
@@ -10,10 +12,10 @@ func NewMenuService() *MenuService {
 	}
 }
 
-func (s *MenuService) GetPeonyMenu() (*Menu, error) {
+func (s *MenuService) GetPeonyMenu() (*entities.Menu, error) {
 	return s.repo.getPeonyMenu()
 }
 
-func (s *MenuService) GetAzileaMenu() (*Menu, error) {
+func (s *MenuService) GetAzileaMenu() (*entities.Menu, error) {
 	return s.repo.getAzileaMenu()
 }
