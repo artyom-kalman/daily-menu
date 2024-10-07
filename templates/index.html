@@ -25,16 +25,16 @@
                     class="bg-white bg-opacity-80 rounded-3xl shadow-2xl overflow-hidden"
                 >
                     <div class="flex flex-row items-center">
-                        <div
-                            class="p-4 relative rounded-lg overflow-hidden aspect-square"
-                        >
-                            <img
-                                src="../public/img/peony.jpg"
-                                alt="Peony Image"
-                                class=""
-                            />
+                        <div class="w-full max-w-md p-4">
+                            <div class="relative overflow-hidden aspect-square">
+                                <img
+                                    src="../public/img/peony.jpg"
+                                    alt="Peony Image"
+                                    class="w-full h-full rounded-lg"
+                                />
+                            </div>
                         </div>
-                        <div class="p-8">
+                        <div class="p-8 w-full">
                             <h2
                                 class="text-3xl font-semibold mb-6 text-pink-600 text-center"
                             >
@@ -61,7 +61,7 @@
                 </div>
                 {{end}}
             </div>
-            <div class="transform transition-transform duration-300">
+            <div class="px-4 py-12">
                 {{with .Azilea}}
                 <div
                     class="bg-white bg-opacity-80 rounded-3xl shadow-2xl overflow-hidden"
@@ -72,11 +72,8 @@
                                 <img
                                     src="../public/img/azilea.jpg"
                                     alt="Azilea Image"
-                                    class="w-full h-full"
+                                    class="w-full h-full rounded-lg"
                                 />
-                                <div
-                                    class="absolute top-0 left-0 w-full h-full bg-gradient-to-l from-blue-500 to-green-500 opacity-50"
-                                ></div>
                             </div>
                         </div>
                         <div class="p-8 w-full">
