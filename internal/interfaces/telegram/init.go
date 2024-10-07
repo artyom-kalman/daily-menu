@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/artyom-kalman/kbu-daily-menu/internal/application/bot"
+	"github.com/artyom-kalman/kbu-daily-menu/internal/cafeteria"
 )
 
 func RunBot() {
@@ -18,8 +19,18 @@ func RunBot() {
 		log.Fatal(err)
 	}
 
-	myChatId := 734130728
-	bot.ScheduleDailyMenu(myChatId, "HEllo", "10:00")
+	menuService := cafeteria.NewMenuService(
+		cafeteria.NewMenuRepository(
+			cafeteria.NewMenuFetcher(),
+		),
+	)
 
-	go bot.HandleMessages("Hello! I am a menu bot.")
+	message, err := menuService.GetMenuString()
+	if err != nil {
+		message = "Произошла ошибка"
+	}
+	myChatId := 734130728
+	bot.ScheduleDailyMenu(myChatId, message, "10:00")
+
+	go bot.HandleMessages(message)
 }

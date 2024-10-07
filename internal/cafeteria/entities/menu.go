@@ -1,5 +1,7 @@
 package entities
 
+import "fmt"
+
 type Menu struct {
 	Items []*MenuItem
 }
@@ -15,4 +17,16 @@ func NewMenuFromDishes(dishes []string) *Menu {
 		}
 	}
 	return &menu
+}
+
+func (m *Menu) String() string {
+	if len(m.Items) == 1 {
+		return "Не удалось получить меню"
+	}
+
+	str := ""
+	for i, item := range m.Items {
+		str += fmt.Sprintf("%d) %s. %s", i+1, item.Name, item.Description)
+	}
+	return str
 }

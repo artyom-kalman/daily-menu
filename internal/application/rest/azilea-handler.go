@@ -8,7 +8,12 @@ import (
 )
 
 func GetAzileaHandler(rw http.ResponseWriter, request *http.Request) {
-	menuService := cafeteria.NewMenuService()
+	menuService := cafeteria.NewMenuService(
+		cafeteria.NewMenuRepository(
+			cafeteria.NewMenuFetcher(),
+		),
+	)
+
 	menu, err := menuService.GetAzileaMenu()
 	if err != nil {
 		http.Error(rw, "Error getting menu", http.StatusInternalServerError)

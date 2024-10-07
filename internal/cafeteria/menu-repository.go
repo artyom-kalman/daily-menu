@@ -1,11 +1,6 @@
 package cafeteria
 
 import (
-	"io"
-	"net/http"
-	"regexp"
-	"strings"
-
 	"github.com/artyom-kalman/kbu-daily-menu/internal/cafeteria/entities"
 )
 
@@ -13,14 +8,16 @@ const PEONY_URL = "https://kbu.ac.kr/kor/CMS/DietMenuMgr/list.do?mCode=MN203&sea
 const AZILEA_RUL = "https://kbu.ac.kr/kor/CMS/DietMenuMgr/list.do?mCode=MN203&searchDietCategory=5"
 
 type MenuRepository struct {
-	peonyMenu  *entities.Menu
-	azileaMenu *entities.Menu
+	peonyMenu   *entities.Menu
+	azileaMenu  *entities.Menu
+	menuFetcher *MenuFetcher
 }
 
-func NewMenuRepository() *MenuRepository {
+func NewMenuRepository(menuFetcher *MenuFetcher) *MenuRepository {
 	return &MenuRepository{
-		peonyMenu:  nil,
-		azileaMenu: nil,
+		peonyMenu:   nil,
+		azileaMenu:  nil,
+		menuFetcher: menuFetcher,
 	}
 }
 
@@ -29,7 +26,8 @@ func (r *MenuRepository) getPeonyMenu() (*entities.Menu, error) {
 		return r.peonyMenu, nil
 	}
 
-	peonyMenu, err := r.getMenu(PEONY_URL)
+	fetcher := NewMenuFetcher()
+	peonyMenu, err := fetcher.FetchMenu(PEONY_URL)
 	if err != nil {
 		return nil, err
 	}
@@ -42,70 +40,10 @@ func (r *MenuRepository) getAzileaMenu() (*entities.Menu, error) {
 		return r.peonyMenu, nil
 	}
 
-	peonyMenu, err := r.getMenu(AZILEA_RUL)
+	peonyMenu, err := NewMenuFetcher().FetchMenu(AZILEA_RUL)
 	if err != nil {
 		return nil, err
 	}
 
 	return peonyMenu, nil
-}
-
-func (r *MenuRepository) getMenu(url string) (*entities.Menu, error) {
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(io.Reader(resp.Body))
-	if err != nil {
-		return nil, err
-	}
-
-	dishes, err := parseResponse(string(body))
-	if err != nil {
-		return nil, err
-	}
-
-	menu := entities.NewMenuFromDishes(dishes)
-	if len(menu.Items) < 1 {
-		menu.Items = append(menu.Items, &entities.MenuItem{
-			Name: "Сегодня тут пусто",
-		})
-		return menu, nil
-	}
-
-	err = AddDescriptionToMenu(menu)
-	if err != nil {
-		return nil, err
-	}
-
-	return menu, nil
-}
-
-func parseResponse(response string) ([]string, error) {
-	dishes := findTodaysDishes(response)
-
-	return dishes, nil
-}
-
-func findTodaysDishes(dom string) []string {
-	dishes := make([]string, 0)
-
-	regex := regexp.MustCompile(`(?Ums)class="foodItem">(.*)<`)
-	for _, match := range regex.FindAllStringSubmatch(dom, -1) {
-		dish := strings.TrimSpace(match[1])
-
-		if dish == "" {
-			continue
-		}
-
-		dishes = append(dishes, dish)
-	}
-
-	if len(dishes) > 7 {
-		return dishes[len(dishes)-7:]
-	} else {
-		return dishes
-	}
 }

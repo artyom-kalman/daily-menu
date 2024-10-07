@@ -9,7 +9,12 @@ import (
 )
 
 func GetIndex(rw http.ResponseWriter, request *http.Request) {
-	menuService := cafeteria.NewMenuService()
+	menuService := cafeteria.NewMenuService(
+		cafeteria.NewMenuRepository(
+			cafeteria.NewMenuFetcher(),
+		),
+	)
+
 	peonyMenu, err := menuService.GetPeonyMenu()
 	if err != nil {
 		http.Error(rw, "Error getting Peony menu", http.StatusInternalServerError)

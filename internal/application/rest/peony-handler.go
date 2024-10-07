@@ -8,7 +8,12 @@ import (
 )
 
 func GetPeonyHandler(rw http.ResponseWriter, request *http.Request) {
-	menuService := cafeteria.NewMenuService()
+	menuService := cafeteria.NewMenuService(
+		cafeteria.NewMenuRepository(
+			cafeteria.NewMenuFetcher(),
+		),
+	)
+
 	menu, err := menuService.GetPeonyMenu()
 	if err != nil {
 		http.Error(rw, "Error getting menu", http.StatusInternalServerError)
