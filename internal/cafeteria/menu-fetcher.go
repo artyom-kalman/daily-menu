@@ -3,8 +3,6 @@ package cafeteria
 import (
 	"io"
 	"net/http"
-	"regexp"
-	"strings"
 
 	"github.com/artyom-kalman/kbu-daily-menu/internal/cafeteria/entities"
 )
@@ -16,7 +14,7 @@ func NewMenuFetcher() *MenuFetcher {
 	return &MenuFetcher{}
 }
 
-func (r *MenuFetcher) FetchMenu(url string) (*entities.Menu, error) {
+func (f *MenuFetcher) FetchMenu(url string) (*entities.Menu, error) {
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
@@ -28,7 +26,7 @@ func (r *MenuFetcher) FetchMenu(url string) (*entities.Menu, error) {
 		return nil, err
 	}
 
-	dishes, err := parseResponse(string(body))
+	dishes, err := parseBody(string(body))
 	if err != nil {
 		return nil, err
 	}
@@ -47,31 +45,4 @@ func (r *MenuFetcher) FetchMenu(url string) (*entities.Menu, error) {
 	}
 
 	return menu, nil
-}
-
-func parseResponse(response string) ([]string, error) {
-	dishes := findTodaysDishes(response)
-
-	return dishes, nil
-}
-
-func findTodaysDishes(dom string) []string {
-	dishes := make([]string, 0)
-
-	regex := regexp.MustCompile(`(?Ums)class="foodItem">(.*)<`)
-	for _, match := range regex.FindAllStringSubmatch(dom, -1) {
-		dish := strings.TrimSpace(match[1])
-
-		if dish == "" {
-			continue
-		}
-
-		dishes = append(dishes, dish)
-	}
-
-	if len(dishes) > 7 {
-		return dishes[len(dishes)-7:]
-	} else {
-		return dishes
-	}
 }
