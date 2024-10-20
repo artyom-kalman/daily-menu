@@ -8,10 +8,14 @@ import (
 )
 
 func GetPeonyHandler(rw http.ResponseWriter, request *http.Request) {
+	database := cafeteria.NewMenuDatabase("data/daily-menu.db")
+	peonyFetcher := cafeteria.NewPeonyFetcher("")
+	azileaFetcher := cafeteria.NewAzileaFetcher("")
+	peonyRepo := cafeteria.NewAzileaRepository(database, peonyFetcher)
+	azileaRepo := cafeteria.NewAzileaRepository(database, azileaFetcher)
 	menuService := cafeteria.NewMenuService(
-		cafeteria.NewMenuRepository(
-			cafeteria.NewMenuFetcher(),
-		),
+		azileaRepo,
+		peonyRepo,
 	)
 
 	menu, err := menuService.GetPeonyMenu()

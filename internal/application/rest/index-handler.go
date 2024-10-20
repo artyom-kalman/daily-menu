@@ -2,6 +2,7 @@ package rest
 
 import (
 	"html/template"
+	"log"
 	"net/http"
 
 	"github.com/artyom-kalman/kbu-daily-menu/internal/cafeteria"
@@ -9,10 +10,20 @@ import (
 )
 
 func GetIndex(rw http.ResponseWriter, request *http.Request) {
+	database := cafeteria.NewMenuDatabase("data/daily-menu.db")
+	err := database.Connect()
+	if err != nil {
+		http.Error(rw, "Error", http.StatusInternalServerError)
+	}
+
+	peonyFetcher := cafeteria.NewPeonyFetcher(cafeteria.PEONY_URL)
+	azileaFetcher := cafeteria.NewAzileaFetcher(cafeteria.AZILEA_URL)
+
+	peonyRepo := cafeteria.NewPeonyReporitory(database, peonyFetcher)
+	azileaRepo := cafeteria.NewAzileaRepository(database, azileaFetcher)
 	menuService := cafeteria.NewMenuService(
-		cafeteria.NewMenuRepository(
-			cafeteria.NewMenuFetcher(),
-		),
+		azileaRepo,
+		peonyRepo,
 	)
 
 	peonyMenu, err := menuService.GetPeonyMenu()
@@ -22,6 +33,7 @@ func GetIndex(rw http.ResponseWriter, request *http.Request) {
 
 	azileaMenu, err := menuService.GetAzileaMenu()
 	if err != nil {
+		log.Fatal(err)
 		http.Error(rw, "Error getting Azilean menu", http.StatusInternalServerError)
 	}
 

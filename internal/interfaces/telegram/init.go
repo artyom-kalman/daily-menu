@@ -11,7 +11,7 @@ import (
 func RunBot() {
 	token := os.Getenv("KBUDAILYMENU_TGBOT_TOKEN")
 	if token == "" {
-		log.Fatal("Set env variable")
+		log.Fatal("Set bot token variable")
 	}
 
 	bot, err := bot.NewBot(token)
@@ -19,10 +19,14 @@ func RunBot() {
 		log.Fatal(err)
 	}
 
+	database := cafeteria.NewMenuDatabase("data/daily-menu.db")
+	peonyFetcher := cafeteria.NewPeonyFetcher("")
+	azileaFetcher := cafeteria.NewAzileaFetcher("")
+	peonyRepo := cafeteria.NewAzileaRepository(database, peonyFetcher)
+	azileaRepo := cafeteria.NewAzileaRepository(database, azileaFetcher)
 	menuService := cafeteria.NewMenuService(
-		cafeteria.NewMenuRepository(
-			cafeteria.NewMenuFetcher(),
-		),
+		azileaRepo,
+		peonyRepo,
 	)
 
 	message, err := menuService.GetMenuString()

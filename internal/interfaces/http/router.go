@@ -20,8 +20,8 @@ func SetupRouts() {
 
 	http.HandleFunc("/", rest.GetIndex)
 
-	http.HandleFunc(API_ROUTE+"/peony", rest.GetPeonyHandler)
-	http.HandleFunc(API_ROUTE+"/azilea", rest.GetAzileaHandler)
+	// http.HandleFunc(API_ROUTE+"/peony", rest.GetPeonyHandler)
+	// http.HandleFunc(API_ROUTE+"/azilea", rest.GetAzileaHandler)
 }
 
 func StartServer() {

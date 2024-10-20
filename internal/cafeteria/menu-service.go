@@ -4,33 +4,36 @@ import (
 	"fmt"
 
 	"github.com/artyom-kalman/kbu-daily-menu/internal/cafeteria/entities"
+	"github.com/artyom-kalman/kbu-daily-menu/internal/cafeteria/interfaces"
 )
 
 type MenuService struct {
-	repo *MenuRepository
+	azileaRepo interfaces.MenuRepository
+	peonyRepo  interfaces.MenuRepository
 }
 
-func NewMenuService(menuRepo *MenuRepository) *MenuService {
+func NewMenuService(azileaRepo interfaces.MenuRepository, peonyRepo interfaces.MenuRepository) *MenuService {
 	return &MenuService{
-		repo: menuRepo,
+		azileaRepo: azileaRepo,
+		peonyRepo:  peonyRepo,
 	}
 }
 
-func (s *MenuService) GetPeonyMenu() (*entities.Menu, error) {
-	return s.repo.getPeonyMenu()
+func (r *MenuService) GetPeonyMenu() (*entities.Menu, error) {
+	return r.peonyRepo.GetMenu()
 }
 
-func (s *MenuService) GetAzileaMenu() (*entities.Menu, error) {
-	return s.repo.getAzileaMenu()
+func (r *MenuService) GetAzileaMenu() (*entities.Menu, error) {
+	return r.azileaRepo.GetMenu()
 }
 
 func (s *MenuService) GetMenuString() (string, error) {
-	peony, err := s.repo.getPeonyMenu()
+	peony, err := s.peonyRepo.GetMenu()
 	if err != nil {
 		return "", err
 	}
 
-	azilea, err := s.repo.getAzileaMenu()
+	azilea, err := s.azileaRepo.GetMenu()
 	if err != nil {
 		return "", nil
 	}

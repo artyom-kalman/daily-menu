@@ -1,15 +1,21 @@
 package entities
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 type Menu struct {
-	Items []*MenuItem
+	Items []*MenuItem `json:"dishes"`
+	Time  *time.Time
 }
 
-func NewMenuFromDishes(dishes []string) *Menu {
+func NewMenuFromDishes(dishes []string, time *time.Time) *Menu {
 	menu := Menu{
 		Items: make([]*MenuItem, len(dishes)),
+		Time:  time,
 	}
+
 	for i, dish := range dishes {
 		menu.Items[i] = &MenuItem{
 			Name:        dish,
@@ -17,6 +23,11 @@ func NewMenuFromDishes(dishes []string) *Menu {
 		}
 	}
 	return &menu
+}
+
+func (m *Menu) Date() *time.Time {
+	truncatedDate := m.Time.Truncate(24 * time.Hour)
+	return &truncatedDate
 }
 
 func (m *Menu) String() string {

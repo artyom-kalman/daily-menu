@@ -3,19 +3,23 @@ package cafeteria
 import (
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/artyom-kalman/kbu-daily-menu/internal/cafeteria/entities"
 )
 
-type MenuFetcher struct {
+type PeonyFetcher struct {
+	Url string
 }
 
-func NewMenuFetcher() *MenuFetcher {
-	return &MenuFetcher{}
+func NewPeonyFetcher(url string) *PeonyFetcher {
+	return &PeonyFetcher{
+		Url: url,
+	}
 }
 
-func (f *MenuFetcher) FetchMenu(url string) (*entities.Menu, error) {
-	resp, err := http.Get(url)
+func (f *PeonyFetcher) FetchMenu() (*entities.Menu, error) {
+	resp, err := http.Get(f.Url)
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +35,8 @@ func (f *MenuFetcher) FetchMenu(url string) (*entities.Menu, error) {
 		return nil, err
 	}
 
-	menu := entities.NewMenuFromDishes(dishes)
+	now := time.Now()
+	menu := entities.NewMenuFromDishes(dishes, &now)
 	if len(menu.Items) < 1 {
 		menu.Items = append(menu.Items, &entities.MenuItem{
 			Name: "Сегодня тут пусто",

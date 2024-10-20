@@ -22,7 +22,6 @@ func AddDescriptionToMenu(menu *entities.Menu) error {
 	// Parse request
 
 	for _, item := range menu.Items {
-		item.Name = "Токпоки"
 		item.Description = "Суповая версия ттокпокки с острыми рисовыми клецками в бульоне."
 	}
 	return nil
