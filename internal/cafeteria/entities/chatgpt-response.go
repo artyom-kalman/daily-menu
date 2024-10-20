@@ -1,5 +1,9 @@
 package entities
 
 type GPTResponse struct {
-	Message *Message `json:"message"`
+	Choices []*Choice `json:"choices"`
+}
+
+type Choice struct {
+	Message Message `json:"message"`
 }

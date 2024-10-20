@@ -3,6 +3,7 @@ package cafeteria
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,8 +18,9 @@ const MENU_PROMPT = "Опиши эти корейские блюда. Для к�
 func AddDescriptionToMenu(menu *entities.Menu) error {
 	// Form a prompt
 	prompt := formMenuPrompt(menu)
+	print(prompt, "\n")
 	// Send request
-	sendRequest(prompt)
+	// sendRequest(prompt)
 	// Parse request
 
 	for _, item := range menu.Items {
@@ -37,13 +39,16 @@ func formMenuPrompt(menu *entities.Menu) string {
 
 func sendRequest(prompt string) (*entities.GPTResponse, error) {
 	apiKey := os.Getenv("OPEN_AI_API_KEY")
+	if apiKey == "" {
+		return nil, errors.New("set env key for openai")
+	}
 
 	reqBody := entities.GPTRequest{
 		Model: "gpt-4",
-		Message: &entities.Message{
+		Messages: []*entities.Message{{
 			Role:    "user",
 			Content: prompt,
-		},
+		}},
 	}
 
 	reqBodyJson, err := json.Marshal(reqBody)

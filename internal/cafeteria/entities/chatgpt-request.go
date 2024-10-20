@@ -1,6 +1,6 @@
 package entities
 
 type GPTRequest struct {
-	Model   string   `json:"model"`
-	Message *Message `json:"message"`
+	Model    string     `json:"model"`
+	Messages []*Message `json:"messages"`
 }
