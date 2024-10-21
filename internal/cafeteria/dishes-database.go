@@ -21,21 +21,8 @@ func NewMenuDatabase(path string) *DishesDatabase {
 	}
 }
 
-func (db *DishesDatabase) IsALive() bool {
-	err := db.connection.Ping()
-	if err != nil {
-		return false
-	}
-	return true
-}
-
 func (db *DishesDatabase) Connect() error {
-	conn, err := sql.Open("sqlite3", db.path)
-	if err != nil {
-		return err
-	}
-
-	err = conn.Ping()
+t 	conn, err := sql.Open("sqlite3", db.path)
 	if err != nil {
 		return err
 	}
@@ -45,14 +32,15 @@ func (db *DishesDatabase) Connect() error {
 }
 
 func (db *DishesDatabase) Close() error {
-	return db.Close()
+	return db.connection.Close()
 }
 
 func (db *DishesDatabase) SelectRow(cafeteria string) ([]*entities.MenuItem, error) {
-	err := db.connection.Ping()
+	err := db.Connect()
 	if err != nil {
 		return nil, err
 	}
+	defer db.Close()
 
 	selectQuery := fmt.Sprintf("SELECT dishes FROM menu WHERE cafeteria = '%s' AND date = DATE('now');", cafeteria)
 	rows, err := db.connection.Query(selectQuery)
@@ -80,6 +68,12 @@ func (db *DishesDatabase) SelectRow(cafeteria string) ([]*entities.MenuItem, err
 }
 
 func (db *DishesDatabase) UpdateDishes(cafeteria string, dishes []*entities.MenuItem) error {
+	err := db.Connect()
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
 	dishesJson, err := json.Marshal(dishes)
 	if err != nil {
 		return err

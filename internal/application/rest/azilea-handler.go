@@ -9,12 +9,6 @@ import (
 
 func GetAzileaHandler(rw http.ResponseWriter, request *http.Request) {
 	database := cafeteria.NewMenuDatabase("data/daily-menu.db")
-	err := database.Connect()
-	if err != nil {
-		http.Error(rw, "Error", http.StatusInternalServerError)
-	}
-	defer database.Close()
-
 	peonyFetcher := cafeteria.NewPeonyFetcher("")
 	azileaFetcher := cafeteria.NewAzileaFetcher("")
 	peonyRepo := cafeteria.NewAzileaRepository(database, peonyFetcher)
