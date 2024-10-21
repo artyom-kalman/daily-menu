@@ -11,11 +11,6 @@ import (
 
 func GetIndex(rw http.ResponseWriter, request *http.Request) {
 	database := cafeteria.NewMenuDatabase("data/daily-menu.db")
-	err := database.Connect()
-	if err != nil {
-		http.Error(rw, "Error", http.StatusInternalServerError)
-	}
-
 	peonyFetcher := cafeteria.NewPeonyFetcher(cafeteria.PEONY_URL)
 	azileaFetcher := cafeteria.NewAzileaFetcher(cafeteria.AZILEA_URL)
 
