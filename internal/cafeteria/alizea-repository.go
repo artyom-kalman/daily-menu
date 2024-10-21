@@ -40,6 +40,7 @@ func (r *AzileaRepository) GetMenu() (*entities.Menu, error) {
 			Items: dishes,
 			Time:  &today,
 		}
+		r.menu = todaysMenu
 		return todaysMenu, nil
 	}
 
