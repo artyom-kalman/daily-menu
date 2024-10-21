@@ -27,7 +27,6 @@ func NewPeonyReporitory(database interfaces.Database, fetcher interfaces.MenuFet
 func (r *PeonyRepository) GetMenu() (*entities.Menu, error) {
 	today := time.Now().Truncate(24 * time.Hour)
 	if r.menu != nil && r.menu.Date().Compare(today) == 0 {
-		print("cache")
 		return r.menu, nil
 	}
 
@@ -41,6 +40,7 @@ func (r *PeonyRepository) GetMenu() (*entities.Menu, error) {
 			Items: dishes,
 			Time:  &today,
 		}
+		r.menu = todaysMenu
 		return todaysMenu, nil
 	}
 

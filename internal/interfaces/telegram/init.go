@@ -6,6 +6,7 @@ import (
 
 	"github.com/artyom-kalman/kbu-daily-menu/internal/application/bot"
 	"github.com/artyom-kalman/kbu-daily-menu/internal/cafeteria"
+	"github.com/artyom-kalman/kbu-daily-menu/internal/config"
 )
 
 func RunBot() {
@@ -19,15 +20,7 @@ func RunBot() {
 		log.Fatal(err)
 	}
 
-	database := cafeteria.NewMenuDatabase("data/daily-menu.db")
-	peonyFetcher := cafeteria.NewPeonyFetcher("")
-	azileaFetcher := cafeteria.NewAzileaFetcher("")
-	peonyRepo := cafeteria.NewAzileaRepository(database, peonyFetcher)
-	azileaRepo := cafeteria.NewAzileaRepository(database, azileaFetcher)
-	menuService := cafeteria.NewMenuService(
-		azileaRepo,
-		peonyRepo,
-	)
+	menuService := config.Fabric("data/daily-menu.db", cafeteria.PEONY_URL, cafeteria.AZILEA_URL)
 
 	message, err := menuService.GetMenuString()
 	if err != nil {

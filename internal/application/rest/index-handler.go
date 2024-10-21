@@ -7,24 +7,11 @@ import (
 
 	"github.com/artyom-kalman/kbu-daily-menu/internal/cafeteria"
 	"github.com/artyom-kalman/kbu-daily-menu/internal/cafeteria/entities"
+	"github.com/artyom-kalman/kbu-daily-menu/internal/config"
 )
 
 func GetIndex(rw http.ResponseWriter, request *http.Request) {
-	database := cafeteria.NewMenuDatabase("data/daily-menu.db")
-	err := database.Connect()
-	if err != nil {
-		http.Error(rw, "Error", http.StatusInternalServerError)
-	}
-
-	peonyFetcher := cafeteria.NewPeonyFetcher(cafeteria.PEONY_URL)
-	azileaFetcher := cafeteria.NewAzileaFetcher(cafeteria.AZILEA_URL)
-
-	peonyRepo := cafeteria.NewPeonyReporitory(database, peonyFetcher)
-	azileaRepo := cafeteria.NewAzileaRepository(database, azileaFetcher)
-	menuService := cafeteria.NewMenuService(
-		azileaRepo,
-		peonyRepo,
-	)
+	menuService := config.Fabric("data/daily-menu.db", cafeteria.PEONY_URL, cafeteria.AZILEA_URL)
 
 	peonyMenu, err := menuService.GetPeonyMenu()
 	if err != nil {

@@ -22,7 +22,7 @@ func NewMenuDatabase(path string) *DishesDatabase {
 }
 
 func (db *DishesDatabase) Connect() error {
-t 	conn, err := sql.Open("sqlite3", db.path)
+	conn, err := sql.Open("sqlite3", db.path)
 	if err != nil {
 		return err
 	}
