@@ -17,7 +17,7 @@ func RunBot() {
 
 	bot, err := bot.NewBot(token)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
 	menuService := config.Fabric("data/daily-menu.db", cafeteria.PEONY_URL, cafeteria.AZILEA_URL)

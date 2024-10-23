@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
 
 	"github.com/artyom-kalman/kbu-daily-menu/internal/cafeteria/entities"
 	_ "github.com/mattn/go-sqlite3"
@@ -55,13 +54,13 @@ func (db *DishesDatabase) SelectRow(cafeteria string) ([]*entities.MenuItem, err
 	var dishesJson string
 	err = rows.Scan(&dishesJson)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	var dishes []*entities.MenuItem
 	err = json.Unmarshal([]byte(dishesJson), &dishes)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	return dishes, nil

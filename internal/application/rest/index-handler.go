@@ -2,7 +2,6 @@ package rest
 
 import (
 	"html/template"
-	"log"
 	"net/http"
 
 	"github.com/artyom-kalman/kbu-daily-menu/internal/cafeteria"
@@ -20,7 +19,6 @@ func GetIndex(rw http.ResponseWriter, request *http.Request) {
 
 	azileaMenu, err := menuService.GetAzileaMenu()
 	if err != nil {
-		log.Fatal(err)
 		http.Error(rw, "Error getting Azilean menu", http.StatusInternalServerError)
 	}
 
