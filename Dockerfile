@@ -1,6 +1,6 @@
 FROM golang:1.21-alpine
 
-RUN apk add npm sqlite gcc g++ git
+RUN apk add npm sqlite gcc g++
 
 WORKDIR /app
 
