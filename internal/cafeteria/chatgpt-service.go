@@ -16,14 +16,6 @@ import (
 const MENU_PROMPT = "Опиши эти корейские блюда. Для каждого блюда напиши одно предложение. Также напиши степень остроты блюда. Вот список блюд: "
 
 func AddDescriptionToMenu(menu *entities.Menu) error {
-	prompt := formMenuPrompt(menu)
-	print(prompt, "\n")
-	// response, err := sendRequest(prompt)
-	// if err != nil {
-	// 	return err
-	// }
-	// println(len(response.Choices))
-
 	for _, item := range menu.Items {
 		item.Description = "Суповая версия ттокпокки с острыми рисовыми клецками в бульоне."
 	}
