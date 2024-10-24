@@ -1,7 +1,6 @@
 package telegram
 
 import (
-	"log"
 	"os"
 
 	"github.com/artyom-kalman/kbu-daily-menu/internal/application/bot"
@@ -12,7 +11,7 @@ import (
 func RunBot() {
 	token := os.Getenv("KBUDAILYMENU_TGBOT_TOKEN")
 	if token == "" {
-		log.Fatal("Set bot token variable")
+		panic("Set bot token")
 	}
 
 	bot, err := bot.NewBot(token)

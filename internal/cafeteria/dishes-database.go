@@ -15,6 +15,11 @@ type DishesDatabase struct {
 }
 
 func NewMenuDatabase(path string) *DishesDatabase {
+	_, err := sql.Open("sqlite3", path)
+	if err != nil {
+		panic(err)
+	}
+
 	return &DishesDatabase{
 		path: path,
 	}

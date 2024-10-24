@@ -25,8 +25,8 @@ func SetupRouts() {
 }
 
 func StartServer() {
-	log.Print("Server is running on localhost:8000")
-	err := http.ListenAndServe("localhost:8000", nil)
+	log.Print("Server is running on localhost:3000")
+	err := http.ListenAndServe(":3000", nil)
 	if err != nil {
 		panic(err)
 	}
