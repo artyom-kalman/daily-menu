@@ -19,9 +19,6 @@ func SetupRouts() {
 	http.Handle("/public/", http.StripPrefix("/public/", fs))
 
 	http.HandleFunc("/", rest.GetIndex)
-
-	// http.HandleFunc(API_ROUTE+"/peony", rest.GetPeonyHandler)
-	// http.HandleFunc(API_ROUTE+"/azilea", rest.GetAzileaHandler)
 }
 
 func StartServer() {
