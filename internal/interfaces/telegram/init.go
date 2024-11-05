@@ -4,7 +4,6 @@ import (
 	"os"
 
 	"github.com/artyom-kalman/kbu-daily-menu/internal/application/bot"
-	"github.com/artyom-kalman/kbu-daily-menu/internal/cafeteria"
 	"github.com/artyom-kalman/kbu-daily-menu/internal/config"
 )
 
@@ -19,7 +18,10 @@ func RunBot() {
 		panic(err)
 	}
 
-	menuService := config.Fabric("data/daily-menu.db", cafeteria.PEONY_URL, cafeteria.AZILEA_URL)
+	menuService, err := config.GetMenuService()
+	if err != nil {
+		panic(err)
+	}
 
 	message, err := menuService.GetMenuString()
 	if err != nil {

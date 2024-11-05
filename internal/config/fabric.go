@@ -1,16 +1,14 @@
 package config
 
 import (
+	"errors"
+
 	"github.com/artyom-kalman/kbu-daily-menu/internal/cafeteria"
 )
 
 var cacheMenuService *cafeteria.MenuService
 
-func Fabric(dbSourcePath string, peonyUrl string, azileaUrl string) *cafeteria.MenuService {
-	if cacheMenuService != nil {
-		return cacheMenuService
-	}
-
+func InitApp(dbSourcePath string, peonyUrl string, azileaUrl string) {
 	database := cafeteria.NewMenuDatabase(dbSourcePath)
 	peonyFetcher := cafeteria.NewPeonyFetcher(peonyUrl)
 	azileaFetcher := cafeteria.NewAzileaFetcher(azileaUrl)
@@ -23,6 +21,11 @@ func Fabric(dbSourcePath string, peonyUrl string, azileaUrl string) *cafeteria.M
 	)
 
 	cacheMenuService = menuService
+}
 
-	return menuService
+func GetMenuService() (*cafeteria.MenuService, error) {
+	if cacheMenuService == nil {
+		return nil, errors.New("Menu service is initialized")
+	}
+	return cacheMenuService, nil
 }

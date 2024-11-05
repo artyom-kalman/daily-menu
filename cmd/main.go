@@ -8,7 +8,8 @@ import (
 )
 
 func main() {
-	config.Fabric("data/daily-menu.db", cafeteria.PEONY_URL, cafeteria.AZILEA_URL)
+	config.InitApp("data/daily-menu.db", cafeteria.PEONY_URL, cafeteria.AZILEA_URL)
+
 	telegram.RunBot()
 
 	http.Run()
