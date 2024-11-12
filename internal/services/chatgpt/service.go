@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -16,10 +17,11 @@ type GptService struct {
 	url    string
 }
 
-func NewChatGPTService(apiKey string, model string) *GptService {
+func NewChatGPTService(apiKey string, model string, url string) *GptService {
 	return &GptService{
 		apiKey: apiKey,
 		model:  model,
+		url:    url,
 	}
 }
 
@@ -62,8 +64,7 @@ func (gpt *GptService) SendRequest(prompt string) ([]*domain.MenuItem, error) {
 
 	if res.StatusCode != 200 && res.StatusCode != 201 {
 		body, _ := io.ReadAll(res.Body)
-		println(string(body))
-		return nil, errors.New("Bad request")
+		return nil, errors.New(fmt.Sprintf("Bad request to AI: %s", body))
 	}
 
 	body, err := io.ReadAll(res.Body)

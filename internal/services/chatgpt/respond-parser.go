@@ -15,7 +15,6 @@ func ParseRespond(res string) ([]*domain.MenuItem, error) {
 	jsonString := strings.ReplaceAll(res, "\n", "")
 	jsonString = strings.ReplaceAll(jsonString, "\t", "")
 	jsonString = jsonString[7 : len(jsonString)-3]
-	println(jsonString)
 
 	var items []*domain.MenuItem
 	err := json.Unmarshal([]byte(jsonString), &items)

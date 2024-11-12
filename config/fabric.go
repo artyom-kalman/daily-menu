@@ -26,7 +26,7 @@ func InitApp(dbSourcePath string, peonyUrl string, azileaUrl string) {
 
 	menuParser := menuparser.NewMenuParser()
 
-	gptService := chatgpt.NewChatGPTService(chatgptApiKey, "gpt-4o")
+	gptService := chatgpt.NewChatGPTService(chatgptApiKey, "gpt-4o", "https://api.aimlapi.com/chat/completions")
 
 	descriptionService := menudescription.NewDescriptionService(gptService)
 
