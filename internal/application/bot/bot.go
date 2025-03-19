@@ -1,9 +1,9 @@
 package bot
 
 import (
-	"log"
 	"time"
 
+	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
 	"github.com/go-co-op/gocron"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -37,7 +37,8 @@ func (b *Bot) ScheduleDailyMenu(chatId int, menu string, messageTime string) {
 		b.SendMessage(chatId, menu)
 	})
 	scheduler.StartAsync()
-	log.Print("Scheduled a daily message for chat ", chatId)
+
+	logger.Info("Scheduled a daily message for chat %d", chatId)
 }
 
 func (b *Bot) HandleMessages(text string) error {

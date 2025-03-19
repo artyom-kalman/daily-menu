@@ -1,34 +1,36 @@
 package telegram
 
 import (
-	"os"
+	"fmt"
 
 	"github.com/artyom-kalman/kbu-daily-menu/config"
 	"github.com/artyom-kalman/kbu-daily-menu/internal/application/bot"
 )
 
-func RunBot() {
-	token := os.Getenv("KBUDAILYMENU_TGBOT_TOKEN")
-	if token == "" {
-		panic("Set bot token")
+func RunBot() error {
+	token, err := config.GetEnv("TELEGRAM_BOT")
+	if err != nil {
+		return err
 	}
 
 	bot, err := bot.NewBot(token)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	menuService, err := config.GetMenuService()
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	message, err := menuService.GetMenuString()
 	if err != nil {
-		message = "Произошла ошибка"
+		return fmt.Errorf("error getting menu string: %w", err)
 	}
 	myChatId := 734130728
 	bot.ScheduleDailyMenu(myChatId, message, "10:00")
 
 	go bot.HandleMessages(message)
+
+	return nil
 }

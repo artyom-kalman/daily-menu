@@ -5,22 +5,26 @@ import (
 	"strings"
 
 	"github.com/artyom-kalman/kbu-daily-menu/internal/domain"
+	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
 )
 
-func ParseRespond(res string) ([]*domain.MenuItem, error) {
+func ParseResponse(res string) ([]*domain.MenuItem, error) {
 	// if !isReponseJson(res) {
 	// 	return nil, errors.New("error parsing response from AI")
 	// }
 
-	jsonString := strings.ReplaceAll(res, "\n", "")
+	var jsonString string
+	jsonString = strings.ReplaceAll(res, "\n", "")
 	jsonString = strings.ReplaceAll(jsonString, "\t", "")
-	jsonString = jsonString[7 : len(jsonString)-3]
+
+	logger.Debug("Trimed json string: %s", jsonString)
 
 	var items []*domain.MenuItem
 	err := json.Unmarshal([]byte(jsonString), &items)
 	if err != nil {
 		return nil, err
 	}
+	logger.Debug("Parsed menu items: %+v", items)
 
 	return items, nil
 }

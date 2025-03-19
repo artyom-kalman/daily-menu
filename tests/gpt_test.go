@@ -52,7 +52,7 @@ func TestParseResponse(t *testing.T) {
 	]
 	***`
 
-	result, err := chatgpt.ParseRespond(gptMessage)
+	result, err := chatgpt.ParseResponse(gptMessage)
 	if err != nil {
 		panic(err)
 	}

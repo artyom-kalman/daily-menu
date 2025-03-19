@@ -15,10 +15,14 @@ func NewDescriptionService(gptService *chatgpt.GptService) *MenuDescriptionServi
 	}
 }
 
-func (mds *MenuDescriptionService) AddDescriptionToMenu(menu *domain.Menu) error {
-	prompt := generatePromtForMenu(menu)
+func (service *MenuDescriptionService) AddDescriptionToMenu(menu *domain.Menu) error {
+	menuPrompt := generatePromtForMenu(menu)
+	messages := []*chatgpt.Message{
+		{Role: "system", Content: "Ты - полезный помощник для генерации описаний меню."},
+		{Role: "user", Content: menuPrompt},
+	}
 
-	items, err := mds.chatgpt.SendRequest(prompt)
+	items, err := service.chatgpt.SendRequest(messages)
 	if err != nil {
 		return err
 	}

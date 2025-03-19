@@ -3,40 +3,33 @@ package chatgpt
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 
 	"github.com/artyom-kalman/kbu-daily-menu/internal/domain"
+	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
 )
 
 type GptService struct {
 	apiKey string
-	model  string
 	url    string
 }
 
-func NewChatGPTService(apiKey string, model string, url string) *GptService {
+func NewChatGPTService(apiKey string, url string) *GptService {
 	return &GptService{
 		apiKey: apiKey,
-		model:  model,
 		url:    url,
 	}
 }
 
-func (gpt *GptService) SendRequest(prompt string) ([]*domain.MenuItem, error) {
-	reqBody := GPTRequest{
-		Model: gpt.model,
-		Messages: []*GptMessage{
-			{
-				Role:    "user",
-				Content: prompt,
-			},
-		},
-		MaxToken: 1024,
-		Stream:   false,
+func (gpt *GptService) SendRequest(messages []*Message) ([]*domain.MenuItem, error) {
+	logger.Info("Sending request to GPT")
+
+	reqBody := Request{
+		Messages: messages,
 	}
+	logger.Debug("Request body: %+v", reqBody)
 
 	reqBodyJson, err := json.Marshal(reqBody)
 	if err != nil {
@@ -64,19 +57,26 @@ func (gpt *GptService) SendRequest(prompt string) ([]*domain.MenuItem, error) {
 
 	if res.StatusCode != 200 && res.StatusCode != 201 {
 		body, _ := io.ReadAll(res.Body)
-		return nil, errors.New(fmt.Sprintf("Bad request to AI: %s", body))
+		return nil, fmt.Errorf("Bad request to AI: %s", body)
 	}
+	logger.Info("Successfuly sent request to GTP: %d", res.StatusCode)
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	var gptResponse GPTResponse
-	err = json.Unmarshal(body, &gptResponse)
+	var response Response
+	err = json.Unmarshal(body, &response)
 	if err != nil {
 		return nil, err
 	}
+	logger.Debug("GPT response: %+v", response)
 
-	return ParseRespond(gptResponse.Choices[0].Message.Content)
+	if !response.Success {
+		return nil, fmt.Errorf("failed to get menu description")
+	}
+
+	logger.Info("Successfully received response from GPT")
+	return ParseResponse(response.Result.Response)
 }

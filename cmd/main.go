@@ -3,9 +3,8 @@ package main
 import (
 	"net/http"
 
-	"github.com/artyom-kalman/kbu-daily-menu/api/rest"
-	"github.com/artyom-kalman/kbu-daily-menu/api/telegram"
 	"github.com/artyom-kalman/kbu-daily-menu/config"
+	"github.com/artyom-kalman/kbu-daily-menu/internal/application/rest"
 	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
 )
 
@@ -34,11 +33,18 @@ func main() {
 
 	config.InitApp(databasePath, peonyUrl, azileanUrl)
 
-	telegram.RunBot()
+	// err = telegram.RunBot()
+	// if err != nil {
+	// 	logger.Error("error running bot: %v", err)
+	// 	return
+	// }
 
-	rest.SetupRouts()
+	fs := http.FileServer(http.Dir("./public/"))
+	http.Handle("/public/", http.StripPrefix("/public/", fs))
+	http.HandleFunc("/", rest.GetIndex)
 
 	port, err := config.GetEnv("PORT")
+
 	if err != nil {
 		logger.Error("error getting PORT: %v", err)
 		return

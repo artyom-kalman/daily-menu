@@ -2,8 +2,6 @@ package config
 
 import (
 	"errors"
-	"log"
-	"os"
 
 	"github.com/artyom-kalman/kbu-daily-menu/internal/database"
 	"github.com/artyom-kalman/kbu-daily-menu/internal/repositories/azilea"
@@ -16,17 +14,21 @@ import (
 
 var cacheMenuService *menu.MenuService
 
-func InitApp(dbSourcePath string, peonyUrl string, azileaUrl string) {
+func InitApp(dbSourcePath string, peonyUrl string, azileaUrl string) error {
 	database := database.NewMenuDatabase(dbSourcePath)
 
-	chatgptApiKey := os.Getenv("AIML_API_KEY")
-	if chatgptApiKey == "" {
-		log.Fatal("Error getting api key from env")
+	gptToken, err := GetEnv("GPT_TOKEN")
+	if err != nil {
+		return err
 	}
 
-	menuParser := menuparser.NewMenuParser()
+	gptUrl, err := GetEnv("GPT_URL")
+	if err != nil {
+		return err
+	}
+	gptService := chatgpt.NewChatGPTService(gptToken, gptUrl)
 
-	gptService := chatgpt.NewChatGPTService(chatgptApiKey, "gpt-4o", "https://api.aimlapi.com/chat/completions")
+	menuParser := menuparser.NewMenuParser()
 
 	descriptionService := menudescription.NewDescriptionService(gptService)
 
@@ -42,6 +44,8 @@ func InitApp(dbSourcePath string, peonyUrl string, azileaUrl string) {
 	)
 
 	cacheMenuService = menuService
+
+	return nil
 }
 
 func GetMenuService() (*menu.MenuService, error) {

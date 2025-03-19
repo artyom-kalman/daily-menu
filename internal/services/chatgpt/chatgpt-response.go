@@ -1,9 +1,9 @@
 package chatgpt
 
-type GPTResponse struct {
-	Choices []*Choice `json:"choices"`
-}
-
-type Choice struct {
-	Message GptMessage `json:"message"`
+type Response struct {
+	Result struct {
+		Response string `json:"response"`
+	} `json:"result"`
+	Success bool     `json:"success"`
+	Errors  []string `json:"errors"`
 }
