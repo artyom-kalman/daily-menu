@@ -1,20 +1,36 @@
 package main
 
 import (
-	"log"
 	"net/http"
 
 	"github.com/artyom-kalman/kbu-daily-menu/api/rest"
 	"github.com/artyom-kalman/kbu-daily-menu/api/telegram"
 	"github.com/artyom-kalman/kbu-daily-menu/config"
+	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
 )
 
-const WEB_APP_PORT = ":3000"
-
 func main() {
+	logger.InitLogger()
+
+	err := config.LoadEnv()
+	if err != nil {
+		logger.Error("error loading .env: %v", err)
+		return
+	}
+
 	databasePath := "data/daily-menu.db"
-	peonyUrl := "https://kbu.ac.kr/kor/CMS/DietMenuMgr/list.do?mCode=MN203&searchDietCategory=4"
-	azileanUrl := "https://kbu.ac.kr/kor/CMS/DietMenuMgr/list.do?mCode=MN203&searchDietCategory=5"
+
+	peonyUrl, err := config.GetEnv("PEONY_URL")
+	if err != nil {
+		logger.Error("error getting PEONY_URL: %v", err)
+		return
+	}
+
+	azileanUrl, err := config.GetEnv("AZILEA_URL")
+	if err != nil {
+		logger.Error("error getting AZILEA_URL: %v", err)
+		return
+	}
 
 	config.InitApp(databasePath, peonyUrl, azileanUrl)
 
@@ -22,9 +38,16 @@ func main() {
 
 	rest.SetupRouts()
 
-	log.Println("Server is running on ", WEB_APP_PORT)
-	err := http.ListenAndServe(WEB_APP_PORT, nil)
+	port, err := config.GetEnv("PORT")
 	if err != nil {
-		log.Fatal(err)
+		logger.Error("error getting PORT: %v", err)
+		return
+	}
+
+	logger.Info("Server is running on %s", port)
+	err = http.ListenAndServe(":"+port, nil)
+	if err != nil {
+		logger.Error("error starting server: %v", err)
+		return
 	}
 }
