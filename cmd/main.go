@@ -39,9 +39,9 @@ func main() {
 	// 	return
 	// }
 
-	fs := http.FileServer(http.Dir("./public/"))
-	http.Handle("/public/", http.StripPrefix("/public/", fs))
-	http.HandleFunc("/", rest.GetIndex)
+	fs := http.FileServer(http.Dir("./web/"))
+	http.Handle("/web/", http.StripPrefix("/web/", fs))
+	http.HandleFunc("/", rest.HandleIndex)
 
 	port, err := config.GetEnv("PORT")
 
