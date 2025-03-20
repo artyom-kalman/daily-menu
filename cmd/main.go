@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/artyom-kalman/kbu-daily-menu/config"
-	"github.com/artyom-kalman/kbu-daily-menu/internal/application/rest"
+	"github.com/artyom-kalman/kbu-daily-menu/internal/handlers"
 	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
 )
 
@@ -41,7 +41,7 @@ func main() {
 
 	fs := http.FileServer(http.Dir("./web/"))
 	http.Handle("/web/", http.StripPrefix("/web/", fs))
-	http.HandleFunc("/", rest.HandleIndex)
+	http.HandleFunc("/", handlers.HandleIndex)
 
 	port, err := config.GetEnv("PORT")
 

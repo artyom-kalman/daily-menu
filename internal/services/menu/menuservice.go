@@ -4,18 +4,18 @@ import (
 	"fmt"
 
 	"github.com/artyom-kalman/kbu-daily-menu/internal/domain"
-	"github.com/artyom-kalman/kbu-daily-menu/internal/interfaces"
+	"github.com/artyom-kalman/kbu-daily-menu/internal/repository"
 )
 
 type MenuService struct {
-	azileaRepo interfaces.MenuRepository
-	peonyRepo  interfaces.MenuRepository
+	azileaRepo *repository.Repository
+	peonyRepo  *repository.Repository
 }
 
-func NewMenuService(azileaRepo interfaces.MenuRepository, peonyRepo interfaces.MenuRepository) *MenuService {
+func New(ar *repository.Repository, pr *repository.Repository) *MenuService {
 	return &MenuService{
-		azileaRepo: azileaRepo,
-		peonyRepo:  peonyRepo,
+		azileaRepo: ar,
+		peonyRepo:  pr,
 	}
 }
 

@@ -9,7 +9,7 @@ type MenuDescriptionService struct {
 	chatgpt *chatgpt.GptService
 }
 
-func NewDescriptionService(gptService *chatgpt.GptService) *MenuDescriptionService {
+func New(gptService *chatgpt.GptService) *MenuDescriptionService {
 	return &MenuDescriptionService{
 		chatgpt: gptService,
 	}

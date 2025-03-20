@@ -1,4 +1,4 @@
-package rest
+package handlers
 
 import (
 	"html/template"
@@ -12,7 +12,7 @@ import (
 func HandleIndex(rw http.ResponseWriter, request *http.Request) {
 	logger.Info("Received request")
 
-	menuService, err := config.GetMenuService()
+	menuService, err := config.MenuService()
 	if err != nil {
 		logger.Error("error get menu service: %v", err)
 		http.Error(rw, "Error loading the page", http.StatusInternalServerError)

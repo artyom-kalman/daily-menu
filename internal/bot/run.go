@@ -7,7 +7,7 @@ import (
 )
 
 func (b *Bot) Run() error {
-	menuService, err := config.GetMenuService()
+	menuService, err := config.MenuService()
 	if err != nil {
 		return err
 	}

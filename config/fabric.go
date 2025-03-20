@@ -4,19 +4,16 @@ import (
 	"errors"
 
 	"github.com/artyom-kalman/kbu-daily-menu/internal/database"
-	"github.com/artyom-kalman/kbu-daily-menu/internal/repositories/azilea"
-	"github.com/artyom-kalman/kbu-daily-menu/internal/repositories/peony"
+	"github.com/artyom-kalman/kbu-daily-menu/internal/fetcher"
+	"github.com/artyom-kalman/kbu-daily-menu/internal/repository"
 	"github.com/artyom-kalman/kbu-daily-menu/internal/services/chatgpt"
 	"github.com/artyom-kalman/kbu-daily-menu/internal/services/menu"
 	"github.com/artyom-kalman/kbu-daily-menu/internal/services/menudescription"
-	"github.com/artyom-kalman/kbu-daily-menu/internal/utils/menuparser"
 )
 
 var cacheMenuService *menu.MenuService
 
 func InitApp(dbSourcePath string, peonyUrl string, azileaUrl string) error {
-	database := database.NewMenuDatabase(dbSourcePath)
-
 	gptToken, err := GetEnv("GPT_TOKEN")
 	if err != nil {
 		return err
@@ -26,31 +23,28 @@ func InitApp(dbSourcePath string, peonyUrl string, azileaUrl string) error {
 	if err != nil {
 		return err
 	}
-	gptService := chatgpt.NewChatGPTService(gptToken, gptUrl)
+	gptService := chatgpt.New(gptToken, gptUrl)
 
-	menuParser := menuparser.NewMenuParser()
+	descriptionService := menudescription.New(gptService)
 
-	descriptionService := menudescription.NewDescriptionService(gptService)
+	peonyFetcher := fetcher.New(peonyUrl, descriptionService)
+	azileaFetcher := fetcher.New(azileaUrl, descriptionService)
 
-	peonyFetcher := peony.NewPeonyFetcher(peonyUrl, descriptionService, menuParser)
-	azileaFetcher := azilea.NewAzileaFetcher(azileaUrl, descriptionService, menuParser)
+	database := database.New(dbSourcePath)
+	peonyRepo := repository.New(repository.PEONY, database, peonyFetcher)
+	azileaRepo := repository.New(repository.AZILEA, database, azileaFetcher)
 
-	peonyRepo := peony.NewPeonyReporitory(database, peonyFetcher)
-	azileaRepo := azilea.NewAzileaRepository(database, azileaFetcher)
-
-	menuService := menu.NewMenuService(
+	cacheMenuService = menu.New(
 		azileaRepo,
 		peonyRepo,
 	)
 
-	cacheMenuService = menuService
-
 	return nil
 }
 
-func GetMenuService() (*menu.MenuService, error) {
+func MenuService() (*menu.MenuService, error) {
 	if cacheMenuService == nil {
-		return nil, errors.New("Menu service is initialized")
+		return nil, errors.New("menu service is not initialized")
 	}
 	return cacheMenuService, nil
 }

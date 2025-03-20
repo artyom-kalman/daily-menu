@@ -7,29 +7,22 @@ import (
 	"time"
 )
 
-type MenuParser struct {
-}
-
-func NewMenuParser() *MenuParser {
-	return &MenuParser{}
-}
-
-func (mp *MenuParser) ParseBody(body string) ([]string, error) {
+func ParseBody(body string) ([]string, error) {
 	dayOfWeek := int(time.Now().Weekday())
 
 	if dayOfWeek == 6 || dayOfWeek == 0 {
 		return []string{"Сегодня выходной"}, nil
 	}
 
-	foodList, err := mp.findFoodList(body, dayOfWeek)
+	foodList, err := findFoodList(body, dayOfWeek)
 	if err != nil {
 		return nil, err
 	}
 
-	return mp.findFoodItems(foodList)
+	return findFoodItems(foodList)
 }
 
-func (mp *MenuParser) findFoodList(body string, dayOfWeek int) (string, error) {
+func findFoodList(body string, dayOfWeek int) (string, error) {
 	regex := regexp.MustCompile(`(?Ums)<ul class="foodList">(.*)<\/ul>`)
 	matches := regex.FindAllStringSubmatch(body, dayOfWeek)
 
@@ -40,7 +33,7 @@ func (mp *MenuParser) findFoodList(body string, dayOfWeek int) (string, error) {
 	return matches[dayOfWeek-1][1], nil
 }
 
-func (mp *MenuParser) findFoodItems(foodList string) ([]string, error) {
+func findFoodItems(foodList string) ([]string, error) {
 	regex := regexp.MustCompile(`(?Ums)class="foodItem">(.*)<`)
 	matches := regex.FindAllStringSubmatch(foodList, -1)
 

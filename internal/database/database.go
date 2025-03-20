@@ -14,7 +14,7 @@ type DishesDatabase struct {
 	path       string
 }
 
-func NewMenuDatabase(path string) *DishesDatabase {
+func New(path string) *DishesDatabase {
 	_, err := sql.Open("sqlite3", path)
 	if err != nil {
 		panic(err)

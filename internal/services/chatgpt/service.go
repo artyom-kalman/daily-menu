@@ -16,7 +16,7 @@ type GptService struct {
 	url    string
 }
 
-func NewChatGPTService(apiKey string, url string) *GptService {
+func New(apiKey string, url string) *GptService {
 	return &GptService{
 		apiKey: apiKey,
 		url:    url,
