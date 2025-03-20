@@ -17,7 +17,7 @@ func main() {
 		return
 	}
 
-	databasePath := "data/daily-menu.db"
+	databasePath := "database/daily-menu.db"
 
 	peonyUrl, err := config.GetEnv("PEONY_URL")
 	if err != nil {
