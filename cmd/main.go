@@ -1,11 +1,10 @@
 package main
 
 import (
-	"net/http"
-
 	"github.com/artyom-kalman/kbu-daily-menu/config"
 	"github.com/artyom-kalman/kbu-daily-menu/internal/handlers"
 	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -39,19 +38,20 @@ func main() {
 	// 	return
 	// }
 
-	fs := http.FileServer(http.Dir("./web/"))
-	http.Handle("/web/", http.StripPrefix("/web/", fs))
-	http.HandleFunc("/", handlers.HandleIndex)
+	router := gin.Default()
+	router.LoadHTMLGlob("templates/*.html")
+	router.StaticFile("/dist/tailwind.css", "./web/dist/tailwind.css")
+	router.Static("/img", "./web/img")
+	router.GET("/", handlers.HandleIndex)
 
 	port, err := config.GetEnv("PORT")
-
 	if err != nil {
 		logger.Error("error getting PORT: %v", err)
 		return
 	}
 
 	logger.Info("Server is running on %s", port)
-	err = http.ListenAndServe(":"+port, nil)
+	err = router.Run(":" + port)
 	if err != nil {
 		logger.Error("error starting server: %v", err)
 		return
