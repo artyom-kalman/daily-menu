@@ -1,6 +1,6 @@
 # Daily Menu Tracker
 
-![Daily Menu Tracker Banner](./public/img/main-page-demo.png)
+![Daily Menu Tracker Banner](./web/img/main-page-demo.png)
 
 **Daily Menu Tracker** is a lightweight web application that provides up-to-date cafeteria menus for university, helping students quickly see what’s on the menu each day.
 
