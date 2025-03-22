@@ -11,8 +11,6 @@ import (
 )
 
 func main() {
-	logger.InitLogger()
-
 	err := config.LoadEnv()
 	if err != nil {
 		logger.Error("error loading .env: %v", err)

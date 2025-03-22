@@ -6,9 +6,7 @@ import (
 	"os"
 )
 
-var Logger *slog.Logger
-
-func InitLogger() {
+func init() {
 	opts := slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	}
@@ -17,6 +15,8 @@ func InitLogger() {
 
 	Logger.Info("Initialized logger")
 }
+
+var Logger *slog.Logger
 
 func Info(mes string, args ...any) {
 	Logger.Info(fmt.Sprintf(mes, args...))
