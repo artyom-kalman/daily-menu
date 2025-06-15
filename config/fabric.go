@@ -39,6 +39,9 @@ func InitApp(dbSourcePath string, peonyUrl string, azileaUrl string) error {
 		peonyRepo,
 	)
 
+	cacheMenuService.GetAzileaMenu()
+	cacheMenuService.GetPeonyMenu()
+
 	return nil
 }
 

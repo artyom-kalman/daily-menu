@@ -33,13 +33,8 @@ func main() {
 
 	config.InitApp(databasePath, peonyUrl, azileanUrl)
 
-	// err = telegram.RunBot()
-	// if err != nil {
-	// 	logger.Error("error running bot: %v", err)
-	// 	return
-	// }
-
 	router := gin.Default()
+	gin.SetMode(gin.DebugMode)
 
 	router.LoadHTMLGlob("templates/*.html")
 	router.StaticFile("/dist/tailwind.css", "./web/dist/tailwind.css")
