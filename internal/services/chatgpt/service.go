@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/artyom-kalman/kbu-daily-menu/internal/domain"
 	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
@@ -29,7 +30,6 @@ func (gpt *GptService) SendRequest(messages []*Message) ([]*domain.MenuItem, err
 	reqBody := Request{
 		Messages: messages,
 	}
-	logger.Debug("Request body: %+v", reqBody)
 
 	reqBodyJson, err := json.Marshal(reqBody)
 	if err != nil {
@@ -64,6 +64,17 @@ func (gpt *GptService) SendRequest(messages []*Message) ([]*domain.MenuItem, err
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
+	}
+
+	bodyStr := string(body)
+
+	if strings.HasSuffix(bodyStr, "} Success:true Errors:[]}\"") {
+		idx := strings.LastIndex(bodyStr, "{\"name\":")
+		if idx != -1 {
+			bodyStr = bodyStr[:idx]
+			bodyStr += "]},\"Success\":true,\"Errors\":[]}"
+		}
+		body = []byte(bodyStr)
 	}
 
 	var response Response
