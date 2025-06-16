@@ -37,12 +37,14 @@ func main() {
 	gin.SetMode(gin.DebugMode)
 
 	router.LoadHTMLGlob("templates/*.html")
-	router.StaticFile("/dist/tailwind.css", "./web/dist/tailwind.css")
-	router.Static("/img", "./web/img")
 
-	router.GET("/", handlers.HandleIndex)
-
-	router.GET("/debug/pprof/*any", gin.WrapH(http.DefaultServeMux))
+	menuGroup := router.Group("/menu")
+	{
+		menuGroup.StaticFile("/dist/tailwind.css", "./web/dist/tailwind.css")
+		menuGroup.Static("/img", "./web/img")
+		menuGroup.GET("/", handlers.HandleIndex)
+		router.GET("/debug/pprof/*any", gin.WrapH(http.DefaultServeMux))
+	}
 
 	err = router.Run()
 	if err != nil {
