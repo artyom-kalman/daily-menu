@@ -38,11 +38,11 @@ func main() {
 
 	router.LoadHTMLGlob("templates/*.html")
 
-	menuGroup := router.Group("/menu")
+	menuGroup := router.Group("/")
 	{
+		menuGroup.GET("/", handlers.HandleIndex)
 		menuGroup.StaticFile("/dist/tailwind.css", "./web/dist/tailwind.css")
 		menuGroup.Static("/img", "./web/img")
-		menuGroup.GET("/", handlers.HandleIndex)
 		router.GET("/debug/pprof/*any", gin.WrapH(http.DefaultServeMux))
 	}
 
