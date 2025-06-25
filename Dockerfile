@@ -1,14 +1,8 @@
-FROM golang:1.23
-
-WORKDIR /app/daily-menu/
-
+FROM golang:1.24
+WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
-
 COPY . .
-
-RUN go build -o app cmd/main.go
-
-EXPOSE 3030
-
-ENTRYPOINT ["./app"]
+RUN GOOS=linux go build -o app cmd/main.go
+EXPOSE 80
+CMD ["./app"]
