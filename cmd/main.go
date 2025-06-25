@@ -17,7 +17,7 @@ func main() {
 		return
 	}
 
-	databasePath := "database/daily-menu.db"
+	databasePath := "./database/daily-menu.db"
 
 	peonyUrl, err := config.GetEnv("PEONY_URL")
 	if err != nil {
@@ -38,7 +38,7 @@ func main() {
 
 	router.LoadHTMLGlob("templates/*.html")
 
-	menuGroup := router.Group("/")
+	menuGroup := router.Group("")
 	{
 		menuGroup.GET("/", handlers.HandleIndex)
 		menuGroup.StaticFile("/dist/tailwind.css", "./web/dist/tailwind.css")
