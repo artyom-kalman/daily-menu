@@ -38,7 +38,14 @@ builder:
 # Inject ENV variables into containers (secrets come from .kamal/secrets).
 #
 env:
-  file: .env
+  clear:
+    PORT: 80
+    PEONY_URL: https://kbu.ac.kr/kor/CMS/DietMenuMgr/list.do?mCode=MN203&searchDietCategory=4
+    AZILEA_URL: https://kbu.ac.kr/kor/CMS/DietMenuMgr/list.do?mCode=MN203&searchDietCategory=5
+  secret:
+    - GPT_URL
+    - GPT_TOKEN
+    - TELEGRAM_BOT
 
 # Aliases are triggered with "bin/kamal <alias>". You can overwrite arguments on invocation:
 # "bin/kamal app logs -r job" will tail logs from the first server in the job section.
@@ -52,8 +59,9 @@ ssh:
   user: artyom
 # Use a persistent storage volume.
 #
-volumes:
-  - "./.env:/app/.env"
+# volumes:
+#   - "app_storage:/app/storage"
+
 # Bridge fingerprinted assets, like JS and CSS, between versions to avoid
 # hitting 404 on in-flight requests. Combines all files from new and old
 # version inside the asset_path.
