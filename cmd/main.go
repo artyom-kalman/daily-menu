@@ -38,6 +38,10 @@ func main() {
 
 	router.LoadHTMLGlob("templates/*.html")
 
+	router.GET("/up", func(c *gin.Context) {
+		c.String(200, "OK")
+	})
+
 	menuGroup := router.Group("")
 	{
 		menuGroup.GET("/", handlers.HandleIndex)
