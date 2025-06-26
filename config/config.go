@@ -1,7 +1,6 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 	"os"
 
@@ -9,15 +8,7 @@ import (
 )
 
 func LoadEnv() error {
-	_, err := os.Stat(".env")
-	if err != nil {
-		return errors.New("failed to find .env file")
-	}
-
-	err = godotenv.Load(".env")
-	if err != nil {
-		return errors.New("failed to load .env file")
-	}
+	godotenv.Load(".env")
 
 	return nil
 }
