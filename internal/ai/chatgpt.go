@@ -1,4 +1,4 @@
-package chatgpt
+package ai
 
 import (
 	"bytes"
@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/artyom-kalman/kbu-daily-menu/internal/domain"
 	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
 )
 
@@ -17,14 +16,14 @@ type GptService struct {
 	url    string
 }
 
-func New(apiKey string, url string) *GptService {
+func NewGptService(apiKey string, url string) *GptService {
 	return &GptService{
 		apiKey: apiKey,
 		url:    url,
 	}
 }
 
-func (gpt *GptService) SendRequest(messages []*Message) ([]*domain.MenuItem, error) {
+func (gpt *GptService) SendRequest(messages []*Message) (any, error) {
 	logger.Info("Sending request to GPT")
 
 	reqBody := Request{
@@ -89,5 +88,5 @@ func (gpt *GptService) SendRequest(messages []*Message) ([]*domain.MenuItem, err
 	}
 
 	logger.Info("Successfully received response from GPT")
-	return ParseResponse(response.Result.Response)
+	return response.Result.Response, nil
 }

@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/artyom-kalman/kbu-daily-menu/config"
-	"github.com/artyom-kalman/kbu-daily-menu/internal/handlers"
+	httpPkg "github.com/artyom-kalman/kbu-daily-menu/internal/http"
 	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
 	"github.com/gin-gonic/gin"
 )
@@ -121,7 +121,7 @@ func (a *App) setupRoutes() {
 
 	webGroup := a.router.Group("")
 	{
-		webGroup.GET("/", handlers.HandleIndex)
+		webGroup.GET("/", httpPkg.HandleIndex)
 	}
 
 	if gin.Mode() != gin.ReleaseMode {

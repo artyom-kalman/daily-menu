@@ -1,4 +1,4 @@
-package domain
+package menu
 
 import (
 	"fmt"
@@ -8,6 +8,19 @@ import (
 type Menu struct {
 	Items []*MenuItem `json:"dishes"`
 	Time  *time.Time
+}
+
+type MenuItem struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Spiciness   int    `json:"spiciness"`
+}
+
+func NewMenu(items []*MenuItem, time *time.Time) *Menu {
+	return &Menu{
+		Items: items,
+		Time:  time,
+	}
 }
 
 func NewMenuFromDishes(dishes []string, time *time.Time) *Menu {
@@ -40,4 +53,12 @@ func (m *Menu) String() string {
 		str += fmt.Sprintf("%d) %s. %s", i+1, item.Name, item.Description)
 	}
 	return str
+}
+
+func (i *MenuItem) AddDescription(description string) {
+	i.Description = description
+}
+
+func (i *MenuItem) AddSpiciness(spiciness int) {
+	i.Spiciness = spiciness
 }

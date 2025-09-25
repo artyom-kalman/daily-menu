@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/artyom-kalman/kbu-daily-menu/internal/domain"
+	"github.com/artyom-kalman/kbu-daily-menu/internal/menu"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -14,7 +14,7 @@ type DishesDatabase struct {
 	path       string
 }
 
-func New(path string) *DishesDatabase {
+func NewDatabase(path string) *DishesDatabase {
 	_, err := sql.Open("sqlite3", path)
 	if err != nil {
 		panic(err)
@@ -39,7 +39,7 @@ func (db *DishesDatabase) Close() error {
 	return db.connection.Close()
 }
 
-func (db *DishesDatabase) SelectRow(cafeteria string) ([]*domain.MenuItem, error) {
+func (db *DishesDatabase) SelectRow(cafeteria string) ([]*menu.MenuItem, error) {
 	err := db.Connect()
 	if err != nil {
 		return nil, err
@@ -62,7 +62,7 @@ func (db *DishesDatabase) SelectRow(cafeteria string) ([]*domain.MenuItem, error
 		return nil, err
 	}
 
-	var dishes []*domain.MenuItem
+	var dishes []*menu.MenuItem
 	err = json.Unmarshal([]byte(dishesJson), &dishes)
 	if err != nil {
 		return nil, err
@@ -71,7 +71,7 @@ func (db *DishesDatabase) SelectRow(cafeteria string) ([]*domain.MenuItem, error
 	return dishes, nil
 }
 
-func (db *DishesDatabase) UpdateDishes(cafeteria string, dishes []*domain.MenuItem) error {
+func (db *DishesDatabase) UpdateDishes(cafeteria string, dishes []*menu.MenuItem) error {
 	err := db.Connect()
 	if err != nil {
 		return err

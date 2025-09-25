@@ -1,12 +1,10 @@
-package repository
+package database
 
 import (
 	"fmt"
 	"time"
 
-	"github.com/artyom-kalman/kbu-daily-menu/internal/domain"
-	"github.com/artyom-kalman/kbu-daily-menu/internal/fetcher"
-	"github.com/artyom-kalman/kbu-daily-menu/internal/interfaces"
+	"github.com/artyom-kalman/kbu-daily-menu/internal/menu"
 	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
 )
 
@@ -18,22 +16,22 @@ const (
 )
 
 type Repository struct {
-	cafeteria Cafeteria
-	menu      *domain.Menu
-	database  interfaces.Database
-	fetcher   *fetcher.MenuFetcher
+	cafeteria   Cafeteria
+	menu        *menu.Menu
+	database    Database
+	menuService *menu.MenuService
 }
 
-func New(c Cafeteria, d interfaces.Database, f *fetcher.MenuFetcher) *Repository {
+func NewRepository(c Cafeteria, d Database, s *menu.MenuService) *Repository {
 	logger.Info("creating new repository for cafeteria: %s", string(c))
 	return &Repository{
-		cafeteria: c,
-		database:  d,
-		fetcher:   f,
+		cafeteria:   c,
+		database:    d,
+		menuService: s,
 	}
 }
 
-func (r *Repository) GetMenu() (*domain.Menu, error) {
+func (r *Repository) GetMenu() (*menu.Menu, error) {
 	logger.Debug("getting menu for cafeteria: %s", string(r.cafeteria))
 
 	today := time.Now().Truncate(24 * time.Hour)
@@ -53,7 +51,7 @@ func (r *Repository) GetMenu() (*domain.Menu, error) {
 
 	if dishes != nil {
 		logger.Info("found menu in database for %s with %d dishes", string(r.cafeteria), len(dishes))
-		todaysMenu := &domain.Menu{
+		todaysMenu := &menu.Menu{
 			Items: dishes,
 			Time:  &today,
 		}
@@ -62,7 +60,7 @@ func (r *Repository) GetMenu() (*domain.Menu, error) {
 	}
 
 	logger.Info("no menu found in database for %s, fetching from external source", string(r.cafeteria))
-	menu, err := r.fetcher.FetchMenu()
+	menu, err := r.menuService.GetDailyMenu()
 	if err != nil {
 		logger.Error("failed to fetch menu from external source for %s: %v", string(r.cafeteria), err)
 		return nil, fmt.Errorf("menu fetch failed for %s: %w", string(r.cafeteria), err)

@@ -1,10 +1,10 @@
-package handlers
+package http
 
 import (
 	"net/http"
 
 	"github.com/artyom-kalman/kbu-daily-menu/config"
-	"github.com/artyom-kalman/kbu-daily-menu/internal/domain"
+	"github.com/artyom-kalman/kbu-daily-menu/internal/menu"
 	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
 	"github.com/gin-gonic/gin"
 )
@@ -39,7 +39,7 @@ func HandleIndex(c *gin.Context) {
 		return
 	}
 
-	c.HTML(200, "index.html", map[string]*domain.Menu{
+	c.HTML(200, "index.html", map[string]*menu.Menu{
 		"Peony":  peonyMenu,
 		"Azilea": azileaMenu,
 	})

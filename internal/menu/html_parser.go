@@ -1,28 +1,36 @@
-package menuparser
+package menu
 
 import (
 	"errors"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
 )
 
-func ParseBody(body string) ([]string, error) {
+type HTMLParser struct{}
+
+func NewHTMLParser() *HTMLParser {
+	return &HTMLParser{}
+}
+
+func (p *HTMLParser) ParseMenuItems(body string) ([]string, error) {
 	dayOfWeek := int(time.Now().Weekday())
 
 	if dayOfWeek == 6 || dayOfWeek == 0 {
 		return []string{"Сегодня выходной"}, nil
 	}
 
-	foodList, err := findFoodList(body, dayOfWeek)
+	foodList, err := p.extractFoodList(body, dayOfWeek)
 	if err != nil {
 		return nil, err
 	}
 
-	return findFoodItems(foodList)
+	return p.extractFoodItems(foodList)
 }
 
-func findFoodList(body string, dayOfWeek int) (string, error) {
+func (p *HTMLParser) extractFoodList(body string, dayOfWeek int) (string, error) {
 	regex := regexp.MustCompile(`(?Ums)<ul class="foodList">(.*)<\/ul>`)
 	matches := regex.FindAllStringSubmatch(body, dayOfWeek)
 
@@ -33,20 +41,21 @@ func findFoodList(body string, dayOfWeek int) (string, error) {
 	return matches[dayOfWeek-1][1], nil
 }
 
-func findFoodItems(foodList string) ([]string, error) {
+func (p *HTMLParser) extractFoodItems(foodList string) ([]string, error) {
 	regex := regexp.MustCompile(`(?Ums)class="foodItem">(.*)<`)
 	matches := regex.FindAllStringSubmatch(foodList, -1)
 
-	dishes := make([]string, len(matches))
+	dishes := make([]string, 0, len(matches))
 
-	for i, match := range matches {
+	for _, match := range matches {
 		newDish := strings.TrimSpace(match[1])
 
 		if newDish == "" {
 			continue
 		}
-		dishes[i] = newDish
+		dishes = append(dishes, newDish)
 	}
 
+	logger.Debug("extracted %d food items from HTML", len(dishes))
 	return dishes, nil
 }

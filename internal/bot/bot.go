@@ -1,8 +1,10 @@
 package bot
 
 import (
+	"fmt"
 	"time"
 
+	"github.com/artyom-kalman/kbu-daily-menu/config"
 	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
 	"github.com/go-co-op/gocron"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -57,5 +59,24 @@ func (b *Bot) HandleMessages(text string) error {
 			return err
 		}
 	}
+	return nil
+}
+
+func (b *Bot) Run() error {
+	menuService, err := config.MenuService()
+	if err != nil {
+		return err
+	}
+
+	message, err := menuService.GetMenuString()
+	if err != nil {
+		return fmt.Errorf("error getting menu string: %w", err)
+	}
+
+	myChatId := 734130728
+	b.ScheduleDailyMenu(myChatId, message, "8:00")
+
+	go b.HandleMessages(message)
+
 	return nil
 }

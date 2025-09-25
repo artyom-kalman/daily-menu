@@ -6,12 +6,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/artyom-kalman/kbu-daily-menu/internal/ai"
 	"github.com/artyom-kalman/kbu-daily-menu/internal/database"
-	"github.com/artyom-kalman/kbu-daily-menu/internal/fetcher"
-	"github.com/artyom-kalman/kbu-daily-menu/internal/repository"
-	"github.com/artyom-kalman/kbu-daily-menu/internal/services/chatgpt"
-	"github.com/artyom-kalman/kbu-daily-menu/internal/services/menu"
-	"github.com/artyom-kalman/kbu-daily-menu/internal/services/menudescription"
+	"github.com/artyom-kalman/kbu-daily-menu/internal/menu"
 	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
 )
 
@@ -20,7 +17,7 @@ const (
 )
 
 var (
-	cacheMenuService *menu.MenuService
+	cacheMenuService *database.MenuService
 	initMutex        sync.RWMutex
 	isInitialized    bool
 )
@@ -99,34 +96,31 @@ func loadAppConfig(peonyUrl, azileaUrl, dbSourcePath string) (*AppConfig, error)
 	return config, nil
 }
 
-func initializeServices(ctx context.Context, config *AppConfig) (*menu.MenuService, error) {
+func initializeServices(ctx context.Context, config *AppConfig) (*database.MenuService, error) {
 	logger.Debug("initializing services")
 
 	logger.Debug("creating ChatGPT service")
-	gptService := chatgpt.New(config.GPTToken, config.GPTURL)
+	gptService := ai.NewGptService(config.GPTToken, config.GPTURL)
 
-	logger.Debug("creating menu description service")
-	descriptionService := menudescription.New(gptService)
-
-	logger.Debug("creating fetchers for Peony and Azilea")
-	peonyFetcher := fetcher.New(config.PeonyURL, descriptionService)
-	azileaFetcher := fetcher.New(config.AzileaURL, descriptionService)
+	logger.Debug("creating menu services for Peony and Azilea")
+	peonyService := menu.NewMenuService(config.PeonyURL, gptService)
+	azileaService := menu.NewMenuService(config.AzileaURL, gptService)
 
 	logger.Debug("initializing database with path: %s", config.DBSourcePath)
-	db := database.New(config.DBSourcePath)
+	db := database.NewDatabase(config.DBSourcePath)
 
 	logger.Debug("creating repositories")
-	peonyRepo := repository.New(repository.PEONY, db, peonyFetcher)
-	azileaRepo := repository.New(repository.AZILEA, db, azileaFetcher)
+	peonyRepo := database.NewRepository(database.PEONY, db, peonyService)
+	azileaRepo := database.NewRepository(database.AZILEA, db, azileaService)
 
 	logger.Debug("creating menu service")
-	menuService := menu.New(azileaRepo, peonyRepo)
+	menuService := database.NewMenuService(azileaRepo, peonyRepo)
 
 	logger.Info("all services initialized successfully")
 	return menuService, nil
 }
 
-func warmupServices(ctx context.Context, menuService *menu.MenuService) error {
+func warmupServices(ctx context.Context, menuService *database.MenuService) error {
 	logger.Info("starting service warmup")
 
 	errChan := make(chan error, 2)
@@ -175,7 +169,7 @@ func warmupServices(ctx context.Context, menuService *menu.MenuService) error {
 	}
 }
 
-func MenuService() (*menu.MenuService, error) {
+func MenuService() (*database.MenuService, error) {
 	initMutex.RLock()
 	defer initMutex.RUnlock()
 
