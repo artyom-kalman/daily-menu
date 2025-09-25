@@ -4,5 +4,5 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 RUN GOOS=linux go build -o app cmd/main.go
-EXPOSE 80
+EXPOSE 3030
 CMD ["./app"]
