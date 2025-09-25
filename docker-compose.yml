@@ -1,0 +1,6 @@
+services:
+  daily-menu:
+    build: .
+    ports:
+      - "3030:3030"
+    restart: unless-stopped
