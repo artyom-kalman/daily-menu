@@ -17,7 +17,7 @@ const (
 )
 
 var (
-	cacheMenuService *database.MenuService
+	cacheMenuService *menu.CombinedMenuService
 	initMutex        sync.RWMutex
 	isInitialized    bool
 )
@@ -96,7 +96,7 @@ func loadAppConfig(peonyUrl, azileaUrl, dbSourcePath string) (*AppConfig, error)
 	return config, nil
 }
 
-func initializeServices(ctx context.Context, config *AppConfig) (*database.MenuService, error) {
+func initializeServices(ctx context.Context, config *AppConfig) (*menu.CombinedMenuService, error) {
 	logger.Debug("initializing services")
 
 	logger.Debug("creating ChatGPT service")
@@ -108,19 +108,20 @@ func initializeServices(ctx context.Context, config *AppConfig) (*database.MenuS
 
 	logger.Debug("initializing database with path: %s", config.DBSourcePath)
 	db := database.NewDatabase(config.DBSourcePath)
+	menuRepo := menu.NewMenuRepository(db)
 
 	logger.Debug("creating repositories")
-	peonyRepo := database.NewRepository(database.PEONY, db, peonyService)
-	azileaRepo := database.NewRepository(database.AZILEA, db, azileaService)
+	peonyRepo := menu.NewRepository(menu.PEONY, menuRepo, peonyService)
+	azileaRepo := menu.NewRepository(menu.AZILEA, menuRepo, azileaService)
 
 	logger.Debug("creating menu service")
-	menuService := database.NewMenuService(azileaRepo, peonyRepo)
+	menuService := menu.NewCombinedMenuService(azileaRepo, peonyRepo)
 
 	logger.Info("all services initialized successfully")
 	return menuService, nil
 }
 
-func warmupServices(ctx context.Context, menuService *database.MenuService) error {
+func warmupServices(ctx context.Context, menuService *menu.CombinedMenuService) error {
 	logger.Info("starting service warmup")
 
 	errChan := make(chan error, 2)
@@ -169,7 +170,7 @@ func warmupServices(ctx context.Context, menuService *database.MenuService) erro
 	}
 }
 
-func MenuService() (*database.MenuService, error) {
+func MenuService() (*menu.CombinedMenuService, error) {
 	initMutex.RLock()
 	defer initMutex.RUnlock()
 

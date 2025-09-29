@@ -1,32 +1,30 @@
-package database
+package menu
 
 import (
 	"fmt"
-
-	"github.com/artyom-kalman/kbu-daily-menu/internal/menu"
 )
 
-type MenuService struct {
+type CombinedMenuService struct {
 	azileaRepo *Repository
 	peonyRepo  *Repository
 }
 
-func NewMenuService(ar *Repository, pr *Repository) *MenuService {
-	return &MenuService{
+func NewCombinedMenuService(ar *Repository, pr *Repository) *CombinedMenuService {
+	return &CombinedMenuService{
 		azileaRepo: ar,
 		peonyRepo:  pr,
 	}
 }
 
-func (r *MenuService) GetPeonyMenu() (*menu.Menu, error) {
+func (r *CombinedMenuService) GetPeonyMenu() (*Menu, error) {
 	return r.peonyRepo.GetMenu()
 }
 
-func (r *MenuService) GetAzileaMenu() (*menu.Menu, error) {
+func (r *CombinedMenuService) GetAzileaMenu() (*Menu, error) {
 	return r.azileaRepo.GetMenu()
 }
 
-func (s *MenuService) GetMenuString() (string, error) {
+func (s *CombinedMenuService) GetMenuString() (string, error) {
 	peony, err := s.peonyRepo.GetMenu()
 	if err != nil {
 		return "", err

@@ -5,6 +5,13 @@ import (
 	"time"
 )
 
+type Cafeteria string
+
+const (
+	PEONY  Cafeteria = "peony"
+	AZILEA Cafeteria = "azilea"
+)
+
 type Menu struct {
 	Items []*MenuItem `json:"dishes"`
 	Time  *time.Time
