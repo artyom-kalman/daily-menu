@@ -7,27 +7,23 @@ import (
 	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
 )
 
-const (
-	emptyMenuMessage = "Сегодня тут пусто"
-)
-
-type MenuService struct {
+type MenuFetcherService struct {
 	htmlParser *MenuParser
 	aiService  *MenuAIService
 }
 
-func NewMenuService(url string, aiService AIService) *MenuService {
-	return &MenuService{
+func NewMenuFetcherService(url string, aiService AIService) *MenuFetcherService {
+	return &MenuFetcherService{
 		htmlParser: NewMenuParser(url),
 		aiService:  NewMenuAIService(aiService),
 	}
 }
 
-func (s *MenuService) GetDailyMenu() (*Menu, error) {
-	return s.GetDailyMenuWithContext(context.Background())
+func (s *MenuFetcherService) FetchMenu() (*Menu, error) {
+	return s.FetchMenuWithContext(context.Background())
 }
 
-func (s *MenuService) GetDailyMenuWithContext(ctx context.Context) (*Menu, error) {
+func (s *MenuFetcherService) FetchMenuWithContext(ctx context.Context) (*Menu, error) {
 	logger.Info("starting daily menu fetch process")
 
 	menu, err := s.htmlParser.ParseMenu()

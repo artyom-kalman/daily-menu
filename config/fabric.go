@@ -102,20 +102,24 @@ func initializeServices(ctx context.Context, config *AppConfig) (*menu.CombinedM
 	logger.Debug("creating ChatGPT service")
 	gptService := ai.NewGptService(config.GPTToken, config.GPTURL)
 
-	logger.Debug("creating menu services for Peony and Azilea")
-	peonyService := menu.NewMenuService(config.PeonyURL, gptService)
-	azileaService := menu.NewMenuService(config.AzileaURL, gptService)
+	logger.Debug("creating menu fetcher services for Peony and Azilea")
+	peonyFetcher := menu.NewMenuFetcherService(config.PeonyURL, gptService)
+	azileaFetcher := menu.NewMenuFetcherService(config.AzileaURL, gptService)
 
 	logger.Debug("initializing database with path: %s", config.DBSourcePath)
 	db := database.NewDatabase(config.DBSourcePath)
 	menuRepo := menu.NewMenuRepository(db)
 
-	logger.Debug("creating repositories")
-	peonyRepo := menu.NewRepository(menu.PEONY, menuRepo, peonyService)
-	azileaRepo := menu.NewRepository(menu.AZILEA, menuRepo, azileaService)
+	logger.Debug("creating core services")
+	cacheService := menu.NewMenuCacheService()
+	persistenceService := menu.NewMenuPersistenceService(menuRepo)
 
-	logger.Debug("creating menu service")
-	menuService := menu.NewCombinedMenuService(azileaRepo, peonyRepo)
+	logger.Debug("creating orchestration services")
+	peonyOrchestration := menu.NewMenuOrchestrationService(cacheService, persistenceService, peonyFetcher)
+	azileaOrchestration := menu.NewMenuOrchestrationService(cacheService, persistenceService, azileaFetcher)
+
+	logger.Debug("creating combined menu service")
+	menuService := menu.NewCombinedMenuService(peonyOrchestration, azileaOrchestration)
 
 	logger.Info("all services initialized successfully")
 	return menuService, nil
