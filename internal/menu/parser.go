@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/artyom-kalman/kbu-daily-menu/internal/http/handlers/fetcher"
+	"github.com/artyom-kalman/kbu-daily-menu/internal/http/fetcher"
 	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
 )
 
