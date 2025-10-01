@@ -1,17 +1,20 @@
 package menu
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/artyom-kalman/kbu-daily-menu/internal/ai"
 	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
 )
 
 type AIService interface {
-	SendRequest(messages []*ai.Message) (any, error)
+	SendRequest(ctx context.Context, messages []*ai.Message) (any, error)
 }
 
 type MenuAIService struct {
@@ -24,63 +27,88 @@ func NewMenuAIService(gptService AIService) *MenuAIService {
 	}
 }
 
-func (s *MenuAIService) GenerateDescriptions(menu *Menu) error {
-	messages := []*ai.Message{
-		{Role: "system", Content: `Ты — генератор описаний для блюд.
-Всегда отвечай только в формате JSON-массива:
-[
-  {"name": "корейское название", "description": "русское название"},
-  ...
-]
-Не добавляй никакого текста, комментариев или пояснений.
-Никаких приветствий, пояснений и Markdown-блоков — только JSON.`},
-		{Role: "user", Content: s.generatePrompt(menu)},
+func (s *MenuAIService) GenerateDescriptions(ctx context.Context, menu *Menu) error {
+	var wg sync.WaitGroup
+	errChan := make(chan error, len(menu.Items))
+	semaphore := make(chan struct{}, 3) // Limit concurrent requests
+
+	for i, item := range menu.Items {
+		wg.Add(1)
+		go func(index int, menuItem *MenuItem) {
+			defer wg.Done()
+
+			semaphore <- struct{}{}
+			defer func() { <-semaphore }()
+
+			parsedItem, err := s.parseSingleItem(ctx, menuItem)
+			if err != nil {
+				errChan <- fmt.Errorf("failed to parse item '%s': %w", menuItem.Name, err)
+				return
+			}
+
+			menuItem.Description = parsedItem.Description
+			menuItem.Spiciness = parsedItem.Spiciness
+		}(i, item)
 	}
 
-	response, err := s.ai.SendRequest(messages)
+	wg.Wait()
+	close(errChan)
+
+	var errs []string
+	for err := range errChan {
+		errs = append(errs, err.Error())
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("encountered %d errors: %s", len(errs), strings.Join(errs, "; "))
+	}
+
+	return nil
+}
+
+func (s *MenuAIService) parseSingleItem(ctx context.Context, item *MenuItem) (*MenuItem, error) {
+	messages := []*ai.Message{
+		{Role: "system", Content: `Ты — генератор смешных описаний для блюд на русском языке.
+Всегда отвечай только в формате JSON-объекта:
+{
+  "name": "название блюда",
+  "description": "смешное описание блюда на русском языке",
+  "spiciness": 0-5
+}
+Не добавляй никакого текста, комментариев или пояснений.
+Никаких приветствий, пояснений и Markdown-блоков — только JSON.`},
+		{Role: "user", Content: fmt.Sprintf("Сгенерируй описание для блюда: %s", item.Name)},
+	}
+
+	response, err := s.ai.SendRequest(ctx, messages)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	respStr, ok := response.(string)
 	if !ok {
-		return errors.New("AIService returned non-string response")
+		return nil, errors.New("AIService returned non-string response")
 	}
 
-	items, err := s.ParseMenuItems(respStr)
+	parsedItem, err := s.ParseSingleItem(respStr)
 	if err != nil {
-		logger.Error("failed to parse AI response: %v\nResponse: %s", err, respStr)
-		return err
-	}
-
-	menu.Items = items
-	return nil
-}
-
-func (s *MenuAIService) generatePrompt(menu *Menu) string {
-	var b strings.Builder
-	b.WriteString("Сгенерируй JSON-массив с описанием блюд.\n")
-	b.WriteString("Формат ответа: [{\"name\": \"корейское название\", \"description\": \"название на русском\"}]\n")
-	b.WriteString("Никакого текста кроме JSON.\n\n")
-	b.WriteString("Список блюд:\n")
-
-	for _, item := range menu.Items {
-		b.WriteString("- " + item.Name + "\n")
-	}
-
-	return b.String()
-}
-
-func (s *MenuAIService) ParseMenuItems(response string) ([]*MenuItem, error) {
-	jsonString := s.cleanJSONResponse(response)
-
-	var items []*MenuItem
-	if err := json.Unmarshal([]byte(jsonString), &items); err != nil {
+		logger.Error("failed to parse AI response for item '%s': %v\nResponse: %s", item.Name, err, respStr)
 		return nil, err
 	}
 
-	logger.Debug("parsed %d menu items from JSON", len(items))
-	return items, nil
+	return parsedItem, nil
+}
+
+func (s *MenuAIService) ParseSingleItem(response string) (*MenuItem, error) {
+	jsonString := s.cleanJSONResponse(response)
+
+	var item MenuItem
+	if err := json.Unmarshal([]byte(jsonString), &item); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
+	}
+
+	logger.Debug("parsed menu item: %+v", item)
+	return &item, nil
 }
 
 func (s *MenuAIService) cleanJSONResponse(response string) string {
@@ -90,5 +118,11 @@ func (s *MenuAIService) cleanJSONResponse(response string) string {
 	}
 
 	response = strings.TrimSpace(response)
+
+	// Fix incomplete JSON by adding missing closing brace if needed
+	if !strings.HasSuffix(response, "}") && strings.Contains(response, "{") {
+		response += "}"
+	}
+
 	return response
 }

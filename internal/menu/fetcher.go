@@ -41,7 +41,7 @@ func (s *MenuFetcherService) FetchMenuWithContext(ctx context.Context) (*Menu, e
 	}
 
 	logger.Debug("adding descriptions to %d menu items", len(menu.Items))
-	if err := s.aiService.GenerateDescriptions(menu); err != nil {
+	if err := s.aiService.GenerateDescriptions(ctx, menu); err != nil {
 		logger.Error("failed to add descriptions to menu: %v", err)
 		return nil, fmt.Errorf("failed to add menu descriptions: %w", err)
 	}

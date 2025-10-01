@@ -2,11 +2,12 @@ package ai
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
+	"time"
 
 	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
 )
@@ -14,16 +15,25 @@ import (
 type GptService struct {
 	apiKey string
 	url    string
+	client *http.Client
 }
 
 func NewGptService(apiKey string, url string) *GptService {
 	return &GptService{
 		apiKey: apiKey,
 		url:    url,
+		client: &http.Client{
+			Timeout: 30 * time.Second,
+			Transport: &http.Transport{
+				MaxIdleConns:       10,
+				IdleConnTimeout:    30 * time.Second,
+				DisableCompression: false,
+			},
+		},
 	}
 }
 
-func (gpt *GptService) SendRequest(messages []*Message) (any, error) {
+func (gpt *GptService) SendRequest(ctx context.Context, messages []*Message) (any, error) {
 	logger.Info("Sending request to GPT")
 
 	reqBody := Request{
@@ -32,59 +42,51 @@ func (gpt *GptService) SendRequest(messages []*Message) (any, error) {
 
 	reqBodyJson, err := json.Marshal(reqBody)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequest(
+	req, err := http.NewRequestWithContext(
+		ctx,
 		"POST",
 		gpt.url,
 		bytes.NewBuffer(reqBodyJson),
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+gpt.apiKey)
 
-	client := &http.Client{}
-	res, err := client.Do(req)
+	res, err := gpt.client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode != 200 && res.StatusCode != 201 {
-		body, _ := io.ReadAll(res.Body)
-		return nil, fmt.Errorf("Bad request to AI: %s", body)
+	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated {
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			return nil, fmt.Errorf("request failed with status %d and couldn't read response", res.StatusCode)
+		}
+		return nil, fmt.Errorf("request failed with status %d: %s", res.StatusCode, string(body))
 	}
-	logger.Info("Successfuly sent request to GTP: %d", res.StatusCode)
+	logger.Info("Successfully sent request to GPT: %d", res.StatusCode)
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, err
-	}
-
-	bodyStr := string(body)
-
-	if strings.HasSuffix(bodyStr, "} Success:true Errors:[]}\"") {
-		idx := strings.LastIndex(bodyStr, "{\"name\":")
-		if idx != -1 {
-			bodyStr = bodyStr[:idx]
-			bodyStr += "]},\"Success\":true,\"Errors\":[]}"
-		}
-		body = []byte(bodyStr)
+		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	var response Response
 	err = json.Unmarshal(body, &response)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 	logger.Debug("GPT response: %+v", response)
 
 	if !response.Success {
-		return nil, fmt.Errorf("failed to get menu description")
+		return nil, fmt.Errorf("AI request failed: %v", response.Errors)
 	}
 
 	logger.Info("Successfully received response from GPT")
