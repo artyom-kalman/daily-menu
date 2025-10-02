@@ -6,32 +6,84 @@ import (
 	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
 )
 
-type MenuService struct {
-	peonyCache        *MenuCacheService
-	azileaCache       *MenuCacheService
-	peonyPersistence  *MenuPersistenceService
-	azileaPersistence *MenuPersistenceService
-	peonyFetcher      *MenuFetcherService
-	azileaFetcher     *MenuFetcherService
+type CafeteriaService struct {
+	cache       *MenuCacheService
+	persistence *MenuPersistenceService
+	fetcher     *MenuFetcherService
 }
 
-func NewMenuService(peonyCache, azileaCache *MenuCacheService, peonyPersistence, azileaPersistence *MenuPersistenceService, peonyFetcher, azileaFetcher *MenuFetcherService) *MenuService {
+func NewCafeteriaService(cache *MenuCacheService, persistence *MenuPersistenceService, fetcher *MenuFetcherService) *CafeteriaService {
+	return &CafeteriaService{
+		cache:       cache,
+		persistence: persistence,
+		fetcher:     fetcher,
+	}
+}
+
+func (s *CafeteriaService) GetMenu(cafeteria Cafeteria) (*Menu, error) {
+	logger.Debug("getting menu for cafeteria: %s", string(cafeteria))
+
+	// Check cache first
+	if menu, exists := s.cache.Get(cafeteria); exists {
+		logger.Debug("returning cached menu for %s", string(cafeteria))
+		return menu, nil
+	}
+
+	// Check database
+	logger.Debug("cached menu not available, checking database for %s", string(cafeteria))
+	menu, err := s.persistence.LoadMenu(cafeteria)
+	if err != nil {
+		return nil, err
+	}
+
+	if menu != nil {
+		logger.Info("found menu in database for %s with %d dishes", string(cafeteria), len(menu.Items))
+		s.cache.Set(cafeteria, menu)
+		return menu, nil
+	}
+
+	// Fetch from external source
+	logger.Info("no menu found in database for %s, fetching from external source", string(cafeteria))
+	menu, err = s.fetcher.FetchMenu()
+	if err != nil {
+		logger.Error("failed to fetch menu from external source for %s: %v", string(cafeteria), err)
+		return nil, fmt.Errorf("menu fetch failed for %s: %w", string(cafeteria), err)
+	}
+
+	logger.Info("successfully fetched menu for %s with %d items", string(cafeteria), len(menu.Items))
+
+	// Save to database and cache
+	logger.Debug("updating database with new menu for %s", string(cafeteria))
+	if err := s.persistence.SaveMenu(cafeteria, menu); err != nil {
+		logger.Error("failed to update database with new menu for %s: %v", string(cafeteria), err)
+		return nil, fmt.Errorf("database update failed for %s: %w", string(cafeteria), err)
+	}
+
+	s.cache.Set(cafeteria, menu)
+	logger.Info("successfully updated database and cached menu for %s", string(cafeteria))
+	return menu, nil
+}
+
+type MenuService struct {
+	services map[Cafeteria]*CafeteriaService
+}
+
+func NewMenuService(peonyService, azileaService *CafeteriaService) *MenuService {
+	services := map[Cafeteria]*CafeteriaService{
+		PEONY:  peonyService,
+		AZILEA: azileaService,
+	}
 	return &MenuService{
-		peonyCache:        peonyCache,
-		azileaCache:       azileaCache,
-		peonyPersistence:  peonyPersistence,
-		azileaPersistence: azileaPersistence,
-		peonyFetcher:      peonyFetcher,
-		azileaFetcher:     azileaFetcher,
+		services: services,
 	}
 }
 
 func (s *MenuService) GetPeonyMenu() (*Menu, error) {
-	return s.getMenu(PEONY, s.peonyCache, s.peonyPersistence, s.peonyFetcher)
+	return s.getMenu(PEONY)
 }
 
 func (s *MenuService) GetAzileaMenu() (*Menu, error) {
-	return s.getMenu(AZILEA, s.azileaCache, s.azileaPersistence, s.azileaFetcher)
+	return s.getMenu(AZILEA)
 }
 
 func (s *MenuService) GetMenuString() (string, error) {
@@ -49,46 +101,11 @@ func (s *MenuService) GetMenuString() (string, error) {
 	return menu, nil
 }
 
-func (s *MenuService) getMenu(cafeteria Cafeteria, cache *MenuCacheService, persistence *MenuPersistenceService, fetcher *MenuFetcherService) (*Menu, error) {
-	logger.Debug("getting menu for cafeteria: %s", string(cafeteria))
-
-	// Check cache first
-	if menu, exists := cache.Get(cafeteria); exists {
-		logger.Debug("returning cached menu for %s", string(cafeteria))
-		return menu, nil
+func (s *MenuService) getMenu(cafeteria Cafeteria) (*Menu, error) {
+	services, exists := s.services[cafeteria]
+	if !exists {
+		return nil, fmt.Errorf("no services configured for cafeteria: %s", string(cafeteria))
 	}
 
-	// Check database
-	logger.Debug("cached menu not available, checking database for %s", string(cafeteria))
-	menu, err := persistence.LoadMenu(cafeteria)
-	if err != nil {
-		return nil, err
-	}
-
-	if menu != nil {
-		logger.Info("found menu in database for %s with %d dishes", string(cafeteria), len(menu.Items))
-		cache.Set(cafeteria, menu)
-		return menu, nil
-	}
-
-	// Fetch from external source
-	logger.Info("no menu found in database for %s, fetching from external source", string(cafeteria))
-	menu, err = fetcher.FetchMenu()
-	if err != nil {
-		logger.Error("failed to fetch menu from external source for %s: %v", string(cafeteria), err)
-		return nil, fmt.Errorf("menu fetch failed for %s: %w", string(cafeteria), err)
-	}
-
-	logger.Info("successfully fetched menu for %s with %d items", string(cafeteria), len(menu.Items))
-
-	// Save to database and cache
-	logger.Debug("updating database with new menu for %s", string(cafeteria))
-	if err := persistence.SaveMenu(cafeteria, menu); err != nil {
-		logger.Error("failed to update database with new menu for %s: %v", string(cafeteria), err)
-		return nil, fmt.Errorf("database update failed for %s: %w", string(cafeteria), err)
-	}
-
-	cache.Set(cafeteria, menu)
-	logger.Info("successfully updated database and cached menu for %s", string(cafeteria))
-	return menu, nil
+	return services.GetMenu(cafeteria)
 }
