@@ -8,6 +8,10 @@ import (
 type Cafeteria string
 
 const (
+	emptyMenuMessage = "Сегодня тут пусто"
+)
+
+const (
 	PEONY  Cafeteria = "peony"
 	AZILEA Cafeteria = "azilea"
 )
