@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"html/template"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -108,6 +109,11 @@ func (a *App) setupRouter() {
 	a.router.Use(gin.Recovery())
 	a.router.Use(corsMiddleware())
 
+	a.router.SetFuncMap(template.FuncMap{
+		"iterate": func(count int) []struct{} {
+			return make([]struct{}, count)
+		},
+	})
 	a.router.LoadHTMLGlob("templates/*.html")
 
 	a.setupRoutes()
