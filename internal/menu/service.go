@@ -86,19 +86,18 @@ func (s *MenuService) GetAzileaMenu() (*Menu, error) {
 	return s.getMenu(AZILEA)
 }
 
-func (s *MenuService) GetMenuString() (string, error) {
+func (s *MenuService) GetMenus() (*Menu, *Menu, error) {
 	peony, err := s.GetPeonyMenu()
 	if err != nil {
-		return "", err
+		return nil, nil, err
 	}
 
 	azilea, err := s.GetAzileaMenu()
 	if err != nil {
-		return "", nil
+		return nil, nil, err
 	}
 
-	menu := fmt.Sprintf("Вот меню на сегодня.\nPeony (нижняя):\n%s\nAzilea (вехняя):\n%s", peony.String(), azilea.String())
-	return menu, nil
+	return peony, azilea, nil
 }
 
 func (s *MenuService) getMenu(cafeteria Cafeteria) (*Menu, error) {

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/artyom-kalman/kbu-daily-menu/config"
+	"github.com/artyom-kalman/kbu-daily-menu/internal/bot"
 	"github.com/artyom-kalman/kbu-daily-menu/internal/http/handlers"
 	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
 	"github.com/gin-gonic/gin"
@@ -48,6 +49,17 @@ func run() error {
 		return fmt.Errorf("failed to initialize app: %w", err)
 	}
 
+	botInstance, err := bot.NewBot(cfg.TelegramBotToken)
+	if err != nil {
+		return fmt.Errorf("failed to create bot: %w", err)
+	}
+
+	go func() {
+		if err := botInstance.Run(); err != nil {
+			logger.Error("bot failed to run: %v", err)
+		}
+	}()
+
 	app := &App{}
 	app.setupRouter()
 	app.setupServer(cfg.Port)
@@ -64,10 +76,11 @@ func run() error {
 }
 
 type Config struct {
-	Port         string
-	DatabasePath string
-	PeonyURL     string
-	AzileaURL    string
+	Port             string
+	DatabasePath     string
+	PeonyURL         string
+	AzileaURL        string
+	TelegramBotToken string
 }
 
 func loadConfig() (*Config, error) {
@@ -85,16 +98,22 @@ func loadConfig() (*Config, error) {
 		return nil, fmt.Errorf("failed to get AZILEA_URL: %w", err)
 	}
 
+	telegramBotToken, err := config.GetEnv("TELEGRAM_BOT_TOKEN")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get TELEGRAM_BOT_TOKEN: %w", err)
+	}
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = defaultPort
 	}
 
 	return &Config{
-		Port:         port,
-		DatabasePath: defaultDBPath,
-		PeonyURL:     peonyURL,
-		AzileaURL:    azileaURL,
+		Port:             port,
+		DatabasePath:     defaultDBPath,
+		PeonyURL:         peonyURL,
+		AzileaURL:        azileaURL,
+		TelegramBotToken: telegramBotToken,
 	}, nil
 }
 

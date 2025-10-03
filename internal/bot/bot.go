@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/artyom-kalman/kbu-daily-menu/config"
+	"github.com/artyom-kalman/kbu-daily-menu/internal/menu"
 	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
 	"github.com/go-co-op/gocron"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -62,16 +63,22 @@ func (b *Bot) HandleMessages(text string) error {
 	return nil
 }
 
+func FormatMenuMessage(peony, azilea *menu.Menu) string {
+	return fmt.Sprintf("Вот меню на сегодня.\nPeony (нижняя):\n%s\nAzilea (вехняя):\n%s", peony.String(), azilea.String())
+}
+
 func (b *Bot) Run() error {
 	menuService, err := config.MenuService()
 	if err != nil {
 		return err
 	}
 
-	message, err := menuService.GetMenuString()
+	peony, azilea, err := menuService.GetMenus()
 	if err != nil {
-		return fmt.Errorf("error getting menu string: %w", err)
+		return fmt.Errorf("error getting menus: %w", err)
 	}
+
+	message := FormatMenuMessage(peony, azilea)
 
 	myChatId := 734130728
 	b.ScheduleDailyMenu(myChatId, message, "8:00")
