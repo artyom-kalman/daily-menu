@@ -1,3 +1,5 @@
+database/*.db
+
 .env
 /.kamal/
 /tmp
