@@ -2,6 +2,7 @@ package bot
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/artyom-kalman/kbu-daily-menu/config"
@@ -64,7 +65,36 @@ func (b *Bot) HandleMessages(text string) error {
 }
 
 func FormatMenuMessage(peony, azilea *menu.Menu) string {
-	return fmt.Sprintf("Вот меню на сегодня.\nPeony (нижняя):\n%s\nAzilea (вехняя):\n%s", peony.String(), azilea.String())
+	var message strings.Builder
+	message.WriteString("Вот меню на сегодня.\n\n")
+
+	message.WriteString("🌸 Peony (нижняя):\n")
+	if len(peony.Items) <= 1 {
+		message.WriteString("Сегодня выходной\n")
+	} else {
+		for i, item := range peony.Items {
+			message.WriteString(fmt.Sprintf("%d) %s", i+1, item.Name))
+			if item.Description != "" && item.Description != "TODO" {
+				message.WriteString(fmt.Sprintf(" - %s", item.Description))
+			}
+			message.WriteString("\n")
+		}
+	}
+
+	message.WriteString("\n🌺 Azilea (верхняя):\n")
+	if len(azilea.Items) <= 1 {
+		message.WriteString("Сегодня выходной\n")
+	} else {
+		for i, item := range azilea.Items {
+			message.WriteString(fmt.Sprintf("%d) %s", i+1, item.Name))
+			if item.Description != "" && item.Description != "TODO" {
+				message.WriteString(fmt.Sprintf(" - %s", item.Description))
+			}
+			message.WriteString("\n")
+		}
+	}
+
+	return message.String()
 }
 
 func (b *Bot) Run() error {
