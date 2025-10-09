@@ -1,126 +1,280 @@
 <!doctype html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Daily Menu</title>
-        <link rel="stylesheet" href="../dist/tailwind.css" />
-        <link
-            href="https://fonts.googleapis.com/css2?family=Pacifico&family=Poppins:wght@400;600&display=swap"
-            rel="stylesheet"
-        />
-    </head>
-    <body
-        class="bg-gradient-to-br from-pink-200 to-blue-200 min-h-screen font-['Poppins'] flex items-center justify-center"
-    >
-        <div class="px-4 py-12">
-            <h1
-                class="text-5xl font-['Pacifico'] text-center mb-12 text-purple-700 animate-pulse"
-            >
-                Today's Culinary Adventure
-            </h1>
-            <div class="px-4 py-12">
-                {{with .Peony}}
-                <div
-                    class="bg-white bg-opacity-80 rounded-3xl shadow-2xl overflow-hidden"
-                >
-                    <div class="flex flex-row items-center">
-                        <div class="w-full max-w-md p-4">
-                            <div class="relative overflow-hidden aspect-square">
-                                <img
-                                    src="../img/peony.jpg"
-                                    alt="Peony Image"
-                                    class="w-full h-full rounded-lg"
-                                />
-                            </div>
-                        </div>
-                        <div class="p-8 w-full">
-                            <h2
-                                class="text-3xl font-semibold mb-6 text-pink-600 text-center"
-                            >
-                                Peony's Delights
-                            </h2>
-                            <div class="space-y-4">
-                                {{range .Items}}
-                                <div
-                                    class="bg-pink-100 rounded-lg p-4 hover:shadow-md transition-shadow duration-300"
-                                >
-                                    <p
-                                        class="font-medium text-lg text-purple-700 text-center"
-                                    >
-                                        {{.Name}}
-                                    </p>
-                                    <p class="text-gray-600 italic text-center">
-                                        {{.Description}}
-                                    </p>
-                                    <div class="flex justify-center mt-2">
-                                        {{if gt .Spiciness 0}}
-                                            {{range $i := iterate .Spiciness}}
-                                                <span class="text-red-500 text-lg">🌶️</span>
-                                            {{end}}
-                                        {{else}}
-                                            <span class="text-gray-400 text-sm">Не острый</span>
-                                        {{end}}
-                                    </div>
-                                </div>
-                                {{end}}
-                            </div>
-                        </div>
-                    </div>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Daily Menu - KBU Cafeterias</title>
+    <meta name="description" content="Today's menu from Peony and Azilea cafeterias" />
+    <link rel="stylesheet" href="../dist/tailwind.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍽️</text></svg>">
+</head>
+<body class="bg-gray-50 min-h-screen font-body">
+    <!-- Header -->
+    <header class="sticky top-0 z-40 bg-white/80 backdrop-blur-xs border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl">🍽️</span>
+                    <h1 class="text-xl font-semibold text-gray-900">Daily Menu</h1>
                 </div>
-                {{end}}
-            </div>
-            <div class="px-4 py-12">
-                {{with .Azilea}}
-                <div
-                    class="bg-white bg-opacity-80 rounded-3xl shadow-2xl overflow-hidden"
-                >
-                    <div class="flex flex-row items-center">
-                        <div class="w-full max-w-md p-4">
-                            <div class="relative overflow-hidden aspect-square">
-                                <img
-                                    src="../img/azilea.jpg"
-                                    alt="Azilea Image"
-                                    class="w-full h-full rounded-lg"
-                                />
-                            </div>
-                        </div>
-                        <div class="p-8 w-full">
-                            <h2
-                                class="text-3xl font-semibold mb-6 text-blue-600 text-center"
-                            >
-                                Azilea's Specialties
-                            </h2>
-                            <div class="space-y-4">
-                                {{range .Items}}
-                                <div
-                                    class="bg-blue-100 rounded-lg p-4 hover:shadow-md transition-shadow duration-300"
-                                >
-                                    <p
-                                        class="font-medium text-lg text-green-700 text-center"
-                                    >
-                                        {{.Name}}
-                                    </p>
-                                    <p class="text-gray-600 italic text-center">
-                                        {{.Description}}
-                                    </p>
-                                    <div class="flex justify-center mt-2">
-                                        {{if gt .Spiciness 0}}
-                                            {{range $i := iterate .Spiciness}}
-                                                <span class="text-red-500 text-lg">🌶️</span>
-                                            {{end}}
-                                        {{else}}
-                                            <span class="text-gray-400 text-sm">Не острый</span>
-                                        {{end}}
-                                    </div>
-                                </div>
-                                {{end}}
-                            </div>
-                        </div>
+                <div class="flex items-center gap-4">
+                    <div class="text-sm text-gray-500 hidden sm:block">
+                        Last updated: <span id="lastUpdated" class="font-medium">Loading...</span>
                     </div>
+                    <button id="darkModeToggle" class="p-2 rounded-lg hover:bg-gray-100 transition-colors" aria-label="Toggle dark mode">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+                        </svg>
+                    </button>
                 </div>
-                {{end}}
             </div>
         </div>
-    </body>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero-gradient text-white py-12 px-4">
+        <div class="max-w-7xl mx-auto text-center">
+            <h2 class="text-4xl md:text-5xl font-bold mb-4 animate-fade-in">
+                Today's Culinary Adventure
+            </h2>
+            <p class="text-xl opacity-90 mb-2" id="currentDate">Loading date...</p>
+            <p class="text-lg opacity-80">Fresh meals from Peony & Azilea cafeterias</p>
+        </div>
+    </section>
+
+    <!-- Filter Bar -->
+    <section class="bg-white border-b border-gray-200 sticky top-16 z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex flex-col sm:flex-row gap-4 items-center justify-between">
+                <div class="relative w-full sm:w-96">
+                    <input 
+                        type="text" 
+                        id="searchInput" 
+                        placeholder="Search dishes..." 
+                        class="search-input w-full pl-10"
+                    >
+                    <svg class="absolute left-3 top-2.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-sm text-gray-600">Spiciness:</span>
+                    <div class="flex gap-1" id="spicinessFilter">
+                        <button class="filter-chip active" data-spice="all">All</button>
+                        <button class="filter-chip" data-spice="0">🌶️ 0</button>
+                        <button class="filter-chip" data-spice="1">🌶️ 1</button>
+                        <button class="filter-chip" data-spice="2">🌶️ 2</button>
+                        <button class="filter-chip" data-spice="3">🌶️ 3+</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="grid gap-8 lg:grid-cols-2 stagger-animation">
+            <!-- Peony Section -->
+            {{if .Peony}}
+            <section class="cafeteria-section">
+                <div class="menu-card">
+                    <div class="bg-gradient-to-r from-primary-500 to-primary-600 p-6 text-white">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="text-2xl font-bold mb-2">🌺 Peony's Delights</h3>
+                                <p class="opacity-90">{{len .Peony.Items}} dishes available</p>
+                            </div>
+                            <button class="cafeteria-toggle p-2 hover:bg-white/20 rounded-lg transition-colors" data-cafeteria="peony">
+                                <svg class="w-6 h-6 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        <div class="mb-6">
+                            <img src="../img/peony.jpg" alt="Peony Cafeteria" class="w-full h-48 object-cover rounded-lg">
+                        </div>
+                        <div class="cafeteria-content" data-cafeteria="peony">
+                            <div class="space-y-4" id="peony-items">
+                                {{range .Peony.Items}}
+                                <div class="menu-item" data-name="{{.Name}}" data-spice="{{.Spiciness}}">
+                                    <div class="flex items-start justify-between">
+                                        <div class="flex-1">
+                                            <h4 class="font-semibold text-lg text-gray-900 mb-1">{{.Name}}</h4>
+                                            <p class="text-gray-600 text-sm mb-2">{{.Description}}</p>
+                                            <div class="spice-indicator">
+                                                {{if gt .Spiciness 0}}
+                                                    {{range $i := iterate .Spiciness}}
+                                                        <span class="text-spice-500">🌶️</span>
+                                                    {{end}}
+                                                    <span class="text-gray-500 text-xs ml-1">({{.Spiciness}})</span>
+                                                {{else}}
+                                                    <span class="text-gray-400 text-xs">Not spicy</span>
+                                                {{end}}
+                                            </div>
+                                        </div>
+                                        <button class="copy-btn ml-4 p-2 hover:bg-gray-100 rounded-lg transition-colors" data-dish="{{.Name}}">
+                                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                {{end}}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            {{end}}
+
+            <!-- Azilea Section -->
+            {{if .Azilea}}
+            <section class="cafeteria-section">
+                <div class="menu-card">
+                    <div class="bg-gradient-to-r from-secondary-500 to-secondary-600 p-6 text-white">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="text-2xl font-bold mb-2">🌸 Azilea's Specialties</h3>
+                                <p class="opacity-90">{{len .Azilea.Items}} dishes available</p>
+                            </div>
+                            <button class="cafeteria-toggle p-2 hover:bg-white/20 rounded-lg transition-colors" data-cafeteria="azilea">
+                                <svg class="w-6 h-6 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        <div class="mb-6">
+                            <img src="../img/azilea.jpg" alt="Azilea Cafeteria" class="w-full h-48 object-cover rounded-lg">
+                        </div>
+                        <div class="cafeteria-content" data-cafeteria="azilea">
+                            <div class="space-y-4" id="azilea-items">
+                                {{range .Azilea.Items}}
+                                <div class="menu-item" data-name="{{.Name}}" data-spice="{{.Spiciness}}">
+                                    <div class="flex items-start justify-between">
+                                        <div class="flex-1">
+                                            <h4 class="font-semibold text-lg text-gray-900 mb-1">{{.Name}}</h4>
+                                            <p class="text-gray-600 text-sm mb-2">{{.Description}}</p>
+                                            <div class="spice-indicator">
+                                                {{if gt .Spiciness 0}}
+                                                    {{range $i := iterate .Spiciness}}
+                                                        <span class="text-spice-500">🌶️</span>
+                                                    {{end}}
+                                                    <span class="text-gray-500 text-xs ml-1">({{.Spiciness}})</span>
+                                                {{else}}
+                                                    <span class="text-gray-400 text-xs">Not spicy</span>
+                                                {{end}}
+                                            </div>
+                                        </div>
+                                        <button class="copy-btn ml-4 p-2 hover:bg-gray-100 rounded-lg transition-colors" data-dish="{{.Name}}">
+                                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                {{end}}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            {{end}}
+        </div>
+
+        <!-- Telegram Bot Card -->
+        <section class="mt-12 mb-8">
+            <div class="telegram-gradient rounded-2xl p-8 text-white relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32"></div>
+                <div class="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full -ml-24 -mb-24"></div>
+                
+                <div class="relative z-10 grid md:grid-cols-2 gap-8 items-center">
+                    <div>
+                        <div class="flex items-center gap-3 mb-4">
+                            <span class="text-4xl">🤖</span>
+                            <h3 class="text-3xl font-bold">Daily Menu Telegram Bot</h3>
+                        </div>
+                        <p class="text-xl mb-6 opacity-90">Never miss today's culinary adventure!</p>
+                        <p class="mb-6 opacity-80">Get menu updates automatically at 10:00 AM every morning.</p>
+                        
+                        <div class="space-y-3 mb-6">
+                            <div class="flex items-center gap-2">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                                </svg>
+                                <span>Daily notifications at 10:00 AM</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                                </svg>
+                                <span>Both cafeterias included</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                                </svg>
+                                <span>Easy subscribe/unsubscribe</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                                </svg>
+                                <span>Completely free</span>
+                            </div>
+                        </div>
+                        
+                        <div class="flex flex-col sm:flex-row gap-4">
+                            <a href="https://t.me/kbu_daily_menu_bot" target="_blank" class="btn-telegram text-center inline-flex items-center justify-center gap-2">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.295-.6.295-.002 0-.003 0-.005 0l.213-3.054 5.56-5.022c.24-.213-.054-.334-.373-.121l-6.869 4.326-2.96-.924c-.64-.203-.658-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.941z"/>
+                                </svg>
+                                Subscribe on Telegram
+                            </a>
+                            <button class="bg-white/20 hover:bg-white/30 text-white font-medium py-3 px-6 rounded-lg transition-all duration-200">
+                                View Commands
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-center">
+                        <div class="bg-white p-4 rounded-xl shadow-xl">
+                            <div class="w-48 h-48 bg-gray-200 rounded-lg flex items-center justify-center">
+                                <div class="text-center">
+                                    <svg class="w-16 h-16 mx-auto mb-2 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M3 3h18v18H3V3zm16.525 13.707c-.131-.821-.666-1.511-2.252-2.155-.552-.259-1.165-.438-1.349-.854-.068-.248-.078-.382-.034-.529.113-.484.687-.629 1.137-.495.293.09.563.315.732.676.775-.507.775-.507 1.316-.844-.203-.314-.304-.451-.439-.586-.473-.528-1.103-.798-2.126-.775l-.528.067c-.507.124-.991.395-1.283.754-.855.968-.611 2.655.427 3.354 1.023.765 2.521.933 2.712 1.653.18.832-.611 1.097-1.372 1.003-.563-.124-.88-.406-1.226-.923l-1.372.788c.157.359.337.517.607.832 1.305 1.316 4.568 1.249 5.153-.754.021-.067.18-.528.056-1.237l.034.049zm-6.737-5.434h-1.686c0 1.453-.007 2.898-.007 4.354 0 .924.047 1.772-.104 2.033-.247.517-.886.451-1.175.359-.297-.146-.448-.349-.623-.641-.047-.078-.082-.146-.095-.146l-1.368.844c.229.473.563.832.994 1.089.641.383 1.502.507 2.404.305.588-.17 1.095-.519 1.358-1.059.384-.697.302-1.553.299-2.509.008-1.541 0-3.083 0-4.635l.003-.04z"/>
+                                    </svg>
+                                    <p class="text-sm text-gray-600">Scan for mobile</p>
+                                </div>
+                            </div>
+                            <p class="text-center text-sm text-gray-600 mt-2">@kbu_daily_menu_bot</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white py-8 px-4">
+        <div class="max-w-7xl mx-auto text-center">
+            <p class="text-gray-400 mb-2">© 2024 KBU Daily Menu. Made with ❤️ for hungry students.</p>
+            <div class="flex justify-center gap-6 text-sm">
+                <button id="printBtn" class="hover:text-white transition-colors">🖨️ Print Menu</button>
+                <button id="scrollToTop" class="hover:text-white transition-colors">⬆️ Back to Top</button>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="fixed bottom-4 right-4 z-50"></div>
+
+    <!-- JavaScript -->
+    <script src="../dist/app.js"></script>
+</body>
 </html>

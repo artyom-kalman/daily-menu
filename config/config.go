@@ -20,3 +20,11 @@ func GetEnv(key string) (string, error) {
 	}
 	return env, nil
 }
+
+func GetEnvWithDefault(key, defaultValue string) string {
+	env := os.Getenv(key)
+	if env == "" {
+		return defaultValue
+	}
+	return env
+}
