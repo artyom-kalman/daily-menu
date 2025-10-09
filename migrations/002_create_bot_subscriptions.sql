@@ -1,0 +1,6 @@
+CREATE TABLE bot_subscriptions (
+    chat_id INTEGER PRIMARY KEY,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

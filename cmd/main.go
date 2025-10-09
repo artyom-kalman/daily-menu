@@ -13,6 +13,7 @@ import (
 
 	"github.com/artyom-kalman/kbu-daily-menu/config"
 	"github.com/artyom-kalman/kbu-daily-menu/internal/bot"
+	"github.com/artyom-kalman/kbu-daily-menu/internal/database"
 	"github.com/artyom-kalman/kbu-daily-menu/internal/http/handlers"
 	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
 	"github.com/gin-gonic/gin"
@@ -45,11 +46,28 @@ func run() error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
+	db := database.NewDatabase(cfg.DatabasePath)
+	if err := db.Connect(); err != nil {
+		return fmt.Errorf("failed to connect to database: %w", err)
+	}
+	defer db.Close()
+
 	if err := config.InitApp(cfg.DatabasePath, cfg.PeonyURL, cfg.AzileaURL); err != nil {
 		return fmt.Errorf("failed to initialize app: %w", err)
 	}
 
-	botInstance, err := bot.NewBot(cfg.TelegramBotToken)
+	migrator := database.NewMigrator(db)
+	migrationPath := config.GetEnvWithDefault("MIGRATION_PATH", "database/migrations")
+	// dir := filepath.Dir(migrationPath)
+	// subdir := filepath.Base(migrationPath)
+	if err := migrator.LoadMigrationsFromFS(os.DirFS("./"), "migrations"); err != nil {
+		return fmt.Errorf("failed to load migrations from %s: %w", migrationPath, err)
+	}
+	if err := migrator.Up(); err != nil {
+		return fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	botInstance, err := bot.NewBot(cfg.TelegramBotToken, db)
 	if err != nil {
 		return fmt.Errorf("failed to create bot: %w", err)
 	}
@@ -142,6 +160,7 @@ func (a *App) setupRoutes() {
 	a.router.GET("/up", healthCheckHandler)
 
 	a.router.StaticFile("/dist/tailwind.css", "./web/dist/tailwind.css")
+	a.router.StaticFile("/dist/app.js", "./web/dist/app.js")
 	a.router.Static("/img", "./web/img")
 
 	webGroup := a.router.Group("")
