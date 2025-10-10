@@ -229,10 +229,3 @@ func healthCheckHandler(c *gin.Context) {
 		"timestamp": time.Now().UTC(),
 	})
 }
-
-func statusHandler(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"service": "kbu-daily-menu",
-		"version": "1.0.0",
-	})
-}

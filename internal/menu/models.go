@@ -73,3 +73,9 @@ func (i *MenuItem) AddDescription(description string) {
 func (i *MenuItem) AddSpiciness(spiciness int) {
 	i.Spiciness = spiciness
 }
+
+type MenuValidationResponse struct {
+	IsValid bool   `json:"is_valid"`
+	Message string `json:"message"`
+	Reason  string `json:"reason,omitempty"`
+}

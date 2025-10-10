@@ -1,143 +1,239 @@
 <!doctype html>
 <html lang="en" class="scroll-smooth">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Daily Menu - KBU Cafeterias</title>
-    <meta name="description" content="Today's menu from Peony and Azilea cafeterias" />
-    <link rel="stylesheet" href="/dist/tailwind.css" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍽️</text></svg>">
-</head>
-<body class="bg-gray-50 dark:bg-gray-900 min-h-screen font-body transition-colors duration-200">
-    <!-- Header -->
-    <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-sm border-b border-gray-200">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex items-center justify-between h-16">
-                <div class="flex items-center gap-3">
-                    <span class="text-2xl">🍽️</span>
-                    <h1 class="text-xl font-semibold text-gray-900">Daily Menu</h1>
-                </div>
-                <div class="flex items-center gap-4">
-                    <div class="text-sm text-gray-500 hidden sm:block">
-                        Last updated: <span id="lastUpdated" class="font-medium">Loading...</span>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Daily Menu - KBU Cafeterias</title>
+        <meta
+            name="description"
+            content="Today's menu from Peony and Azilea cafeterias"
+        />
+        <link rel="stylesheet" href="/dist/tailwind.css" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            rel="icon"
+            type="image/svg+xml"
+            href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍽️</text></svg>"
+        />
+    </head>
+    <body
+        class="bg-gray-50 dark:bg-gray-900 min-h-screen font-body transition-colors duration-200"
+    >
+        <!-- Header -->
+        <header
+            class="sticky top-0 z-40 bg-white/90 backdrop-blur-sm border-b border-gray-200"
+        >
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16">
+                    <div class="flex items-center gap-3">
+                        <span class="text-2xl">🍽️</span>
+                        <h1 class="text-xl font-semibold text-gray-900">
+                            Daily Menu
+                        </h1>
                     </div>
-                    <button id="darkModeToggle" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" aria-label="Toggle dark mode">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
-                        </svg>
+                    <div class="flex items-center gap-4">
+                        <div class="text-sm text-gray-500 hidden sm:block">
+                            Last updated:
+                            <span id="lastUpdated" class="font-medium"
+                                >Loading...</span
+                            >
+                        </div>
+                        <button
+                            id="darkModeToggle"
+                            class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                            aria-label="Toggle dark mode"
+                        >
+                            <svg
+                                class="w-5 h-5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+                                ></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Hero Section -->
+        <section
+            class="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 text-white py-16 px-4"
+        >
+            <div class="max-w-4xl mx-auto text-center">
+                <h2 class="text-5xl md:text-6xl font-bold mb-4">
+                    Today's Menu
+                </h2>
+                <p class="text-2xl opacity-90 mb-2" id="currentDate">
+                    Loading date...
+                </p>
+                <p class="text-lg opacity-80">
+                    Fresh from Peony & Azilea cafeterias
+                </p>
+            </div>
+        </section>
+
+        <!-- Main Content -->
+        <main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div class="grid gap-12 lg:grid-cols-2">
+                <!-- Peony Section -->
+                {{if .Peony}}
+                <section
+                    class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden"
+                >
+                    <div
+                        class="bg-gradient-to-r from-rose-500 to-pink-600 p-8 text-white"
+                    >
+                        <h3 class="text-3xl font-bold mb-2">🌺 Peony</h3>
+                        <p class="opacity-90">
+                            {{len .Peony.Items}} dishes today
+                        </p>
+                    </div>
+                    <div class="p-8">
+                        <div class="space-y-6" id="peony-items">
+                            {{range .Peony.Items}}
+                            <div
+                                class="border-l-4 border-rose-400 pl-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                            >
+                                <h4
+                                    class="font-semibold text-xl text-gray-900 dark:text-white mb-2"
+                                >
+                                    {{.Name}}
+                                </h4>
+                                <p
+                                    class="text-gray-600 dark:text-gray-300 mb-3"
+                                >
+                                    {{.Description}}
+                                </p>
+                                {{if gt .Spiciness 0}}
+                                <div class="flex items-center gap-1">
+                                    {{range $i := iterate .Spiciness}}
+                                    <span class="text-orange-500">🌶️</span>
+                                    {{end}}
+                                    <span
+                                        class="text-gray-500 dark:text-gray-400 text-sm ml-2"
+                                        >({{.Spiciness}})</span
+                                    >
+                                </div>
+                                {{end}}
+                            </div>
+                            {{end}}
+                        </div>
+                    </div>
+                </section>
+                {{end}}
+
+                <!-- Azilea Section -->
+                {{if .Azilea}}
+                <section
+                    class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden"
+                >
+                    <div
+                        class="bg-gradient-to-r from-blue-500 to-indigo-600 p-8 text-white"
+                    >
+                        <h3 class="text-3xl font-bold mb-2">🌸 Azilea</h3>
+                        <p class="opacity-90">
+                            {{len .Azilea.Items}} dishes today
+                        </p>
+                    </div>
+                    <div class="p-8">
+                        <div class="space-y-6" id="azilea-items">
+                            {{range .Azilea.Items}}
+                            <div
+                                class="border-l-4 border-blue-400 pl-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                            >
+                                <h4
+                                    class="font-semibold text-xl text-gray-900 dark:text-white mb-2"
+                                >
+                                    {{.Name}}
+                                </h4>
+                                <p
+                                    class="text-gray-600 dark:text-gray-300 mb-3"
+                                >
+                                    {{.Description}}
+                                </p>
+                                {{if gt .Spiciness 0}}
+                                <div class="flex items-center gap-1">
+                                    {{range $i := iterate .Spiciness}}
+                                    <span class="text-orange-500">🌶️</span>
+                                    {{end}}
+                                    <span
+                                        class="text-gray-500 dark:text-gray-400 text-sm ml-2"
+                                        >({{.Spiciness}})</span
+                                    >
+                                </div>
+                                {{end}}
+                            </div>
+                            {{end}}
+                        </div>
+                    </div>
+                </section>
+                {{end}}
+            </div>
+
+            <!-- Telegram Bot Card -->
+            <section class="mt-16 mb-8">
+                <div
+                    class="bg-gradient-to-r from-blue-600 to-cyan-600 rounded-3xl p-10 text-white text-center"
+                >
+                    <div class="max-w-2xl mx-auto">
+                        <span class="text-5xl mb-4 block">🤖</span>
+                        <h3 class="text-4xl font-bold mb-4">
+                            Get Daily Updates
+                        </h3>
+                        <p class="text-xl mb-8 opacity-90">
+                            Subscribe to our Telegram bot for menu notifications
+                            every morning at 10:00 AM
+                        </p>
+                        <a
+                            href="https://t.me/@kbudailymenubot"
+                            target="_blank"
+                            class="inline-flex items-center gap-3 bg-white text-blue-600 font-semibold py-4 px-8 rounded-xl hover:bg-gray-100 transition-colors text-lg"
+                        >
+                            <svg
+                                class="w-6 h-6"
+                                fill="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.295-.6.295-.002 0-.003 0-.005 0l.213-3.054 5.56-5.022c.24-.213-.054-.334-.373-.121l-6.869 4.326-2.96-.924c-.64-.203-.658-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.941z"
+                                />
+                            </svg>
+                            Subscribe on Telegram
+                        </a>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="bg-gray-900 dark:bg-black text-white py-8 px-4">
+            <div class="max-w-7xl mx-auto text-center">
+                <p class="text-gray-400 dark:text-gray-500 mb-2">
+                    © 2024 KBU Daily Menu. Made with ❤️ for hungry students.
+                </p>
+                <div class="flex justify-center gap-6 text-sm">
+                    <button
+                        id="scrollToTop"
+                        class="hover:text-white transition-colors"
+                    >
+                        ⬆️ Back to Top
                     </button>
                 </div>
             </div>
-        </div>
-    </header>
+        </footer>
 
-    <!-- Hero Section -->
-    <section class="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 text-white py-16 px-4">
-        <div class="max-w-4xl mx-auto text-center">
-            <h2 class="text-5xl md:text-6xl font-bold mb-4">
-                Today's Menu
-            </h2>
-            <p class="text-2xl opacity-90 mb-2" id="currentDate">Loading date...</p>
-            <p class="text-lg opacity-80">Fresh from Peony & Azilea cafeterias</p>
-        </div>
-    </section>
+        <!-- Toast Container -->
+        <div id="toastContainer" class="fixed bottom-4 right-4 z-50"></div>
 
-
-
-    <!-- Main Content -->
-    <main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div class="grid gap-12 lg:grid-cols-2">
-            <!-- Peony Section -->
-            {{if .Peony}}
-            <section class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden">
-                <div class="bg-gradient-to-r from-rose-500 to-pink-600 p-8 text-white">
-                    <h3 class="text-3xl font-bold mb-2">🌺 Peony</h3>
-                    <p class="opacity-90">{{len .Peony.Items}} dishes today</p>
-                </div>
-                <div class="p-8">
-                    <div class="space-y-6" id="peony-items">
-                        {{range .Peony.Items}}
-                        <div class="border-l-4 border-rose-400 pl-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                            <h4 class="font-semibold text-xl text-gray-900 dark:text-white mb-2">{{.Name}}</h4>
-                            <p class="text-gray-600 dark:text-gray-300 mb-3">{{.Description}}</p>
-                            {{if gt .Spiciness 0}}
-                                <div class="flex items-center gap-1">
-                                    {{range $i := iterate .Spiciness}}
-                                        <span class="text-orange-500">🌶️</span>
-                                    {{end}}
-                                    <span class="text-gray-500 dark:text-gray-400 text-sm ml-2">({{.Spiciness}})</span>
-                                </div>
-                            {{end}}
-                        </div>
-                        {{end}}
-                    </div>
-                </div>
-            </section>
-            {{end}}
-
-            <!-- Azilea Section -->
-            {{if .Azilea}}
-            <section class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden">
-                <div class="bg-gradient-to-r from-blue-500 to-indigo-600 p-8 text-white">
-                    <h3 class="text-3xl font-bold mb-2">🌸 Azilea</h3>
-                    <p class="opacity-90">{{len .Azilea.Items}} dishes today</p>
-                </div>
-                <div class="p-8">
-                    <div class="space-y-6" id="azilea-items">
-                        {{range .Azilea.Items}}
-                        <div class="border-l-4 border-blue-400 pl-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                            <h4 class="font-semibold text-xl text-gray-900 dark:text-white mb-2">{{.Name}}</h4>
-                            <p class="text-gray-600 dark:text-gray-300 mb-3">{{.Description}}</p>
-                            {{if gt .Spiciness 0}}
-                                <div class="flex items-center gap-1">
-                                    {{range $i := iterate .Spiciness}}
-                                        <span class="text-orange-500">🌶️</span>
-                                    {{end}}
-                                    <span class="text-gray-500 dark:text-gray-400 text-sm ml-2">({{.Spiciness}})</span>
-                                </div>
-                            {{end}}
-                        </div>
-                        {{end}}
-                    </div>
-                </div>
-            </section>
-            {{end}}
-        </div>
-
-        <!-- Telegram Bot Card -->
-        <section class="mt-16 mb-8">
-            <div class="bg-gradient-to-r from-blue-600 to-cyan-600 rounded-3xl p-10 text-white text-center">
-                <div class="max-w-2xl mx-auto">
-                    <span class="text-5xl mb-4 block">🤖</span>
-                    <h3 class="text-4xl font-bold mb-4">Get Daily Updates</h3>
-                    <p class="text-xl mb-8 opacity-90">Subscribe to our Telegram bot for menu notifications every morning at 10:00 AM</p>
-                    <a href="https://t.me/kbu_daily_menu_bot" target="_blank" class="inline-flex items-center gap-3 bg-white text-blue-600 font-semibold py-4 px-8 rounded-xl hover:bg-gray-100 transition-colors text-lg">
-                        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.295-.6.295-.002 0-.003 0-.005 0l.213-3.054 5.56-5.022c.24-.213-.054-.334-.373-.121l-6.869 4.326-2.96-.924c-.64-.203-.658-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.941z"/>
-                        </svg>
-                        Subscribe on Telegram
-                    </a>
-                </div>
-            </div>
-        </section>
-    </main>
-
-    <!-- Footer -->
-    <footer class="bg-gray-900 dark:bg-black text-white py-8 px-4">
-        <div class="max-w-7xl mx-auto text-center">
-            <p class="text-gray-400 dark:text-gray-500 mb-2">© 2024 KBU Daily Menu. Made with ❤️ for hungry students.</p>
-            <div class="flex justify-center gap-6 text-sm">
-                <button id="scrollToTop" class="hover:text-white transition-colors">⬆️ Back to Top</button>
-            </div>
-        </div>
-    </footer>
-
-    <!-- Toast Container -->
-    <div id="toastContainer" class="fixed bottom-4 right-4 z-50"></div>
-
-    <!-- JavaScript -->
-    <script src="/dist/app.js"></script>
-</body>
+        <!-- JavaScript -->
+        <script src="/dist/app.js"></script>
+    </body>
 </html>

@@ -110,6 +110,60 @@ func (s *MenuAIService) ParseSingleItem(response string) (*MenuItem, error) {
 	return &item, nil
 }
 
+func (s *MenuAIService) ValidateMenu(ctx context.Context, menu *Menu) (*MenuValidationResponse, error) {
+	menuText := s.formatMenuForValidation(menu)
+
+	messages := []*ai.Message{
+		{Role: "system", Content: `Ты — ассистент для проверки меню столовой.
+Проанализируй меню и определи, является ли оно полноценным дневным меню.
+Ответь в формате JSON:
+{
+  "is_valid": true/false,
+  "message": "текст для отображения пользователю, на русском",
+  "reason": "краткое объяснение на русском"
+}
+
+Если меню пустое или это выходной - is_valid: false и создай дружелюбное сообщение.
+Если меню полноценное - is_valid: true и message можно оставить пустым.`},
+		{Role: "user", Content: fmt.Sprintf("Проверь меню на сегодня: %s", menuText)},
+	}
+
+	response, err := s.ai.SendRequest(ctx, messages)
+	if err != nil {
+		return nil, err
+	}
+
+	respStr, ok := response.(string)
+	if !ok {
+		return nil, errors.New("AIService returned non-string response")
+	}
+
+	return s.parseValidationResponse(respStr)
+}
+
+func (s *MenuAIService) parseValidationResponse(response string) (*MenuValidationResponse, error) {
+	jsonString := s.cleanJSONResponse(response)
+
+	var validation MenuValidationResponse
+	if err := json.Unmarshal([]byte(jsonString), &validation); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal validation response: %w", err)
+	}
+
+	return &validation, nil
+}
+
+func (s *MenuAIService) formatMenuForValidation(menu *Menu) string {
+	if len(menu.Items) == 0 {
+		return "Пустое меню"
+	}
+
+	var items []string
+	for _, item := range menu.Items {
+		items = append(items, item.Name)
+	}
+	return fmt.Sprintf("Блюда (%d): %s", len(items), strings.Join(items, ", "))
+}
+
 func (s *MenuAIService) cleanJSONResponse(response string) string {
 	re := regexp.MustCompile("(?s)```json(.*?)```")
 	if matches := re.FindStringSubmatch(response); len(matches) == 2 {

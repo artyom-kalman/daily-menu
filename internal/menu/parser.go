@@ -30,19 +30,8 @@ func (p *MenuParser) ParseMenu() (*Menu, error) {
 
 	loc, _ := time.LoadLocation("Asia/Seoul")
 	now := time.Now().In(loc)
-	dayOfWeek := int(now.Weekday())
 
-	if dayOfWeek == 6 || dayOfWeek == 0 {
-		return &Menu{
-			Items: []*MenuItem{
-				{
-					Name: emptyMenuMessage,
-				},
-			},
-		}, nil
-	}
-
-	foodList, err := p.extractFoodList(body, dayOfWeek)
+	foodList, err := p.extractFoodList(body, int(now.Weekday()))
 	if err != nil {
 		return nil, err
 	}
