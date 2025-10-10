@@ -2,6 +2,7 @@ package menu
 
 import (
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
@@ -20,7 +21,8 @@ func NewMenuPersistenceService(repo *MenuRepository) *MenuPersistenceService {
 func (p *MenuPersistenceService) LoadMenu(cafeteria Cafeteria) (*Menu, error) {
 	dishes, err := p.repo.GetMenuItems(string(cafeteria))
 	if err != nil {
-		logger.Error("failed to load menu from database for %s: %v", string(cafeteria), err)
+		logger.ErrorErrWithFields("Failed to load menu from database", err,
+			slog.String("cafeteria", string(cafeteria)))
 		return nil, fmt.Errorf("database query failed for %s: %w", string(cafeteria), err)
 	}
 
@@ -47,7 +49,8 @@ func (p *MenuPersistenceService) LoadMenu(cafeteria Cafeteria) (*Menu, error) {
 func (p *MenuPersistenceService) SaveMenu(cafeteria Cafeteria, menu *Menu) error {
 	err := p.repo.SaveMenuItems(string(cafeteria), menu.Items)
 	if err != nil {
-		logger.Error("failed to save menu to database for %s: %v", string(cafeteria), err)
+		logger.ErrorErrWithFields("Failed to save menu to database", err,
+			slog.String("cafeteria", string(cafeteria)))
 		return fmt.Errorf("database update failed for %s: %w", string(cafeteria), err)
 	}
 

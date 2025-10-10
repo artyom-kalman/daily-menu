@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"html/template"
+	"log/slog"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -35,7 +36,7 @@ type App struct {
 
 func main() {
 	if err := run(); err != nil {
-		logger.Error("application failed: %v", err)
+		logger.ErrorErr("Application failed", err)
 		os.Exit(1)
 	}
 }
@@ -74,7 +75,7 @@ func run() error {
 
 	go func() {
 		if err := botInstance.Run(); err != nil {
-			logger.Error("bot failed to run: %v", err)
+			logger.ErrorErr("Bot failed to run", err)
 		}
 	}()
 
@@ -84,7 +85,7 @@ func run() error {
 
 	errChan := make(chan error, 1)
 	go func() {
-		logger.Info("starting server on port %s", cfg.Port)
+		logger.InfoWithFields("Starting server", slog.String("port", cfg.Port))
 		if err := app.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			errChan <- fmt.Errorf("server failed to start: %w", err)
 		}
@@ -191,7 +192,7 @@ func (a *App) waitForShutdown(errChan chan error) error {
 	case err := <-errChan:
 		return err
 	case sig := <-quit:
-		logger.Info("received signal %v, shutting down server...", sig)
+		logger.InfoWithFields("Received signal, shutting down server", slog.String("signal", sig.String()))
 		return a.gracefulShutdown()
 	}
 }
@@ -204,7 +205,7 @@ func (a *App) gracefulShutdown() error {
 		return fmt.Errorf("server forced to shutdown: %w", err)
 	}
 
-	logger.Info("server shutdown complete")
+	logger.Info("Server shutdown complete")
 	return nil
 }
 

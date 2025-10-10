@@ -24,7 +24,7 @@ func NewMenuParser(url string) *MenuParser {
 func (p *MenuParser) ParseMenu() (*Menu, error) {
 	body, err := p.fetcher.Fetch()
 	if err != nil {
-		logger.Error("failed to fetch HTML content: %v", err)
+		logger.ErrorErr("Failed to fetch HTML content", err)
 		return nil, fmt.Errorf("failed to fetch menu: %w", err)
 	}
 

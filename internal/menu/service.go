@@ -2,6 +2,7 @@ package menu
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
 )
@@ -33,24 +34,31 @@ func (s *CafeteriaService) GetMenu(cafeteria Cafeteria) (*Menu, error) {
 	}
 
 	if menu != nil {
-		logger.Info("found menu in database for %s with %d dishes", string(cafeteria), len(menu.Items))
+		logger.InfoWithFields("Found menu in database",
+			slog.String("cafeteria", string(cafeteria)),
+			slog.Int("dish_count", len(menu.Items)))
 		s.cache.Set(cafeteria, menu)
 		return menu, nil
 	}
 
 	// Fetch from external source
-	logger.Info("fetching fresh menu for %s from external source", string(cafeteria))
+	logger.InfoWithFields("Fetching fresh menu from external source",
+		slog.String("cafeteria", string(cafeteria)))
 	menu, err = s.fetcher.FetchMenu()
 	if err != nil {
-		logger.Error("failed to fetch menu from external source for %s: %v", string(cafeteria), err)
+		logger.ErrorErrWithFields("Failed to fetch menu from external source", err,
+			slog.String("cafeteria", string(cafeteria)))
 		return nil, fmt.Errorf("menu fetch failed for %s: %w", string(cafeteria), err)
 	}
 
-	logger.Info("successfully fetched menu for %s with %d items", string(cafeteria), len(menu.Items))
+	logger.InfoWithFields("Successfully fetched menu",
+		slog.String("cafeteria", string(cafeteria)),
+		slog.Int("item_count", len(menu.Items)))
 
 	// Save to database and cache
 	if err := s.persistence.SaveMenu(cafeteria, menu); err != nil {
-		logger.Error("failed to update database with new menu for %s: %v", string(cafeteria), err)
+		logger.ErrorErrWithFields("Failed to update database with new menu", err,
+			slog.String("cafeteria", string(cafeteria)))
 		return nil, fmt.Errorf("database update failed for %s: %w", string(cafeteria), err)
 	}
 

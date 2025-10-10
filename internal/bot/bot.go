@@ -3,6 +3,7 @@ package bot
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -65,7 +66,7 @@ func (b *Bot) loadSubscribers() ([]int64, error) {
 func (b *Bot) scheduleDailyMessages(message string) {
 	subscribers, err := b.loadSubscribers()
 	if err != nil {
-		logger.Error("Failed to load subscribers: %v", err)
+		logger.ErrorErr("Failed to load subscribers", err)
 		return
 	}
 
@@ -77,13 +78,16 @@ func (b *Bot) scheduleDailyMessages(message string) {
 	b.scheduler.Every(1).Day().At("10:00").Do(func() {
 		for _, chatID := range subscribers {
 			if err := b.SendMessage(int(chatID), message); err != nil {
-				logger.Error("Failed to send message to chat %d: %v", chatID, err)
+				logger.ErrorErrWithFields("Failed to send message to chat", err,
+					slog.Int64("chat_id", chatID))
 			}
 		}
 	})
 
 	b.scheduler.StartAsync()
-	logger.Info("Scheduled daily messages for %d subscribers at 10:00", len(subscribers))
+	logger.InfoWithFields("Scheduled daily messages for subscribers",
+		slog.Int("subscriber_count", len(subscribers)),
+		slog.String("schedule_time", "10:00"))
 }
 
 func (b *Bot) subscribeChat(chatID int64) error {
@@ -164,7 +168,7 @@ func (b *Bot) HandleMessages(text string) error {
 
 		if update.Message.IsCommand() {
 			if err := b.handleCommand(update, text); err != nil {
-				logger.Error("Failed to handle command: %v", err)
+				logger.ErrorErr("Failed to handle command", err)
 			}
 		} else {
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, text)

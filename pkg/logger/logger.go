@@ -132,3 +132,60 @@ func Error(msg string, args ...any) {
 		Logger.Error(fmt.Sprintf(msg, args...))
 	}
 }
+
+// InfoWithFields logs an info message with structured fields
+func InfoWithFields(msg string, attrs ...slog.Attr) {
+	args := make([]any, len(attrs)*2)
+	for i, attr := range attrs {
+		args[i*2] = attr.Key
+		args[i*2+1] = attr.Value
+	}
+	Logger.Info(msg, args...)
+}
+
+// DebugWithFields logs a debug message with structured fields
+func DebugWithFields(msg string, attrs ...slog.Attr) {
+	args := make([]any, len(attrs)*2)
+	for i, attr := range attrs {
+		args[i*2] = attr.Key
+		args[i*2+1] = attr.Value
+	}
+	Logger.Debug(msg, args...)
+}
+
+// WarnWithFields logs a warning message with structured fields
+func WarnWithFields(msg string, attrs ...slog.Attr) {
+	args := make([]any, len(attrs)*2)
+	for i, attr := range attrs {
+		args[i*2] = attr.Key
+		args[i*2+1] = attr.Value
+	}
+	Logger.Warn(msg, args...)
+}
+
+// ErrorWithFields logs an error message with structured fields
+func ErrorWithFields(msg string, attrs ...slog.Attr) {
+	args := make([]any, len(attrs)*2)
+	for i, attr := range attrs {
+		args[i*2] = attr.Key
+		args[i*2+1] = attr.Value
+	}
+	Logger.Error(msg, args...)
+}
+
+// ErrorErr logs an error message with an error field
+func ErrorErr(msg string, err error) {
+	Logger.Error(msg, "error", err)
+}
+
+// ErrorErrWithFields logs an error message with an error field and additional attributes
+func ErrorErrWithFields(msg string, err error, attrs ...slog.Attr) {
+	args := make([]any, 2+len(attrs)*2)
+	args[0] = "error"
+	args[1] = err
+	for i, attr := range attrs {
+		args[2+i*2] = attr.Key
+		args[2+i*2+1] = attr.Value
+	}
+	Logger.Error(msg, args...)
+}

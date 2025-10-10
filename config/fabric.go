@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -39,35 +40,36 @@ func InitAppWithContext(ctx context.Context, dbSourcePath string, peonyUrl strin
 	defer initMutex.Unlock()
 
 	if isInitialized {
-		logger.Info("application already initialized, skipping")
+		logger.Info("Application already initialized, skipping")
 		return nil
 	}
 
-	logger.Info("initializing application with database path: %s", dbSourcePath)
+	logger.InfoWithFields("Initializing application",
+		slog.String("database_path", dbSourcePath))
 
 	ctx, cancel := context.WithTimeout(ctx, initTimeout)
 	defer cancel()
 
 	config, err := loadAppConfig(peonyUrl, azileaUrl, dbSourcePath)
 	if err != nil {
-		logger.Error("failed to load application config: %v", err)
+		logger.ErrorErr("Failed to load application config", err)
 		return fmt.Errorf("config loading failed: %w", err)
 	}
 
 	services, err := initializeServices(ctx, config)
 	if err != nil {
-		logger.Error("failed to initialize services: %v", err)
+		logger.ErrorErr("Failed to initialize services", err)
 		return fmt.Errorf("service initialization failed: %w", err)
 	}
 
 	if err := warmupServices(ctx, services); err != nil {
-		logger.Error("service warmup failed (continuing anyway): %v", err)
+		logger.ErrorErr("Service warmup failed (continuing anyway)", err)
 	}
 
 	cacheMenuService = services
 	isInitialized = true
 
-	logger.Info("application initialization completed successfully")
+	logger.Info("Application initialization completed successfully")
 	return nil
 }
 
@@ -109,12 +111,12 @@ func initializeServices(ctx context.Context, config *AppConfig) (*menu.MenuServi
 
 	menuService := menu.NewMenuService(peonyOrchestration, azileaOrchestration)
 
-	logger.Info("all services initialized successfully")
+	logger.Info("All services initialized successfully")
 	return menuService, nil
 }
 
 func warmupServices(ctx context.Context, menuService *menu.MenuService) error {
-	logger.Info("starting service warmup")
+	logger.Info("Starting service warmup")
 
 	errChan := make(chan error, 2)
 	var wg sync.WaitGroup
@@ -124,7 +126,7 @@ func warmupServices(ctx context.Context, menuService *menu.MenuService) error {
 	go func() {
 		defer wg.Done()
 		if _, err := menuService.GetAzileaMenu(); err != nil {
-			logger.Error("failed to warmup Azilea menu: %v", err)
+			logger.ErrorErr("Failed to warmup Azilea menu", err)
 			errChan <- fmt.Errorf("Azilea warmup failed: %w", err)
 			return
 		}
@@ -133,7 +135,7 @@ func warmupServices(ctx context.Context, menuService *menu.MenuService) error {
 	go func() {
 		defer wg.Done()
 		if _, err := menuService.GetPeonyMenu(); err != nil {
-			logger.Error("failed to warmup Peony menu: %v", err)
+			logger.ErrorErr("Failed to warmup Peony menu", err)
 			errChan <- fmt.Errorf("Peony warmup failed: %w", err)
 			return
 		}
@@ -147,13 +149,13 @@ func warmupServices(ctx context.Context, menuService *menu.MenuService) error {
 
 	select {
 	case <-ctx.Done():
-		logger.Error("service warmup cancelled due to context timeout")
+		logger.Error("Service warmup cancelled due to context timeout")
 		return ctx.Err()
 	case err := <-errChan:
-		logger.Error("service warmup completed with errors: %v", err)
+		logger.ErrorErr("Service warmup completed with errors", err)
 		return err
 	case <-done:
-		logger.Info("service warmup completed successfully")
+		logger.Info("Service warmup completed successfully")
 		return nil
 	}
 }
@@ -163,7 +165,7 @@ func MenuService() (*menu.MenuService, error) {
 	defer initMutex.RUnlock()
 
 	if !isInitialized || cacheMenuService == nil {
-		logger.Error("attempted to get menu service before initialization")
+		logger.Error("Attempted to get menu service before initialization")
 		return nil, fmt.Errorf("menu service is not initialized - call InitApp first")
 	}
 
@@ -184,8 +186,8 @@ func Shutdown() {
 		return
 	}
 
-	logger.Info("shutting down application services")
+	logger.Info("Shutting down application services")
 	cacheMenuService = nil
 	isInitialized = false
-	logger.Info("application shutdown completed")
+	logger.Info("Application shutdown completed")
 }

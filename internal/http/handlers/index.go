@@ -14,7 +14,7 @@ func HandleIndex(c *gin.Context) {
 
 	menuService, err := config.MenuService()
 	if err != nil {
-		logger.Error("error get menu service: %v", err)
+		logger.ErrorErr("Error getting menu service", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Internal server error",
 		})
@@ -23,7 +23,7 @@ func HandleIndex(c *gin.Context) {
 
 	peonyMenu, err := menuService.GetPeonyMenu()
 	if err != nil {
-		logger.Error("error getting Peony menu: %v", err)
+		logger.ErrorErr("Error getting Peony menu", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Internal server error",
 		})
@@ -32,7 +32,7 @@ func HandleIndex(c *gin.Context) {
 
 	azileaMenu, err := menuService.GetAzileaMenu()
 	if err != nil {
-		logger.Error("error getting Azilea menu: %v", err)
+		logger.ErrorErr("Error getting Azilea menu", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Internal server error",
 		})

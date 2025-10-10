@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 	"sync"
@@ -92,7 +93,9 @@ func (s *MenuAIService) parseSingleItem(ctx context.Context, item *MenuItem) (*M
 
 	parsedItem, err := s.ParseSingleItem(respStr)
 	if err != nil {
-		logger.Error("failed to parse AI response for item '%s': %v\nResponse: %s", item.Name, err, respStr)
+		logger.ErrorErrWithFields("Failed to parse AI response for menu item", err,
+			slog.String("item_name", item.Name),
+			slog.String("response", respStr))
 		return nil, err
 	}
 
