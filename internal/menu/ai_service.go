@@ -107,7 +107,6 @@ func (s *MenuAIService) ParseSingleItem(response string) (*MenuItem, error) {
 		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
 	}
 
-	logger.Debug("parsed menu item: %+v", item)
 	return &item, nil
 }
 

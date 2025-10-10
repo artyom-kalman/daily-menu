@@ -18,8 +18,6 @@ func NewMenuPersistenceService(repo *MenuRepository) *MenuPersistenceService {
 }
 
 func (p *MenuPersistenceService) LoadMenu(cafeteria Cafeteria) (*Menu, error) {
-	logger.Debug("loading menu from database for cafeteria: %s", string(cafeteria))
-
 	dishes, err := p.repo.GetMenuItems(string(cafeteria))
 	if err != nil {
 		logger.Error("failed to load menu from database for %s: %v", string(cafeteria), err)
@@ -29,8 +27,6 @@ func (p *MenuPersistenceService) LoadMenu(cafeteria Cafeteria) (*Menu, error) {
 	if dishes == nil {
 		return nil, nil
 	}
-
-	logger.Info("found menu in database for %s with %d dishes", string(cafeteria), len(dishes))
 
 	today := time.Now().Truncate(24 * time.Hour)
 	menuItems := make([]*MenuItem, len(dishes))
@@ -49,14 +45,11 @@ func (p *MenuPersistenceService) LoadMenu(cafeteria Cafeteria) (*Menu, error) {
 }
 
 func (p *MenuPersistenceService) SaveMenu(cafeteria Cafeteria, menu *Menu) error {
-	logger.Debug("saving menu to database for cafeteria: %s", string(cafeteria))
-
 	err := p.repo.SaveMenuItems(string(cafeteria), menu.Items)
 	if err != nil {
 		logger.Error("failed to save menu to database for %s: %v", string(cafeteria), err)
 		return fmt.Errorf("database update failed for %s: %w", string(cafeteria), err)
 	}
 
-	logger.Info("successfully saved menu to database for %s", string(cafeteria))
 	return nil
 }

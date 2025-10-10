@@ -23,8 +23,6 @@ type HTTPFetcher struct {
 }
 
 func NewHTTPFetcher(url string) *HTTPFetcher {
-	logger.Info("creating HTTP fetcher for URL: %s", url)
-
 	client := &http.Client{
 		Timeout: httpDefaultTimeout,
 		Transport: &http.Transport{
@@ -45,12 +43,10 @@ func (f *HTTPFetcher) Fetch() (string, error) {
 }
 
 func (f *HTTPFetcher) FetchWithContext(ctx context.Context) (string, error) {
-	logger.Info("starting HTTP fetch from URL: %s", f.url)
-
 	var lastErr error
 	for attempt := 1; attempt <= httpRetryAttempts; attempt++ {
 		if attempt > 1 {
-			logger.Debug("retry attempt %d/%d for URL: %s", attempt, httpRetryAttempts, f.url)
+			logger.Warn("retry attempt %d/%d for URL: %s", attempt, httpRetryAttempts, f.url)
 			select {
 			case <-ctx.Done():
 				return "", ctx.Err()
@@ -60,7 +56,7 @@ func (f *HTTPFetcher) FetchWithContext(ctx context.Context) (string, error) {
 
 		body, err := f.fetchAttempt(ctx)
 		if err == nil {
-			logger.Info("successfully fetched content (%d bytes)", len(body))
+			logger.Debug("successfully fetched content (%d bytes)", len(body))
 			return body, nil
 		}
 
@@ -81,7 +77,6 @@ func (f *HTTPFetcher) fetchAttempt(ctx context.Context) (string, error) {
 	req.Header.Set("User-Agent", "KBU-Daily-Menu/1.0")
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
 
-	logger.Debug("sending HTTP request to %s", f.url)
 	resp, err := f.httpClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("HTTP request failed: %w", err)
@@ -97,15 +92,11 @@ func (f *HTTPFetcher) fetchAttempt(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("HTTP request failed with status %d", resp.StatusCode)
 	}
 
-	logger.Debug("received response with status %d, content-length: %s",
-		resp.StatusCode, resp.Header.Get("Content-Length"))
-
 	body, err := f.readResponseBody(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	logger.Debug("successfully read response body (%d bytes)", len(body))
 	return body, nil
 }
 

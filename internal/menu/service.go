@@ -21,16 +21,12 @@ func NewCafeteriaService(cache *MenuCacheService, persistence *MenuPersistenceSe
 }
 
 func (s *CafeteriaService) GetMenu(cafeteria Cafeteria) (*Menu, error) {
-	logger.Debug("getting menu for cafeteria: %s", string(cafeteria))
-
 	// Check cache first
 	if menu, exists := s.cache.Get(cafeteria); exists {
-		logger.Debug("returning cached menu for %s", string(cafeteria))
 		return menu, nil
 	}
 
 	// Check database
-	logger.Debug("cached menu not available, checking database for %s", string(cafeteria))
 	menu, err := s.persistence.LoadMenu(cafeteria)
 	if err != nil {
 		return nil, err
@@ -43,7 +39,7 @@ func (s *CafeteriaService) GetMenu(cafeteria Cafeteria) (*Menu, error) {
 	}
 
 	// Fetch from external source
-	logger.Info("no menu found in database for %s, fetching from external source", string(cafeteria))
+	logger.Info("fetching fresh menu for %s from external source", string(cafeteria))
 	menu, err = s.fetcher.FetchMenu()
 	if err != nil {
 		logger.Error("failed to fetch menu from external source for %s: %v", string(cafeteria), err)
@@ -53,14 +49,12 @@ func (s *CafeteriaService) GetMenu(cafeteria Cafeteria) (*Menu, error) {
 	logger.Info("successfully fetched menu for %s with %d items", string(cafeteria), len(menu.Items))
 
 	// Save to database and cache
-	logger.Debug("updating database with new menu for %s", string(cafeteria))
 	if err := s.persistence.SaveMenu(cafeteria, menu); err != nil {
 		logger.Error("failed to update database with new menu for %s: %v", string(cafeteria), err)
 		return nil, fmt.Errorf("database update failed for %s: %w", string(cafeteria), err)
 	}
 
 	s.cache.Set(cafeteria, menu)
-	logger.Info("successfully updated database and cached menu for %s", string(cafeteria))
 	return menu, nil
 }
 

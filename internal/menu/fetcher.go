@@ -24,8 +24,6 @@ func (s *MenuFetcherService) FetchMenu() (*Menu, error) {
 }
 
 func (s *MenuFetcherService) FetchMenuWithContext(ctx context.Context) (*Menu, error) {
-	logger.Info("starting daily menu fetch process")
-
 	menu, err := s.htmlParser.ParseMenu()
 	if err != nil {
 		logger.Error("failed to parse HTML content: %v", err)
@@ -40,12 +38,11 @@ func (s *MenuFetcherService) FetchMenuWithContext(ctx context.Context) (*Menu, e
 		return menu, nil
 	}
 
-	logger.Debug("adding descriptions to %d menu items", len(menu.Items))
 	if err := s.aiService.GenerateDescriptions(ctx, menu); err != nil {
 		logger.Error("failed to add descriptions to menu: %v", err)
 		return nil, fmt.Errorf("failed to add menu descriptions: %w", err)
 	}
 
-	logger.Info("successfully processed menu with %d items", len(menu.Items))
+	logger.Debug("successfully processed menu with %d items", len(menu.Items))
 	return menu, nil
 }

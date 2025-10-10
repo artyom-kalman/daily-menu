@@ -8,8 +8,6 @@ import (
 	"io"
 	"net/http"
 	"time"
-
-	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
 )
 
 type GptService struct {
@@ -34,8 +32,6 @@ func NewGptService(apiKey string, url string) *GptService {
 }
 
 func (gpt *GptService) SendRequest(ctx context.Context, messages []*Message) (any, error) {
-	logger.Info("Sending request to GPT")
-
 	reqBody := Request{
 		Messages: messages,
 	}
@@ -71,7 +67,6 @@ func (gpt *GptService) SendRequest(ctx context.Context, messages []*Message) (an
 		}
 		return nil, fmt.Errorf("request failed with status %d: %s", res.StatusCode, string(body))
 	}
-	logger.Info("Successfully sent request to GPT: %d", res.StatusCode)
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
@@ -83,12 +78,10 @@ func (gpt *GptService) SendRequest(ctx context.Context, messages []*Message) (an
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
-	logger.Debug("GPT response: %+v", response)
 
 	if !response.Success {
 		return nil, fmt.Errorf("AI request failed: %v", response.Errors)
 	}
 
-	logger.Info("Successfully received response from GPT")
 	return response.Result.Response, nil
 }

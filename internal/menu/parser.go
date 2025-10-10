@@ -79,6 +79,5 @@ func (p *MenuParser) extractFoodItems(foodList string) ([]string, error) {
 		dishes = append(dishes, newDish)
 	}
 
-	logger.Debug("extracted %d food items from HTML", len(dishes))
 	return dishes, nil
 }

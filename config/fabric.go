@@ -72,8 +72,6 @@ func InitAppWithContext(ctx context.Context, dbSourcePath string, peonyUrl strin
 }
 
 func loadAppConfig(peonyUrl, azileaUrl, dbSourcePath string) (*AppConfig, error) {
-	logger.Debug("loading application configuration")
-
 	gptToken, err := GetEnv("GPT_TOKEN")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get GPT_TOKEN: %w", err)
@@ -92,33 +90,23 @@ func loadAppConfig(peonyUrl, azileaUrl, dbSourcePath string) (*AppConfig, error)
 		GPTURL:       gptUrl,
 	}
 
-	logger.Debug("application config loaded successfully")
 	return config, nil
 }
 
 func initializeServices(ctx context.Context, config *AppConfig) (*menu.MenuService, error) {
-	logger.Debug("initializing services")
-
-	logger.Debug("creating ChatGPT service")
 	gptService := ai.NewGptService(config.GPTToken, config.GPTURL)
-
-	logger.Debug("creating menu fetcher services for Peony and Azilea")
 	peonyFetcher := menu.NewMenuFetcherService(config.PeonyURL, gptService)
 	azileaFetcher := menu.NewMenuFetcherService(config.AzileaURL, gptService)
 
-	logger.Debug("initializing database with path: %s", config.DBSourcePath)
 	db := database.NewDatabase(config.DBSourcePath)
 	menuRepo := menu.NewMenuRepository(db)
 
-	logger.Debug("creating core services")
 	cacheService := menu.NewMenuCacheService()
 	persistenceService := menu.NewMenuPersistenceService(menuRepo)
 
-	logger.Debug("creating orchestration services")
 	peonyOrchestration := menu.NewCafeteriaService(cacheService, persistenceService, peonyFetcher)
 	azileaOrchestration := menu.NewCafeteriaService(cacheService, persistenceService, azileaFetcher)
 
-	logger.Debug("creating combined menu service")
 	menuService := menu.NewMenuService(peonyOrchestration, azileaOrchestration)
 
 	logger.Info("all services initialized successfully")
@@ -135,24 +123,20 @@ func warmupServices(ctx context.Context, menuService *menu.MenuService) error {
 
 	go func() {
 		defer wg.Done()
-		logger.Debug("warming up Azilea menu service")
 		if _, err := menuService.GetAzileaMenu(); err != nil {
 			logger.Error("failed to warmup Azilea menu: %v", err)
 			errChan <- fmt.Errorf("Azilea warmup failed: %w", err)
 			return
 		}
-		logger.Debug("Azilea menu warmup completed")
 	}()
 
 	go func() {
 		defer wg.Done()
-		logger.Debug("warming up Peony menu service")
 		if _, err := menuService.GetPeonyMenu(); err != nil {
 			logger.Error("failed to warmup Peony menu: %v", err)
 			errChan <- fmt.Errorf("Peony warmup failed: %w", err)
 			return
 		}
-		logger.Debug("Peony menu warmup completed")
 	}()
 
 	done := make(chan struct{})
@@ -183,7 +167,6 @@ func MenuService() (*menu.MenuService, error) {
 		return nil, fmt.Errorf("menu service is not initialized - call InitApp first")
 	}
 
-	logger.Debug("returning initialized menu service")
 	return cacheMenuService, nil
 }
 
