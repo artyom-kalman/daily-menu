@@ -44,13 +44,28 @@ func (p *MenuParser) ParseMenu() (*Menu, error) {
 
 func (p *MenuParser) extractFoodList(body string, dayOfWeek int) (string, error) {
 	regex := regexp.MustCompile(`(?Ums)<ul class="foodList">(.*)<\/ul>`)
-	matches := regex.FindAllStringSubmatch(body, dayOfWeek)
+	matches := regex.FindAllStringSubmatch(body, -1)
 
-	if len(matches) < dayOfWeek {
+	// The website typically only shows weekdays (Mon-Fri), not weekends
+	// Convert dayOfWeek to appropriate index:
+	// Sunday(0) -> Friday(5), Monday(1) -> Monday(1), Tuesday(2) -> Tuesday(2), etc.
+	// Saturday(6) -> Friday(5)
+	var targetDay int
+	switch dayOfWeek {
+	case 0: // Sunday
+		targetDay = 5 // Use Friday's menu
+	case 6: // Saturday
+		targetDay = 5 // Use Friday's menu
+	default:
+		targetDay = dayOfWeek
+	}
+
+	if len(matches) < targetDay {
+		logger.Debug(fmt.Sprintf("Found %d foodList elements, but need day %d", len(matches), targetDay))
 		return "", errors.New("error parsing body")
 	}
 
-	return matches[dayOfWeek-1][1], nil
+	return matches[targetDay-1][1], nil
 }
 
 func (p *MenuParser) extractFoodItems(foodList string) ([]string, error) {
@@ -66,6 +81,12 @@ func (p *MenuParser) extractFoodItems(foodList string) ([]string, error) {
 			continue
 		}
 		dishes = append(dishes, newDish)
+	}
+
+	// If no valid dishes found, it might be a holiday
+	if len(dishes) == 0 {
+		logger.Info("No valid menu items found - likely holiday or weekend")
+		return []string{}, nil
 	}
 
 	return dishes, nil

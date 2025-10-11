@@ -148,8 +148,25 @@ func (a *App) setupRouter() {
 	a.router.Use(corsMiddleware())
 
 	a.router.SetFuncMap(template.FuncMap{
-		"iterate": func(count int) []struct{} {
-			return make([]struct{}, count)
+		"spicinessIndicators": func(spiciness int) []string {
+			indicators := make([]string, 5)
+			for i := 0; i < 5; i++ {
+				if i < spiciness {
+					indicators[i] = "bg-red-500"
+				} else {
+					indicators[i] = "bg-gray-300"
+				}
+			}
+			return indicators
+		},
+		"debugType": func(v interface{}) string {
+			return fmt.Sprintf("%T", v)
+		},
+		"formatDate": func(t time.Time) string {
+			return t.Format("02.01.2006")
+		},
+		"formatTime": func(t time.Time) string {
+			return t.Format("15:04")
 		},
 	})
 	a.router.LoadHTMLGlob("templates/*.html")
