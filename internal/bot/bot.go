@@ -60,7 +60,7 @@ func (b *Bot) scheduleDailyMessages(message string) {
 
 	b.scheduler.Every(1).Day().At("10:00").Do(func() {
 		for _, chatID := range subscribers {
-			if err := b.SendMessage(int(chatID), message); err != nil {
+			if err := b.sendMenuWithButtons(chatID, message); err != nil {
 				logger.ErrorErrWithFields("Failed to send message to chat", err,
 					slog.Int64("chat_id", chatID))
 			}
@@ -85,34 +85,138 @@ func (b *Bot) getSubscriptionStatus(chatID int64) (bool, error) {
 	return b.repo.GetStatus(chatID)
 }
 
+func (b *Bot) sendStartMessage(chatID int64) error {
+	msg := tgbotapi.NewMessage(chatID, "🍽️ Добро пожаловать в бот ежедневного меню нашего универа!\n\nПолучайте обновления меню каждый день в 10:00.\nНажмите кнопку ниже, чтобы подписаться:")
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🔔 Подписаться", "subscribe"),
+		),
+	)
+
+	msg.ReplyMarkup = keyboard
+	_, err := b.bot.Send(msg)
+	return err
+}
+
+func (b *Bot) sendSubscriptionConfirmation(chatID int64) error {
+	msg := tgbotapi.NewMessage(chatID, "✅ Вы подписаны на ежедневные обновления меню в 10:00!\n\nВы будете получать меню каждый день в 10:00.")
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("❌ Отписаться", "unsubscribe_confirm"),
+		),
+	)
+
+	msg.ReplyMarkup = keyboard
+	_, err := b.bot.Send(msg)
+	return err
+}
+
+func (b *Bot) sendMenuWithButtons(chatID int64, menuText string) error {
+	msg := tgbotapi.NewMessage(chatID, menuText)
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("❌ Отписаться", "unsubscribe_confirm"),
+		),
+	)
+
+	msg.ReplyMarkup = keyboard
+	_, err := b.bot.Send(msg)
+	return err
+}
+
+func (b *Bot) sendUnsubscribeConfirmation(chatID int64) error {
+	msg := tgbotapi.NewMessage(chatID, "Вы уверены, что хотите отписаться от ежедневных обновлений меню?")
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("Да, отписаться", "unsubscribe_yes"),
+			tgbotapi.NewInlineKeyboardButtonData("Отмена", "unsubscribe_cancel"),
+		),
+	)
+
+	msg.ReplyMarkup = keyboard
+	_, err := b.bot.Send(msg)
+	return err
+}
+
+func (b *Bot) handleCallbackQuery(callback *tgbotapi.CallbackQuery) error {
+	chatID := callback.Message.Chat.ID
+	action := callback.Data
+
+	switch action {
+	case "subscribe":
+		if err := b.subscribeChat(chatID); err != nil {
+			return b.SendMessage(int(chatID), "Failed to subscribe. Please try again later.")
+		}
+		return b.sendSubscriptionConfirmation(chatID)
+
+	case "unsubscribe_confirm":
+		return b.sendUnsubscribeConfirmation(chatID)
+
+	case "unsubscribe_yes":
+		if err := b.unsubscribeChat(chatID); err != nil {
+			return b.SendMessage(int(chatID), "Не удалось отписаться. Попробуйте позже.")
+		}
+		msg := tgbotapi.NewMessage(chatID, "❌ Вы отписались от ежедневных обновлений меню.\n\nИспользуйте /start чтобы подписаться снова.")
+		keyboard := tgbotapi.NewInlineKeyboardMarkup(
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("🔔 Подписаться снова", "subscribe"),
+			),
+		)
+		msg.ReplyMarkup = keyboard
+		_, err := b.bot.Send(msg)
+		return err
+
+	case "unsubscribe_cancel":
+		msg := tgbotapi.NewMessage(chatID, "❌ Отписка отменена.\nВы продолжите получать ежедневные обновления меню.")
+		keyboard := tgbotapi.NewInlineKeyboardMarkup(
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("❌ Отписаться", "unsubscribe_confirm"),
+			),
+		)
+		msg.ReplyMarkup = keyboard
+		_, err := b.bot.Send(msg)
+		return err
+
+	default:
+		return b.SendMessage(int(chatID), "Неизвестное действие. Попробуйте еще раз.")
+	}
+}
+
 func (b *Bot) handleCommand(update tgbotapi.Update, defaultMessage string) error {
 	chatID := update.Message.Chat.ID
 	command := update.Message.Command()
 
 	switch command {
+	case "start":
+		return b.sendStartMessage(chatID)
+
 	case "subscribe":
 		if err := b.subscribeChat(chatID); err != nil {
-			return b.SendMessage(int(chatID), "Failed to subscribe. Please try again later.")
+			return b.SendMessage(int(chatID), "Не удалось подписаться. Попробуйте позже.")
 		}
-		return b.SendMessage(int(chatID), "✅ You have been subscribed to daily menu updates at 10:00 AM!")
+		return b.sendSubscriptionConfirmation(chatID)
 
 	case "unsubscribe":
 		if err := b.unsubscribeChat(chatID); err != nil {
-			return b.SendMessage(int(chatID), "Failed to unsubscribe. Please try again later.")
+			return b.SendMessage(int(chatID), "Не удалось отписаться. Попробуйте позже.")
 		}
-		return b.SendMessage(int(chatID), "❌ You have been unsubscribed from daily menu updates.")
+		return b.SendMessage(int(chatID), "❌ Вы отписались от ежедневных обновлений меню.")
 
 	case "status":
 		isActive, err := b.getSubscriptionStatus(chatID)
 		if err != nil {
-			return b.SendMessage(int(chatID), "Failed to check subscription status. Please try again later.")
+			return b.SendMessage(int(chatID), "Не удалось проверить статус подписки. Попробуйте позже.")
 		}
 
-		status := "❌ Not subscribed"
+		status := "❌ Не подписан"
 		if isActive {
-			status = "✅ Subscribed"
+			status = "✅ Подписан"
 		}
-		return b.SendMessage(int(chatID), fmt.Sprintf("Subscription status: %s\nDaily menu updates at 10:00 AM", status))
+		return b.SendMessage(int(chatID), fmt.Sprintf("Статус подписки: %s\nЕжедневные обновления меню в 10:00", status))
 
 	default:
 		msg := tgbotapi.NewMessage(chatID, defaultMessage)
@@ -127,19 +231,24 @@ func (b *Bot) HandleMessages(text string) error {
 
 	updates := b.bot.GetUpdatesChan(updateConf)
 	for update := range updates {
-		if update.Message == nil {
-			continue
-		}
-
-		if update.Message.IsCommand() {
-			if err := b.handleCommand(update, text); err != nil {
-				logger.ErrorErr("Failed to handle command", err)
+		if update.Message != nil {
+			if update.Message.IsCommand() {
+				if err := b.handleCommand(update, text); err != nil {
+					logger.ErrorErr("Failed to handle command", err)
+				}
+			} else {
+				if err := b.sendMenuWithButtons(update.Message.Chat.ID, text); err != nil {
+					return err
+				}
 			}
-		} else {
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, text)
-			_, err := b.bot.Send(msg)
-			if err != nil {
-				return err
+		} else if update.CallbackQuery != nil {
+			if err := b.handleCallbackQuery(update.CallbackQuery); err != nil {
+				logger.ErrorErr("Failed to handle callback query", err)
+			}
+
+			callbackCfg := tgbotapi.NewCallback(update.CallbackQuery.ID, "")
+			if _, err := b.bot.Request(callbackCfg); err != nil {
+				logger.ErrorErr("Failed to answer callback query", err)
 			}
 		}
 	}
@@ -148,9 +257,9 @@ func (b *Bot) HandleMessages(text string) error {
 
 func FormatMenuMessage(peony, azilea *menu.Menu) string {
 	var message strings.Builder
-	message.WriteString("Вот меню на сегодня.\n\n")
+	message.WriteString("🍽️ Меню на сегодня.\n\n")
 
-	message.WriteString("🌸 Peony (нижняя):\n")
+	message.WriteString("🌸 Peony (нижняя столовая):\n")
 	if len(peony.Items) <= 1 {
 		message.WriteString("Сегодня выходной\n")
 	} else {
@@ -163,7 +272,7 @@ func FormatMenuMessage(peony, azilea *menu.Menu) string {
 		}
 	}
 
-	message.WriteString("\n🌺 Azilea (верхняя):\n")
+	message.WriteString("\n🌺 Azilea (верхняя столовая):\n")
 	if len(azilea.Items) <= 1 {
 		message.WriteString("Сегодня выходной\n")
 	} else {
