@@ -1,14 +1,12 @@
 package bot
 
 import (
-	"database/sql"
 	"fmt"
 	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/artyom-kalman/kbu-daily-menu/config"
-	"github.com/artyom-kalman/kbu-daily-menu/internal/database"
 	"github.com/artyom-kalman/kbu-daily-menu/internal/menu"
 	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
 	"github.com/go-co-op/gocron"
@@ -17,11 +15,11 @@ import (
 
 type Bot struct {
 	bot       *tgbotapi.BotAPI
-	db        *database.Database
+	repo      *SubscriptionRepository
 	scheduler *gocron.Scheduler
 }
 
-func NewBot(token string, db *database.Database) (*Bot, error) {
+func NewBot(token string, repo *SubscriptionRepository) (*Bot, error) {
 	bot, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
 		return nil, err
@@ -31,7 +29,7 @@ func NewBot(token string, db *database.Database) (*Bot, error) {
 
 	return &Bot{
 		bot:       bot,
-		db:        db,
+		repo:      repo,
 		scheduler: scheduler,
 	}, nil
 }
@@ -45,22 +43,7 @@ func (b *Bot) SendMessage(chatId int, text string) error {
 }
 
 func (b *Bot) loadSubscribers() ([]int64, error) {
-	rows, err := b.db.Conn.Query("SELECT chat_id FROM bot_subscriptions WHERE is_active = true")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var subscribers []int64
-	for rows.Next() {
-		var chatID int64
-		if err := rows.Scan(&chatID); err != nil {
-			return nil, err
-		}
-		subscribers = append(subscribers, chatID)
-	}
-
-	return subscribers, nil
+	return b.repo.LoadSubscribers()
 }
 
 func (b *Bot) scheduleDailyMessages(message string) {
@@ -91,33 +74,15 @@ func (b *Bot) scheduleDailyMessages(message string) {
 }
 
 func (b *Bot) subscribeChat(chatID int64) error {
-	_, err := b.db.Conn.Exec(`
-		INSERT OR REPLACE INTO bot_subscriptions (chat_id, is_active, updated_at) 
-		VALUES (?, true, CURRENT_TIMESTAMP)
-	`, chatID)
-	return err
+	return b.repo.Subscribe(chatID)
 }
 
 func (b *Bot) unsubscribeChat(chatID int64) error {
-	_, err := b.db.Conn.Exec(`
-		UPDATE bot_subscriptions 
-		SET is_active = false, updated_at = CURRENT_TIMESTAMP 
-		WHERE chat_id = ?
-	`, chatID)
-	return err
+	return b.repo.Unsubscribe(chatID)
 }
 
 func (b *Bot) getSubscriptionStatus(chatID int64) (bool, error) {
-	var isActive bool
-	err := b.db.Conn.QueryRow(`
-		SELECT is_active FROM bot_subscriptions 
-		WHERE chat_id = ?
-	`, chatID).Scan(&isActive)
-
-	if err == sql.ErrNoRows {
-		return false, nil
-	}
-	return isActive, err
+	return b.repo.GetStatus(chatID)
 }
 
 func (b *Bot) handleCommand(update tgbotapi.Update, defaultMessage string) error {

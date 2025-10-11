@@ -68,7 +68,8 @@ func run() error {
 		return fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	botInstance, err := bot.NewBot(cfg.TelegramBotToken, db)
+	botRepo := bot.NewSubscriptionRepository(db)
+	botInstance, err := bot.NewBot(cfg.TelegramBotToken, botRepo)
 	if err != nil {
 		return fmt.Errorf("failed to create bot: %w", err)
 	}
