@@ -1,200 +1,304 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ежедневное меню KBU</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        'inter': ['Inter', 'sans-serif'],
-                    }
-                }
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Ежедневное меню KBU</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+            rel="stylesheet"
+        />
+        <script>
+            tailwind.config = {
+                theme: {
+                    extend: {
+                        fontFamily: {
+                            inter: ["Inter", "sans-serif"],
+                        },
+                    },
+                },
+            };
+        </script>
+        <style>
+            body {
+                font-family: "Inter", sans-serif;
             }
-        }
-    </script>
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-    </style>
-</head>
-<body class="bg-gray-50 min-h-screen flex flex-col">
-    <!-- Header -->
-    <header class="bg-white shadow-sm border-b border-gray-200">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <div class="text-center">
-                <h1 class="text-3xl font-bold text-gray-900 mb-2">Ежедневное меню</h1>
-                <p class="text-gray-600">KBU Кафе</p>
-                <p class="text-sm text-gray-500 mt-1" id="current-date"></p>
+        </style>
+    </head>
+    <body class="bg-gray-50 min-h-screen flex flex-col">
+        <!-- Header -->
+        <header class="bg-white shadow-sm border-b border-gray-200">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                <div class="text-center">
+                    <h1 class="text-3xl font-bold text-gray-900 mb-2">
+                        Ежедневное меню
+                    </h1>
+                    <p class="text-gray-600">KBU Кафе</p>
+                    <p class="text-sm text-gray-500 mt-1" id="current-date"></p>
+                </div>
             </div>
-        </div>
-    </header>
+        </header>
 
-    <!-- Main Content -->
-    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <!-- Peony Restaurant Card -->
-            <div class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300">
-                <div class="bg-gradient-to-r from-purple-600 to-purple-700 p-6">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h2 class="text-2xl font-bold text-white">Peony</h2>
-                            <p class="text-purple-100">Азиатская кухня</p>
-                        </div>
-                        <div class="bg-white/20 backdrop-blur-sm rounded-full p-3">
-                            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-                            </svg>
+        <!-- Main Content -->
+        <main
+            class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full"
+        >
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Peony Restaurant Card -->
+                <div
+                    class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300"
+                >
+                    <div
+                        class="bg-gradient-to-r from-purple-600 to-purple-700 p-6"
+                    >
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h2 class="text-2xl font-bold text-white">
+                                    Peony
+                                </h2>
+                                <p class="text-purple-100">Азиатская кухня</p>
+                            </div>
+                            <div
+                                class="bg-white/20 backdrop-blur-sm rounded-full p-3"
+                            >
+                                <svg
+                                    class="w-8 h-8 text-white"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                                    ></path>
+                                </svg>
+                            </div>
                         </div>
                     </div>
-                </div>
-                <div class="p-6">
-                    {{if .Peony}}
-                        {{if .Peony.Time}}
-                            <p class="text-sm text-gray-500 mb-4">Обновлено: {{.Peony.Time.Format "15:04"}}</p>
-                        {{end}}
-                        {{if .Peony.Items}}
-                            <div class="space-y-4">
-                                {{range .Peony.Items}}
-                                    <div class="border-l-4 border-purple-500 pl-4 py-2">
-                                        <h3 class="font-semibold text-gray-900 text-lg">{{.Name}}</h3>
-                                        {{if .Description}}
-                                            <p class="text-gray-600 text-sm mt-1">{{.Description}}</p>
-                                        {{end}}
-                                        {{if .Spiciness}}
-                                            <div class="flex items-center mt-2">
-                                                <span class="text-xs text-gray-500 mr-2">Острота:</span>
-                                                <div class="flex">
-                                                    Острота: {{.Spiciness}}/5
-                                                </div>
-                                            </div>
-                                        {{end}}
+                    <div class="p-6">
+                        {{if .Peony}} {{if .Peony.Time}}
+                        <p class="text-sm text-gray-500 mb-4">
+                            Обновлено: {{.Peony.Time.Format "15:04"}}
+                        </p>
+                        {{end}} {{if .Peony.Items}}
+                        <div class="space-y-4">
+                            {{range .Peony.Items}}
+                            <div class="border-l-4 border-purple-500 pl-4 py-2">
+                                <h3 class="font-semibold text-gray-900 text-lg">
+                                    {{.Name}}
+                                </h3>
+                                {{if .Description}}
+                                <p class="text-gray-600 text-sm mt-1">
+                                    {{.Description}}
+                                </p>
+                                {{end}} {{if .Spiciness}}
+                                <div class="flex items-center mt-2">
+                                    <span class="text-xs text-gray-500 mr-2"
+                                        >Острота:</span
+                                    >
+                                    <div class="flex">
+                                        Острота: {{.Spiciness}}/5
                                     </div>
+                                </div>
                                 {{end}}
                             </div>
+                            {{end}}
+                        </div>
                         {{else}}
-                            <div class="text-center py-8">
-                                <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                </svg>
-                                <p class="text-gray-500">Сегодня тут пусто</p>
-                            </div>
-                        {{end}}
-                    {{else}}
                         <div class="text-center py-8">
-                            <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            <svg
+                                class="w-16 h-16 text-gray-300 mx-auto mb-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                ></path>
+                            </svg>
+                            <p class="text-gray-500">Сегодня тут пусто</p>
+                        </div>
+                        {{end}} {{else}}
+                        <div class="text-center py-8">
+                            <svg
+                                class="w-16 h-16 text-gray-300 mx-auto mb-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                ></path>
                             </svg>
                             <p class="text-gray-500">Загрузка меню...</p>
                         </div>
-                    {{end}}
-                </div>
-            </div>
-
-            <!-- Azilea Restaurant Card -->
-            <div class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300">
-                <div class="bg-gradient-to-r from-green-600 to-green-700 p-6">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h2 class="text-2xl font-bold text-white">Azilea</h2>
-                            <p class="text-green-100">Европейская кухня</p>
-                        </div>
-                        <div class="bg-white/20 backdrop-blur-sm rounded-full p-3">
-                            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                            </svg>
-                        </div>
+                        {{end}}
                     </div>
                 </div>
-                <div class="p-6">
-                    {{if .Azilea}}
-                        {{if .Azilea.Time}}
-                            <p class="text-sm text-gray-500 mb-4">Обновлено: {{.Azilea.Time.Format "15:04"}}</p>
-                        {{end}}
-                        {{if .Azilea.Items}}
-                            <div class="space-y-4">
-                                {{range .Azilea.Items}}
-                                    <div class="border-l-4 border-green-500 pl-4 py-2">
-                                        <h3 class="font-semibold text-gray-900 text-lg">{{.Name}}</h3>
-                                        {{if .Description}}
-                                            <p class="text-gray-600 text-sm mt-1">{{.Description}}</p>
-                                        {{end}}
-                                        {{if .Spiciness}}
-                                            <div class="flex items-center mt-2">
-                                                <span class="text-xs text-gray-500 mr-2">Острота:</span>
-                                                <div class="flex">
-                                                    Острота: {{.Spiciness}}/5
-                                                </div>
-                                            </div>
-                                        {{end}}
+
+                <!-- Azilea Restaurant Card -->
+                <div
+                    class="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300"
+                >
+                    <div
+                        class="bg-gradient-to-r from-green-600 to-green-700 p-6"
+                    >
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h2 class="text-2xl font-bold text-white">
+                                    Azilea
+                                </h2>
+                                <p class="text-green-100">Европейская кухня</p>
+                            </div>
+                            <div
+                                class="bg-white/20 backdrop-blur-sm rounded-full p-3"
+                            >
+                                <svg
+                                    class="w-8 h-8 text-white"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+                                    ></path>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        {{if .Azilea}} {{if .Azilea.Time}}
+                        <p class="text-sm text-gray-500 mb-4">
+                            Обновлено: {{.Azilea.Time.Format "15:04"}}
+                        </p>
+                        {{end}} {{if .Azilea.Items}}
+                        <div class="space-y-4">
+                            {{range .Azilea.Items}}
+                            <div class="border-l-4 border-green-500 pl-4 py-2">
+                                <h3 class="font-semibold text-gray-900 text-lg">
+                                    {{.Name}}
+                                </h3>
+                                {{if .Description}}
+                                <p class="text-gray-600 text-sm mt-1">
+                                    {{.Description}}
+                                </p>
+                                {{end}} {{if .Spiciness}}
+                                <div class="flex items-center mt-2">
+                                    <span class="text-xs text-gray-500 mr-2"
+                                        >Острота:</span
+                                    >
+                                    <div class="flex">
+                                        Острота: {{.Spiciness}}/5
                                     </div>
+                                </div>
                                 {{end}}
                             </div>
+                            {{end}}
+                        </div>
                         {{else}}
-                            <div class="text-center py-8">
-                                <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                                </svg>
-                                <p class="text-gray-500">Сегодня тут пусто</p>
-                            </div>
-                        {{end}}
-                    {{else}}
                         <div class="text-center py-8">
-                            <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            <svg
+                                class="w-16 h-16 text-gray-300 mx-auto mb-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                ></path>
+                            </svg>
+                            <p class="text-gray-500">Сегодня тут пусто</p>
+                        </div>
+                        {{end}} {{else}}
+                        <div class="text-center py-8">
+                            <svg
+                                class="w-16 h-16 text-gray-300 mx-auto mb-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                ></path>
                             </svg>
                             <p class="text-gray-500">Загрузка меню...</p>
                         </div>
-                    {{end}}
+                        {{end}}
+                    </div>
                 </div>
             </div>
-        </div>
-    </main>
+        </main>
 
-    <!-- Footer -->
-    <footer class="bg-white border-t border-gray-200 mt-auto">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div class="text-center">
-                <div class="mb-6">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-2">Подпишитесь на наш Telegram бот</h3>
-                    <p class="text-gray-600 mb-4">Получайте уведомления о ежедневном меню прямо в Telegram</p>
-                    <a href="https://t.me/kbu_daily_menu_bot" target="_blank" class="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-colors duration-200">
-                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.295-.6.295-.002 0-.003 0-.005 0l.213-3.054 5.56-5.022c.24-.213-.054-.334-.373-.121l-6.869 4.326-2.96-.924c-.64-.203-.658-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.941z"/>
-                        </svg>
-                        Открыть Telegram бот
-                    </a>
-                </div>
-                <div class="text-sm text-gray-500">
-                    <p>© 2024 KBU Daily Menu. Все права защищены.</p>
+        <!-- Footer -->
+        <footer class="bg-white border-t border-gray-200 mt-auto">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <div class="text-center">
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-2">
+                            Подпишитесь на наш Telegram бот
+                        </h3>
+                        <p class="text-gray-600 mb-4">
+                            Получайте уведомления о ежедневном меню прямо в
+                            Telegram
+                        </p>
+                        <a
+                            href="https://t.me/kbu_daily_menu_bot"
+                            target="_blank"
+                            class="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-colors duration-200"
+                        >
+                            <svg
+                                class="w-5 h-5 mr-2"
+                                fill="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.295-.6.295-.002 0-.003 0-.005 0l.213-3.054 5.56-5.022c.24-.213-.054-.334-.373-.121l-6.869 4.326-2.96-.924c-.64-.203-.658-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.941z"
+                                />
+                            </svg>
+                            Открыть Telegram бот
+                        </a>
+                    </div>
                 </div>
             </div>
-        </div>
-    </footer>
+        </footer>
 
-    <script>
-        // Set current date in Russian
-        const options = { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-        };
-        const today = new Date();
-        const russianDate = today.toLocaleDateString('ru-RU', options);
-        document.getElementById('current-date').textContent = russianDate.charAt(0).toUpperCase() + russianDate.slice(1);
+        <script>
+            // Set current date in Russian
+            const options = {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+            };
+            const today = new Date();
+            const russianDate = today.toLocaleDateString("ru-RU", options);
+            document.getElementById("current-date").textContent =
+                russianDate.charAt(0).toUpperCase() + russianDate.slice(1);
 
-        // Auto-refresh every 5 minutes
-        setTimeout(() => {
-            location.reload();
-        }, 300000);
-    </script>
-</body>
+            // Auto-refresh every 5 minutes
+            setTimeout(() => {
+                location.reload();
+            }, 300000);
+        </script>
+    </body>
 </html>
