@@ -180,6 +180,7 @@ func (a *App) setupRoutes() {
 
 	a.router.StaticFile("/dist/tailwind.css", "./web/dist/tailwind.css")
 	a.router.StaticFile("/dist/app.js", "./web/dist/app.js")
+	a.router.Static("/static", "./web/static")
 	a.router.Static("/img", "./web/img")
 
 	webGroup := a.router.Group("")

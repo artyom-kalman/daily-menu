@@ -22,334 +22,34 @@
                 },
             };
         </script>
-        <style>
-            /* Enhanced Typography & Base Styles */
-            body {
-                font-family: "Inter", sans-serif;
-                line-height: 1.6;
-                letter-spacing: 0.01em;
-            }
-
-            /* Animations */
-            @keyframes fadeIn {
-                from { opacity: 0; transform: translateY(8px); }
-                to { opacity: 1; transform: translateY(0); }
-            }
-
-            @keyframes float {
-                0%, 100% { transform: translateY(0px); }
-                50% { transform: translateY(-3px); }
-            }
-
-            main {
-                animation: fadeIn 0.6s ease-out;
-            }
-
-            /* Refined Theme Variables */
-            [data-theme="default"] {
-                --color-primary: #6366f1;
-                --color-accent: #8b5cf6;
-                --bg-color: #f9fafb;
-                --text-color: #111827;
-                --card-bg: #ffffff;
-                --header-bg: #ffffff;
-                --footer-bg: #ffffff;
-                --border-color: #e5e7eb;
-                
-                /* Peony (Asian) - Sophisticated purple */
-                --peony-primary: #9333ea;
-                --peony-accent: #7c3aed;
-                --peony-bg: #faf5ff;
-                
-                /* Azilea (European) - Rich emerald */
-                --azilea-primary: #059669;
-                --azilea-accent: #047857;
-                --azilea-bg: #f0fdf4;
-                
-                /* Theme selector specific colors */
-                --selector-bg: #ffffff;
-                --selector-text: #111827;
-                --selector-border: #e5e7eb;
-                --selector-focus: #6366f1;
-            }
-
-            [data-theme="halloween"] {
-                --color-primary: #ff7518;
-                --color-accent: #b85cff;
-                --bg-color: #121212;
-                --text-color: #f0f0f0;
-                --card-bg: #1e1e1e;
-                --header-bg: #181818;
-                --footer-bg: #181818;
-                --border-color: #2a2a2a;
-                
-                /* Adaptive text colors for dark backgrounds */
-                --text-primary: #f0f0f0;     /* Bright text for headings */
-                --text-secondary: #b8b8b8;   /* Medium bright for descriptions */
-                --text-muted: #888888;       /* Muted but readable text */
-                --text-on-light: #1a1a1a;    /* Dark text for any light elements */
-                
-                /* Theme selector specific colors */
-                --selector-bg: #2d2d2d;
-                --selector-text: #f0f0f0;
-                --selector-border: #4a4a4a;
-                --selector-focus: #ff7518;
-                
-                /* Peony (Asian) - Pumpkin to mystical violet */
-                --peony-primary: #ff6b35;
-                --peony-accent: #b85cff;
-                --peony-bg: #2d1b1b;
-                
-                /* Azilea (European) - Blood red to dark shadow */
-                --azilea-primary: #dc2626;
-                --azilea-accent: #374151;
-                --azilea-bg: #1f1f1f;
-            }
-
-            [data-theme="christmas"] {
-                --color-primary: #e60026;
-                --color-accent: #007f3d;
-                --bg-color: #f8faf9;
-                --text-color: #202020;
-                --card-bg: #ffffff;
-                --header-bg: #ffffff;
-                --footer-bg: #f1f5f1;
-                --border-color: #d4d4d8;
-                
-                /* Peony (Asian) - Festive red to gold */
-                --peony-primary: #dc2626;
-                --peony-accent: #fbbf24;
-                --peony-bg: #fef2f2;
-                
-                /* Azilea (European) - Rich green to silver */
-                --azilea-primary: #059669;
-                --azilea-accent: #9ca3af;
-                --azilea-bg: #f0fdf4;
-                
-                /* Theme selector specific colors */
-                --selector-bg: #ffffff;
-                --selector-text: #202020;
-                --selector-border: #d4d4d8;
-                --selector-focus: #059669;
-            }
-
-            /* Smooth Theme Transitions */
-            [data-theme] {
-                background-color: var(--bg-color);
-                color: var(--text-color);
-                transition: background-color 0.4s ease, color 0.4s ease;
-            }
-
-            /* Enhanced Card Styles */
-            [data-theme] .restaurant-card {
-                background-color: var(--card-bg);
-                border: 1px solid var(--border-color);
-                border-radius: 1rem;
-                transition: all 0.25s ease;
-            }
-
-            [data-theme] .peony-card {
-                background-color: var(--peony-bg);
-            }
-
-            [data-theme] .azilea-card {
-                background-color: var(--azilea-bg);
-            }
-
-            /* Header & Footer */
-            [data-theme] header {
-                background-color: var(--header-bg);
-                border-color: var(--border-color);
-                transition: all 0.4s ease;
-            }
-
-            [data-theme] footer {
-                background-color: var(--footer-bg);
-                border-color: var(--border-color);
-                transition: all 0.4s ease;
-            }
-
-            /* Theme Classes */
-            [data-theme] .theme-primary {
-                background-color: var(--color-primary);
-            }
-
-            [data-theme] .theme-gradient {
-                background: linear-gradient(to right, var(--color-primary), var(--color-accent));
-            }
-
-            [data-theme] .theme-border {
-                border-color: var(--color-primary);
-            }
-
-            [data-theme] .theme-text {
-                color: var(--color-primary);
-            }
-
-            /* Enhanced Restaurant Gradients */
-            [data-theme] .peony-gradient {
-                background: linear-gradient(145deg, var(--peony-primary), var(--peony-accent));
-                transition: filter 0.25s ease;
-            }
-
-            [data-theme] .azilea-gradient {
-                background: linear-gradient(145deg, var(--azilea-primary), var(--azilea-accent));
-                transition: filter 0.25s ease;
-            }
-
-            [data-theme] .peony-border {
-                border-color: var(--peony-primary);
-            }
-
-            [data-theme] .azilea-border {
-                border-color: var(--azilea-primary);
-            }
-
-            /* Enhanced Shadows & Hover Effects */
-            [data-theme] .restaurant-card {
-                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            }
-
-            [data-theme] .restaurant-card:hover {
-                transform: translateY(-3px) scale(1.01);
-                box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-            }
-
-            [data-theme] .restaurant-card:hover .peony-gradient,
-            [data-theme] .restaurant-card:hover .azilea-gradient {
-                filter: brightness(1.1);
-            }
-
-            /* Theme-specific shadows */
-            [data-theme="default"] .peony-card {
-                box-shadow: 0 10px 25px rgba(147, 51, 234, 0.15);
-            }
-
-            [data-theme="default"] .azilea-card {
-                box-shadow: 0 10px 25px rgba(5, 150, 105, 0.15);
-            }
-
-            [data-theme="halloween"] .peony-card {
-                box-shadow: 0 10px 25px rgba(255, 107, 53, 0.25);
-            }
-
-            [data-theme="halloween"] .azilea-card {
-                box-shadow: 0 10px 25px rgba(220, 38, 38, 0.25);
-            }
-
-            [data-theme="christmas"] .peony-card {
-                box-shadow: 0 10px 25px rgba(220, 38, 38, 0.2);
-            }
-
-            [data-theme="christmas"] .azilea-card {
-                box-shadow: 0 10px 25px rgba(5, 150, 105, 0.2);
-            }
-
-            /* Seasonal Personality */
-            [data-theme="halloween"] {
-                background-image: radial-gradient(circle, #2a2a2a 1px, transparent 1px);
-                background-size: 40px 40px;
-            }
-
-            [data-theme="halloween"] .peony-card h2 {
-                text-shadow: 0 0 8px rgba(255, 107, 53, 0.7);
-            }
-
-            [data-theme="christmas"]::before {
-                content: "";
-                position: fixed;
-                inset: 0;
-                pointer-events: none;
-                background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="50" font-size="40">❄️</text></svg>');
-                background-size: 100px 100px;
-                opacity: 0.03;
-                animation: float 6s ease-in-out infinite;
-            }
-
-            /* Enhanced Typography */
-            .dish-name {
-                font-size: 1.125rem;
-                line-height: 1.4;
-                font-weight: 600;
-            }
-
-            @media (min-width: 1024px) {
-                .dish-name {
-                    font-size: 1.25rem;
-                }
-            }
-
-            /* Loading States */
-            .loading-state {
-                font-style: italic;
-                color: #9ca3af;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 0.5rem;
-            }
-
-            /* Focus States */
-            select:focus, a:focus {
-                outline: 2px solid var(--color-primary);
-                outline-offset: 2px;
-            }
-
-            /* Halloween-specific adaptive text colors */
-            [data-theme="halloween"] .text-adaptive-primary {
-                color: var(--text-primary) !important;
-            }
-
-            [data-theme="halloween"] .text-adaptive-secondary {
-                color: var(--text-secondary) !important;
-            }
-
-            [data-theme="halloween"] .text-adaptive-muted {
-                color: var(--text-muted) !important;
-            }
-
-            [data-theme="halloween"] .text-adaptive-on-light {
-                color: var(--text-on-light) !important;
-            }
-
-            /* Theme selector styling for all themes */
-            [data-theme] #theme-switcher {
-                background-color: var(--selector-bg);
-                color: var(--selector-text);
-                border-color: var(--selector-border);
-                transition: all 0.25s ease;
-            }
-
-            [data-theme] #theme-switcher:focus {
-                border-color: var(--selector-focus);
-                box-shadow: 0 0 0 2px var(--selector-focus);
-            }
-
-            [data-theme] #theme-switcher option {
-                background-color: var(--selector-bg);
-                color: var(--selector-text);
-            }
-        </style>
+        <link rel="stylesheet" href="/static/styles.css" />
     </head>
-    <body class="bg-gray-50 min-h-screen flex flex-col" data-theme="default">
+    <body class="min-h-screen flex flex-col" data-theme="halloween">
         <!-- Header -->
         <header class="bg-white shadow-sm border-b border-gray-200">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
                 <div class="text-center">
-                    <h1 class="text-3xl font-bold text-gray-900 text-adaptive-primary mb-2">
+                    <h1
+                        class="text-3xl font-bold text-gray-900 text-adaptive-primary mb-2"
+                    >
                         Ежедневное меню
                     </h1>
-                    <p class="text-gray-600 text-adaptive-secondary">KBU Кафе</p>
-                    <p class="text-sm text-gray-500 text-adaptive-muted mt-1" id="current-date"></p>
-                    
+                    <p class="text-gray-600 text-adaptive-secondary">
+                        KBU Кафе
+                    </p>
+                    <p
+                        class="text-sm text-gray-500 text-adaptive-muted mt-1"
+                        id="current-date"
+                    ></p>
+
                     <!-- Theme Switcher -->
-                    <div class="mt-4 flex justify-center">
+                    <!--<div class="mt-4 flex justify-center">
                         <select id="theme-switcher" class="px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                             <option value="default">🌅 Обычная тема</option>
                             <option value="halloween">🎃 Хэллоуин</option>
                             <option value="christmas">🎄 Рождество</option>
                         </select>
-                    </div>
+                    </div>-->
                 </div>
             </div>
         </header>
@@ -363,9 +63,7 @@
                 <div
                     class="peony-card restaurant-card bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300"
                 >
-                    <div
-                        class="peony-gradient p-8"
-                    >
+                    <div class="peony-gradient p-8">
                         <div class="flex items-center justify-between">
                             <div>
                                 <h2 class="text-2xl font-bold text-white">
@@ -394,23 +92,30 @@
                     </div>
                     <div class="p-8">
                         {{if .Peony}} {{if .Peony.Time}}
-                        <p class="text-sm text-gray-500 text-adaptive-muted mb-4">
+                        <p
+                            class="text-sm text-gray-500 text-adaptive-muted mb-4"
+                        >
                             Обновлено: {{.Peony.Time.Format "15:04"}}
                         </p>
                         {{end}} {{if .Peony.Items}}
                         <div class="space-y-4">
                             {{range .Peony.Items}}
                             <div class="border-l-4 peony-border pl-4 py-2">
-                                <h3 class="font-semibold text-gray-900 text-adaptive-primary dish-name">
+                                <h3
+                                    class="font-semibold text-gray-900 text-adaptive-primary dish-name"
+                                >
                                     {{.Name}}
                                 </h3>
                                 {{if .Description}}
-                                <p class="text-gray-600 text-adaptive-secondary text-sm mt-1">
+                                <p
+                                    class="text-gray-600 text-adaptive-secondary text-sm mt-1"
+                                >
                                     {{.Description}}
                                 </p>
                                 {{end}} {{if .Spiciness}}
                                 <div class="flex items-center mt-2">
-                                    <span class="text-xs text-gray-500 text-adaptive-muted mr-2"
+                                    <span
+                                        class="text-xs text-gray-500 text-adaptive-muted mr-2"
                                         >Острота:</span
                                     >
                                     <div class="flex">
@@ -436,7 +141,9 @@
                                     d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                                 ></path>
                             </svg>
-                            <p class="text-gray-500 text-adaptive-muted italic">Сегодня тут пусто 😔</p>
+                            <p class="text-gray-500 text-adaptive-muted italic">
+                                Сегодня тут пусто 😔
+                            </p>
                         </div>
                         {{end}} {{else}}
                         <div class="text-center py-8">
@@ -466,9 +173,7 @@
                 <div
                     class="azilea-card restaurant-card bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300"
                 >
-                    <div
-                        class="azilea-gradient p-8"
-                    >
+                    <div class="azilea-gradient p-8">
                         <div class="flex items-center justify-between">
                             <div>
                                 <h2 class="text-2xl font-bold text-white">
@@ -497,23 +202,30 @@
                     </div>
                     <div class="p-8">
                         {{if .Azilea}} {{if .Azilea.Time}}
-                        <p class="text-sm text-gray-500 text-adaptive-muted mb-4">
+                        <p
+                            class="text-sm text-gray-500 text-adaptive-muted mb-4"
+                        >
                             Обновлено: {{.Azilea.Time.Format "15:04"}}
                         </p>
                         {{end}} {{if .Azilea.Items}}
                         <div class="space-y-4">
                             {{range .Azilea.Items}}
                             <div class="border-l-4 azilea-border pl-4 py-2">
-                                <h3 class="font-semibold text-gray-900 text-adaptive-primary dish-name">
+                                <h3
+                                    class="font-semibold text-gray-900 text-adaptive-primary dish-name"
+                                >
                                     {{.Name}}
                                 </h3>
                                 {{if .Description}}
-                                <p class="text-gray-600 text-adaptive-secondary text-sm mt-1">
+                                <p
+                                    class="text-gray-600 text-adaptive-secondary text-sm mt-1"
+                                >
                                     {{.Description}}
                                 </p>
                                 {{end}} {{if .Spiciness}}
                                 <div class="flex items-center mt-2">
-                                    <span class="text-xs text-gray-500 text-adaptive-muted mr-2"
+                                    <span
+                                        class="text-xs text-gray-500 text-adaptive-muted mr-2"
                                         >Острота:</span
                                     >
                                     <div class="flex">
@@ -539,7 +251,9 @@
                                     d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                                 ></path>
                             </svg>
-                            <p class="text-gray-500 text-adaptive-muted italic">Сегодня тут пусто 😔</p>
+                            <p class="text-gray-500 text-adaptive-muted italic">
+                                Сегодня тут пусто 😔
+                            </p>
                         </div>
                         {{end}} {{else}}
                         <div class="text-center py-8">
@@ -572,7 +286,9 @@
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <div class="text-center">
                     <div class="mb-6">
-                        <h3 class="text-lg font-semibold text-gray-900 text-adaptive-primary mb-2">
+                        <h3
+                            class="text-lg font-semibold text-gray-900 text-adaptive-primary mb-2"
+                        >
                             Подпишитесь на наш Telegram бот
                         </h3>
                         <p class="text-gray-600 text-adaptive-secondary mb-4">
@@ -602,19 +318,19 @@
 
         <script>
             // Theme switching functionality
-            const themeSwitcher = document.getElementById('theme-switcher');
+            const themeSwitcher = document.getElementById("theme-switcher");
             const body = document.body;
 
             // Load saved theme from localStorage
-            const savedTheme = localStorage.getItem('theme') || 'default';
-            body.setAttribute('data-theme', savedTheme);
+            const savedTheme = localStorage.getItem("theme") || "halloween";
+            body.setAttribute("data-theme", savedTheme);
             themeSwitcher.value = savedTheme;
 
             // Theme switcher event listener
-            themeSwitcher.addEventListener('change', (e) => {
+            themeSwitcher.addEventListener("change", (e) => {
                 const selectedTheme = e.target.value;
-                body.setAttribute('data-theme', selectedTheme);
-                localStorage.setItem('theme', selectedTheme);
+                body.setAttribute("data-theme", selectedTheme);
+                localStorage.setItem("theme", selectedTheme);
             });
 
             // Set current date in Russian
