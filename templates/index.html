@@ -118,8 +118,12 @@
                                         class="text-xs text-gray-500 text-adaptive-muted mr-2"
                                         >Острота:</span
                                     >
-                                    <div class="flex">
-                                        Острота: {{.Spiciness}}/5
+                                    <div class="spiciness-indicator" title="Острота: {{.Spiciness}}/5">
+                                        {{if eq .Spiciness 1}}<span class="spiciness-chili">🌶️</span>{{end}}
+                                        {{if eq .Spiciness 2}}<span class="spiciness-chili">🌶️</span><span class="spiciness-chili">🌶️</span>{{end}}
+                                        {{if eq .Spiciness 3}}<span class="spiciness-chili">🌶️</span><span class="spiciness-chili">🌶️</span><span class="spiciness-chili">🌶️</span>{{end}}
+                                        {{if eq .Spiciness 4}}<span class="spiciness-chili">🌶️</span><span class="spiciness-chili">🌶️</span><span class="spiciness-chili">🌶️</span><span class="spiciness-chili">🌶️</span>{{end}}
+                                        {{if eq .Spiciness 5}}<span class="spiciness-chili">🌶️</span><span class="spiciness-chili">🌶️</span><span class="spiciness-chili">🌶️</span><span class="spiciness-chili">🌶️</span><span class="spiciness-chili">🌶️</span>{{end}}
                                     </div>
                                 </div>
                                 {{end}}
@@ -228,8 +232,12 @@
                                         class="text-xs text-gray-500 text-adaptive-muted mr-2"
                                         >Острота:</span
                                     >
-                                    <div class="flex">
-                                        Острота: {{.Spiciness}}/5
+                                    <div class="spiciness-indicator" title="Острота: {{.Spiciness}}/5">
+                                        {{if eq .Spiciness 1}}<span class="spiciness-chili">🌶️</span>{{end}}
+                                        {{if eq .Spiciness 2}}<span class="spiciness-chili">🌶️</span><span class="spiciness-chili">🌶️</span>{{end}}
+                                        {{if eq .Spiciness 3}}<span class="spiciness-chili">🌶️</span><span class="spiciness-chili">🌶️</span><span class="spiciness-chili">🌶️</span>{{end}}
+                                        {{if eq .Spiciness 4}}<span class="spiciness-chili">🌶️</span><span class="spiciness-chili">🌶️</span><span class="spiciness-chili">🌶️</span><span class="spiciness-chili">🌶️</span>{{end}}
+                                        {{if eq .Spiciness 5}}<span class="spiciness-chili">🌶️</span><span class="spiciness-chili">🌶️</span><span class="spiciness-chili">🌶️</span><span class="spiciness-chili">🌶️</span><span class="spiciness-chili">🌶️</span>{{end}}
                                     </div>
                                 </div>
                                 {{end}}

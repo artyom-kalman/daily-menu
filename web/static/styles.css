@@ -34,6 +34,7 @@ main {
 /* Refined Theme Variables */
 [data-theme="default"] {
     --color-primary: #6366f1;
+    --color-primary-rgb: 99, 102, 241;
     --color-accent: #8b5cf6;
     --bg-color: #f9fafb;
     --text-color: #111827;
@@ -76,6 +77,7 @@ main {
     background-blend-mode: overlay;
 
     --color-primary: #ff7518;
+    --color-primary-rgb: 255, 117, 24;
     --color-accent: #b85cff;
     --bg-color: #121212;
     --text-color: #f0f0f0;
@@ -110,6 +112,7 @@ main {
 
 [data-theme="christmas"] {
     --color-primary: #e60026;
+    --color-primary-rgb: 230, 0, 38;
     --color-accent: #007f3d;
     --bg-color: #f8faf9;
     --text-color: #202020;
@@ -226,19 +229,31 @@ main {
     box-shadow:
         0 4px 6px -1px rgba(0, 0, 0, 0.1),
         0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 [data-theme] .restaurant-card:hover {
-    transform: translateY(-3px) scale(1.01);
     box-shadow:
-        0 20px 25px -5px rgba(0, 0, 0, 0.1),
-        0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        0 25px 30px -5px rgba(0, 0, 0, 0.15),
+        0 15px 15px -5px rgba(0, 0, 0, 0.08);
 }
 
 [data-theme] .restaurant-card:hover .peony-gradient,
 [data-theme] .restaurant-card:hover .azilea-gradient {
-    filter: brightness(1.1);
+    filter: brightness(1.15) saturate(1.1);
 }
+
+
+
+/* Staggered animation for menu items */
+[data-theme] .space-y-4 > div:nth-child(1) { transition-delay: 0.05s; }
+[data-theme] .space-y-4 > div:nth-child(2) { transition-delay: 0.1s; }
+[data-theme] .space-y-4 > div:nth-child(3) { transition-delay: 0.15s; }
+[data-theme] .space-y-4 > div:nth-child(4) { transition-delay: 0.2s; }
+[data-theme] .space-y-4 > div:nth-child(5) { transition-delay: 0.25s; }
+[data-theme] .space-y-4 > div:nth-child(6) { transition-delay: 0.3s; }
+[data-theme] .space-y-4 > div:nth-child(7) { transition-delay: 0.35s; }
+[data-theme] .space-y-4 > div:nth-child(8) { transition-delay: 0.4s; }
 
 /* Theme-specific shadows */
 [data-theme="default"] .peony-card {
@@ -273,6 +288,32 @@ main {
 
 [data-theme="halloween"] .peony-card h2 {
     text-shadow: 0 0 8px rgba(255, 107, 53, 0.7);
+    transition: all 0.3s ease;
+}
+
+[data-theme="halloween"] .peony-card:hover h2 {
+    text-shadow: 0 0 12px rgba(255, 107, 53, 0.9);
+    transform: scale(1.05);
+}
+
+[data-theme="halloween"] .azilea-card h2 {
+    text-shadow: 0 0 8px rgba(220, 38, 38, 0.7);
+    transition: all 0.3s ease;
+}
+
+[data-theme="halloween"] .azilea-card:hover h2 {
+    text-shadow: 0 0 12px rgba(220, 38, 38, 0.9);
+    transform: scale(1.05);
+}
+
+/* Halloween floating animation */
+@keyframes halloween-float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-2px); }
+}
+
+[data-theme="halloween"] .restaurant-card:hover {
+    animation: halloween-float 3s ease-in-out infinite;
 }
 
 [data-theme="christmas"]::before {
@@ -286,16 +327,215 @@ main {
     animation: float 6s ease-in-out infinite;
 }
 
+/* Christmas sparkle effect */
+@keyframes christmas-sparkle {
+    0%, 100% { filter: brightness(1) hue-rotate(0deg); }
+    50% { filter: brightness(1.2) hue-rotate(10deg); }
+}
+
+[data-theme="christmas"] .restaurant-card:hover {
+    animation: christmas-sparkle 2s ease-in-out infinite;
+}
+
+[data-theme="christmas"] .peony-card:hover {
+    box-shadow: 0 15px 30px rgba(220, 38, 38, 0.3);
+}
+
+[data-theme="christmas"] .azilea-card:hover {
+    box-shadow: 0 15px 30px rgba(5, 150, 105, 0.3);
+}
+
 /* Enhanced Typography */
 .dish-name {
     font-size: 1.125rem;
     line-height: 1.4;
     font-weight: 600;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @media (min-width: 1024px) {
     .dish-name {
         font-size: 1.25rem;
+    }
+}
+
+/* Menu Item Hover Effects */
+[data-theme] .border-l-4 {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+}
+
+[data-theme] .border-l-4:hover {
+    transform: translateX(4px);
+    border-left-width: 6px;
+    background-color: rgba(var(--color-primary-rgb, 99, 102, 241), 0.05);
+    border-radius: 0 8px 8px 0;
+}
+
+[data-theme] .border-l-4:hover .dish-name {
+    transform: scale(1.02);
+    color: var(--color-primary);
+}
+
+[data-theme] .border-l-4:hover .text-gray-600 {
+    opacity: 1;
+    letter-spacing: 0.025em;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Theme-specific menu item hover backgrounds */
+[data-theme="halloween"] .border-l-4:hover {
+    background-color: rgba(255, 117, 24, 0.1);
+    box-shadow: 0 0 12px rgba(255, 117, 24, 0.3);
+}
+
+[data-theme="christmas"] .border-l-4:hover {
+    background-color: rgba(230, 0, 38, 0.08);
+}
+
+[data-theme="default"] .border-l-4:hover {
+    background-color: rgba(99, 102, 241, 0.05);
+}
+
+/* Spiciness Indicator Enhancements */
+.spiciness-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    transition: all 0.2s ease;
+}
+
+.spiciness-indicator:hover {
+    transform: scale(1.1);
+}
+
+.spiciness-chili {
+    font-size: 14px;
+    transition: all 0.2s ease;
+    display: inline-block;
+}
+
+.spiciness-indicator:hover .spiciness-chili {
+    animation: chili-wiggle 0.3s ease-in-out;
+}
+
+@keyframes chili-wiggle {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(-5deg); }
+    75% { transform: rotate(5deg); }
+}
+
+/* Theme-specific spiciness colors */
+[data-theme="halloween"] .spiciness-chili {
+    filter: hue-rotate(20deg) brightness(1.2);
+}
+
+[data-theme="halloween"] .spiciness-indicator:hover .spiciness-chili {
+    filter: hue-rotate(20deg) brightness(1.4) drop-shadow(0 0 4px rgba(255, 117, 24, 0.6));
+}
+
+[data-theme="christmas"] .spiciness-chili:nth-child(odd) {
+    filter: hue-rotate(0deg);
+}
+
+[data-theme="christmas"] .spiciness-chili:nth-child(even) {
+    filter: hue-rotate(120deg);
+}
+
+/* Enhanced Loading States */
+.loading-state {
+    font-style: italic;
+    color: #9ca3af;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.loading-state:hover {
+    transform: scale(1.05);
+}
+
+.loading-state span:last-child {
+    animation: loading-bounce 1.4s ease-in-out infinite;
+}
+
+@keyframes loading-bounce {
+    0%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-4px); }
+}
+
+/* Timestamp hover effects */
+[data-theme] .text-gray-500 {
+    transition: all 0.2s ease;
+    cursor: help;
+}
+
+[data-theme] .text-gray-500:hover {
+    color: var(--color-primary);
+    transform: translateY(-1px);
+}
+
+/* Empty state hover animations */
+[data-theme] .text-gray-300 {
+    transition: all 0.3s ease;
+}
+
+[data-theme] .text-gray-300:hover {
+    transform: scale(1.1) rotate(5deg);
+    filter: brightness(1.2);
+}
+
+/* Enhanced Telegram Button */
+.theme-primary {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.theme-primary::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+.theme-primary:hover::before {
+    width: 300px;
+    height: 300px;
+}
+
+.theme-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(var(--color-primary-rgb, 99, 102, 241), 0.3);
+}
+
+/* Accessibility - Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+    [data-theme] .border-l-4,
+    [data-theme] .border-l-4:hover .dish-name,
+    .spiciness-indicator,
+    .spiciness-chili,
+    .loading-state,
+    .loading-state span:last-child,
+    [data-theme] .text-gray-500,
+    [data-theme] .text-gray-300,
+    .theme-primary {
+        animation: none !important;
+        transition: none !important;
+        transform: none !important;
+    }
+    
+    [data-theme] .border-l-4:hover {
+        border-left-width: 4px;
+        background-color: transparent;
     }
 }
 
@@ -349,4 +589,54 @@ a:focus {
 [data-theme] #theme-switcher option {
     background-color: var(--selector-bg);
     color: var(--selector-text);
+}
+
+/* Header and footer micro-interactions */
+[data-theme] h1 {
+    transition: all 0.3s ease;
+}
+
+[data-theme] h1:hover {
+    transform: scale(1.02);
+    filter: brightness(1.1);
+}
+
+[data-theme] .text-gray-600 {
+    transition: all 0.2s ease;
+}
+
+[data-theme] .text-gray-600:hover {
+    color: var(--color-primary);
+    transform: translateY(-1px);
+}
+
+/* Enhanced footer link hover */
+[data-theme] footer a {
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+[data-theme] footer a::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background-color: var(--color-primary);
+    transition: width 0.3s ease;
+}
+
+[data-theme] footer a:hover::after {
+    width: 100%;
+}
+
+/* Pulse animation for loading states */
+@keyframes pulse-glow {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+}
+
+[data-theme] .loading-state span:first-child {
+    animation: pulse-glow 2s ease-in-out infinite;
 }
