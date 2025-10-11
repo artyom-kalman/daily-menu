@@ -19,7 +19,7 @@ func NewMenuPersistenceService(repo *MenuRepository) *MenuPersistenceService {
 }
 
 func (p *MenuPersistenceService) LoadMenu(cafeteria Cafeteria) (*Menu, error) {
-	dishes, err := p.repo.GetMenuItems(string(cafeteria))
+	dishes, err := p.repo.GetMenu(string(cafeteria))
 	if err != nil {
 		logger.ErrorErrWithFields("Failed to load menu from database", err,
 			slog.String("cafeteria", string(cafeteria)))
@@ -47,7 +47,7 @@ func (p *MenuPersistenceService) LoadMenu(cafeteria Cafeteria) (*Menu, error) {
 }
 
 func (p *MenuPersistenceService) SaveMenu(cafeteria Cafeteria, menu *Menu) error {
-	err := p.repo.SaveMenuItems(string(cafeteria), menu.Items)
+	err := p.repo.SaveMenu(string(cafeteria), menu.Items)
 	if err != nil {
 		logger.ErrorErrWithFields("Failed to save menu to database", err,
 			slog.String("cafeteria", string(cafeteria)))

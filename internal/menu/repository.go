@@ -17,36 +17,7 @@ func NewMenuRepository(d *database.Database) *MenuRepository {
 	}
 }
 
-func (r *MenuRepository) GetMenuItems(cafeteria string) ([]*MenuItem, error) {
-	return r.SelectRow(cafeteria)
-}
-
-func (r *MenuRepository) SaveMenuItems(cafeteria string, items []*MenuItem) error {
-	return r.UpdateDishes(cafeteria, items)
-}
-
-func (r *MenuRepository) UpdateDishes(cafeteria string, dishes []*MenuItem) error {
-	err := r.db.Connect()
-	if err != nil {
-		return err
-	}
-	defer r.db.Close()
-
-	dishesJson, err := json.Marshal(dishes)
-	if err != nil {
-		return err
-	}
-
-	updateQuery := "UPDATE menu SET dishes = $1, date = DATE('now') WHERE cafeteria = $2;"
-	_, err = r.db.Conn.Exec(updateQuery, string(dishesJson), cafeteria)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (r *MenuRepository) SelectRow(cafeteria string) ([]*MenuItem, error) {
+func (r *MenuRepository) GetMenu(cafeteria string) ([]*MenuItem, error) {
 	err := r.db.Connect()
 	if err != nil {
 		return nil, err
@@ -76,4 +47,25 @@ func (r *MenuRepository) SelectRow(cafeteria string) ([]*MenuItem, error) {
 	}
 
 	return dishes, nil
+}
+
+func (r *MenuRepository) SaveMenu(cafeteria string, dishes []*MenuItem) error {
+	err := r.db.Connect()
+	if err != nil {
+		return err
+	}
+	defer r.db.Close()
+
+	dishesJson, err := json.Marshal(dishes)
+	if err != nil {
+		return err
+	}
+
+	insertQuery := "INSERT INTO menu (cafeteria, dishes, date) VALUES ($1, $2, DATE('now'))"
+	_, err = r.db.Conn.Exec(insertQuery, cafeteria, string(dishesJson))
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
