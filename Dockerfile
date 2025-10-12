@@ -37,6 +37,9 @@ RUN addgroup -g 1001 -S appgroup && \
 
 WORKDIR /app
 
+# Create database directory
+RUN mkdir -p /app/database
+
 # Copy binary from builder stage
 COPY --from=builder /app/app .
 
