@@ -25,6 +25,16 @@
         <link rel="stylesheet" href="/static/styles.css" />
     </head>
     <body class="min-h-screen flex flex-col" data-theme="halloween">
+        <!-- Background Emoji Decorations -->
+        <div class="emoji-decoration" aria-hidden="true" style="top: 15%; left: 8%;">🌟</div>
+        <div class="emoji-decoration" aria-hidden="true" style="top: 25%; right: 12%;">✨</div>
+        <div class="emoji-decoration" aria-hidden="true" style="top: 45%; left: 5%;">🌸</div>
+        <div class="emoji-decoration" aria-hidden="true" style="top: 55%; right: 8%;">🎃</div>
+        <div class="emoji-decoration" aria-hidden="true" style="top: 70%; left: 15%;">👻</div>
+        <div class="emoji-decoration" aria-hidden="true" style="bottom: 30%; right: 20%;">🦇</div>
+        <div class="emoji-decoration" aria-hidden="true" style="bottom: 20%; left: 25%;">🍬</div>
+        <div class="emoji-decoration" aria-hidden="true" style="bottom: 10%; right: 5%;">🌙</div>
+        
         <!-- Header -->
         <header class="bg-white shadow-sm border-b border-gray-200">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -377,17 +387,38 @@
             const themeSwitcher = document.getElementById("theme-switcher");
             const body = document.body;
 
+            // Theme-specific emoji decorations
+            const themeEmojis = {
+                default: ["🍕", "🥗", "🍰", "☕", "🍎"],
+                halloween: ["🎃", "👻", "🦇", "🍬", "🌙"],
+                christmas: ["❄️", "🎄", "⭐", "🎁", "🔔"]
+            };
+
+            // Update emoji decorations based on theme
+            function updateEmojiDecorations(theme) {
+                const decorations = document.querySelectorAll('.emoji-decoration');
+                const emojis = themeEmojis[theme] || themeEmojis.default;
+                
+                decorations.forEach((decoration, index) => {
+                    decoration.textContent = emojis[index % emojis.length];
+                });
+            }
+
             // Load saved theme from localStorage
             const savedTheme = localStorage.getItem("theme") || "halloween";
             body.setAttribute("data-theme", savedTheme);
-            themeSwitcher.value = savedTheme;
+            if (themeSwitcher) themeSwitcher.value = savedTheme;
+            updateEmojiDecorations(savedTheme);
 
             // Theme switcher event listener
-            themeSwitcher.addEventListener("change", (e) => {
-                const selectedTheme = e.target.value;
-                body.setAttribute("data-theme", selectedTheme);
-                localStorage.setItem("theme", selectedTheme);
-            });
+            if (themeSwitcher) {
+                themeSwitcher.addEventListener("change", (e) => {
+                    const selectedTheme = e.target.value;
+                    body.setAttribute("data-theme", selectedTheme);
+                    localStorage.setItem("theme", selectedTheme);
+                    updateEmojiDecorations(selectedTheme);
+                });
+            }
 
             // Set current date in Russian
             const options = {
@@ -405,6 +436,18 @@
             setTimeout(() => {
                 location.reload();
             }, 300000);
+
+            // Add click effects to emoji decorations
+            document.querySelectorAll('.emoji-decoration').forEach(emoji => {
+                emoji.addEventListener('click', function() {
+                    this.style.transform = 'scale(1.5) rotate(360deg)';
+                    this.style.opacity = '0.2';
+                    setTimeout(() => {
+                        this.style.transform = '';
+                        this.style.opacity = '';
+                    }, 300);
+                });
+            });
         </script>
     </body>
 </html>

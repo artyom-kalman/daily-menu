@@ -243,17 +243,31 @@ main {
     filter: brightness(1.15) saturate(1.1);
 }
 
-
-
 /* Staggered animation for menu items */
-[data-theme] .space-y-4 > div:nth-child(1) { transition-delay: 0.05s; }
-[data-theme] .space-y-4 > div:nth-child(2) { transition-delay: 0.1s; }
-[data-theme] .space-y-4 > div:nth-child(3) { transition-delay: 0.15s; }
-[data-theme] .space-y-4 > div:nth-child(4) { transition-delay: 0.2s; }
-[data-theme] .space-y-4 > div:nth-child(5) { transition-delay: 0.25s; }
-[data-theme] .space-y-4 > div:nth-child(6) { transition-delay: 0.3s; }
-[data-theme] .space-y-4 > div:nth-child(7) { transition-delay: 0.35s; }
-[data-theme] .space-y-4 > div:nth-child(8) { transition-delay: 0.4s; }
+[data-theme] .space-y-4 > div:nth-child(1) {
+    transition-delay: 0.05s;
+}
+[data-theme] .space-y-4 > div:nth-child(2) {
+    transition-delay: 0.1s;
+}
+[data-theme] .space-y-4 > div:nth-child(3) {
+    transition-delay: 0.15s;
+}
+[data-theme] .space-y-4 > div:nth-child(4) {
+    transition-delay: 0.2s;
+}
+[data-theme] .space-y-4 > div:nth-child(5) {
+    transition-delay: 0.25s;
+}
+[data-theme] .space-y-4 > div:nth-child(6) {
+    transition-delay: 0.3s;
+}
+[data-theme] .space-y-4 > div:nth-child(7) {
+    transition-delay: 0.35s;
+}
+[data-theme] .space-y-4 > div:nth-child(8) {
+    transition-delay: 0.4s;
+}
 
 /* Theme-specific shadows */
 [data-theme="default"] .peony-card {
@@ -308,8 +322,13 @@ main {
 
 /* Halloween floating animation */
 @keyframes halloween-float {
-    0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(-2px); }
+    0%,
+    100% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-2px);
+    }
 }
 
 [data-theme="halloween"] .restaurant-card:hover {
@@ -329,8 +348,13 @@ main {
 
 /* Christmas sparkle effect */
 @keyframes christmas-sparkle {
-    0%, 100% { filter: brightness(1) hue-rotate(0deg); }
-    50% { filter: brightness(1.2) hue-rotate(10deg); }
+    0%,
+    100% {
+        filter: brightness(1) hue-rotate(0deg);
+    }
+    50% {
+        filter: brightness(1.2) hue-rotate(10deg);
+    }
 }
 
 [data-theme="christmas"] .restaurant-card:hover {
@@ -420,9 +444,16 @@ main {
 }
 
 @keyframes chili-wiggle {
-    0%, 100% { transform: rotate(0deg); }
-    25% { transform: rotate(-5deg); }
-    75% { transform: rotate(5deg); }
+    0%,
+    100% {
+        transform: rotate(0deg);
+    }
+    25% {
+        transform: rotate(-5deg);
+    }
+    75% {
+        transform: rotate(5deg);
+    }
 }
 
 /* Theme-specific spiciness colors */
@@ -431,7 +462,8 @@ main {
 }
 
 [data-theme="halloween"] .spiciness-indicator:hover .spiciness-chili {
-    filter: hue-rotate(20deg) brightness(1.4) drop-shadow(0 0 4px rgba(255, 117, 24, 0.6));
+    filter: hue-rotate(20deg) brightness(1.4)
+        drop-shadow(0 0 4px rgba(255, 117, 24, 0.6));
 }
 
 [data-theme="christmas"] .spiciness-chili:nth-child(odd) {
@@ -462,8 +494,14 @@ main {
 }
 
 @keyframes loading-bounce {
-    0%, 80%, 100% { transform: translateY(0); }
-    40% { transform: translateY(-4px); }
+    0%,
+    80%,
+    100% {
+        transform: translateY(0);
+    }
+    40% {
+        transform: translateY(-4px);
+    }
 }
 
 /* Timestamp hover effects */
@@ -495,7 +533,7 @@ main {
 }
 
 .theme-primary::before {
-    content: '';
+    content: "";
     position: absolute;
     top: 50%;
     left: 50%;
@@ -504,7 +542,9 @@ main {
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.3);
     transform: translate(-50%, -50%);
-    transition: width 0.6s, height 0.6s;
+    transition:
+        width 0.6s,
+        height 0.6s;
 }
 
 .theme-primary:hover::before {
@@ -532,7 +572,7 @@ main {
         transition: none !important;
         transform: none !important;
     }
-    
+
     [data-theme] .border-l-4:hover {
         border-left-width: 4px;
         background-color: transparent;
@@ -579,6 +619,8 @@ a:focus {
     color: var(--selector-text);
     border-color: var(--selector-border);
     transition: all 0.25s ease;
+    position: relative;
+    z-index: 10;
 }
 
 [data-theme] #theme-switcher:focus {
@@ -617,7 +659,7 @@ a:focus {
 }
 
 [data-theme] footer a::after {
-    content: '';
+    content: "";
     position: absolute;
     bottom: -2px;
     left: 0;
@@ -633,10 +675,268 @@ a:focus {
 
 /* Pulse animation for loading states */
 @keyframes pulse-glow {
-    0%, 100% { opacity: 0.6; }
-    50% { opacity: 1; }
+    0%,
+    100% {
+        opacity: 0.6;
+    }
+    50% {
+        opacity: 1;
+    }
 }
 
 [data-theme] .loading-state span:first-child {
     animation: pulse-glow 2s ease-in-out infinite;
+}
+/* Default theme - Food emojis */
+[data-theme="default"]::before {
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="30" font-size="25">🍕</text><text y="60" font-size="25">🍜</text><text y="90" font-size="25">🥗</text></svg>');
+    top: 10%;
+    left: 5%;
+    animation: gentle-float 8s ease-in-out infinite;
+}
+
+[data-theme="default"]::after {
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="30" font-size="25">🍰</text><text y="60" font-size="25">🍎</text><text y="90" font-size="25">☕</text></svg>');
+    bottom: 10%;
+    right: 5%;
+    animation: gentle-float 10s ease-in-out infinite reverse;
+}
+
+/* Halloween theme - Spooky emojis */
+[data-theme="halloween"]::before {
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="30" font-size="30">🎃</text><text y="65" font-size="25">👻</text><text y="95" font-size="20">🍂</text></svg>');
+    top: 15%;
+    left: 8%;
+    animation: spooky-sway 6s ease-in-out infinite;
+}
+
+[data-theme="halloween"]::after {
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="35" font-size="25">🦇</text><text y="70" font-size="30">🍬</text><text y="100" font-size="20">🌙</text></svg>');
+    bottom: 15%;
+    right: 8%;
+    animation: spooky-sway 7s ease-in-out infinite reverse;
+}
+
+/* Christmas theme - Festive emojis (enhanced existing) */
+[data-theme="christmas"]::after {
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="30" font-size="25">🎁</text><text y="65" font-size="30">🔔</text><text y="95" font-size="25">🕯️</text></svg>');
+    top: 0;
+    right: 10%;
+    animation: snowfall 15s linear infinite 3s;
+}
+
+/* Hover effects for background emojis */
+[data-theme]:hover::before,
+[data-theme]:hover::after {
+    pointer-events: auto;
+    opacity: 0.15;
+    transform: scale(1.1);
+    filter: brightness(1.3);
+}
+
+[data-theme]:hover::before {
+    cursor: pointer;
+}
+
+[data-theme]:hover::after {
+    cursor: pointer;
+}
+
+/* Theme-specific hover effects */
+[data-theme="default"]:hover::before {
+    filter: brightness(1.3) hue-rotate(10deg);
+}
+
+[data-theme="default"]:hover::after {
+    filter: brightness(1.3) hue-rotate(-10deg);
+}
+
+[data-theme="halloween"]:hover::before {
+    filter: brightness(1.4) hue-rotate(20deg)
+        drop-shadow(0 0 10px rgba(255, 117, 24, 0.3));
+}
+
+[data-theme="halloween"]:hover::after {
+    filter: brightness(1.4) hue-rotate(-20deg)
+        drop-shadow(0 0 10px rgba(184, 92, 255, 0.3));
+}
+
+[data-theme="christmas"]:hover::before {
+    filter: brightness(1.5) drop-shadow(0 0 8px rgba(230, 0, 38, 0.2));
+}
+
+[data-theme="christmas"]:hover::after {
+    filter: brightness(1.5) drop-shadow(0 0 8px rgba(0, 127, 61, 0.2));
+}
+
+/* Animation keyframes */
+@keyframes gentle-float {
+    0%,
+    100% {
+        transform: translateY(0px) rotate(0deg);
+    }
+    25% {
+        transform: translateY(-8px) rotate(2deg);
+    }
+    50% {
+        transform: translateY(-4px) rotate(-1deg);
+    }
+    75% {
+        transform: translateY(-12px) rotate(1deg);
+    }
+}
+
+@keyframes spooky-sway {
+    0%,
+    100% {
+        transform: translateY(0px) rotate(-3deg) translateX(0px);
+    }
+    25% {
+        transform: translateY(-10px) rotate(3deg) translateX(5px);
+    }
+    50% {
+        transform: translateY(-5px) rotate(-2deg) translateX(-3px);
+    }
+    75% {
+        transform: translateY(-15px) rotate(2deg) translateX(3px);
+    }
+}
+
+@keyframes snowfall {
+    0% {
+        transform: translateY(-100px) rotate(0deg);
+        opacity: 0;
+    }
+    10% {
+        opacity: 0.02;
+    }
+    90% {
+        opacity: 0.02;
+    }
+    100% {
+        transform: translateY(calc(100vh + 100px)) rotate(360deg);
+        opacity: 0;
+    }
+}
+
+/* Interactive emoji click effects */
+[data-theme]::before:active,
+[data-theme]::after:active {
+    transform: scale(0.95) rotate(5deg);
+    filter: brightness(1.5);
+    transition: all 0.1s ease;
+}
+
+/* Responsive adjustments for mobile */
+@media (max-width: 768px) {
+    [data-theme]::before,
+    [data-theme]::after {
+        background-size: 70px 70px;
+        opacity: 0.03;
+    }
+
+    [data-theme]:hover::before,
+    [data-theme]:hover::after {
+        opacity: 0.1;
+    }
+
+    [data-theme] .emoji-decoration {
+        font-size: 2rem;
+        opacity: 0.08;
+    }
+
+    [data-theme]:hover .emoji-decoration {
+        opacity: 0.2;
+    }
+}
+
+/* Additional floating emoji elements */
+[data-theme] .emoji-decoration {
+    position: fixed;
+    pointer-events: none;
+    opacity: 0.4;
+    font-size: 3.3rem;
+    z-index: 100;
+    user-select: none;
+    transition: all 0.3s ease;
+    filter: blur(0.3px);
+    color: currentColor;
+}
+
+[data-theme="default"] .emoji-decoration:nth-child(1) {
+    top: 20%;
+    left: 10%;
+    animation: gentle-float 9s ease-in-out infinite;
+}
+[data-theme="default"] .emoji-decoration:nth-child(2) {
+    top: 60%;
+    right: 15%;
+    animation: gentle-float 11s ease-in-out infinite 2s;
+}
+[data-theme="default"] .emoji-decoration:nth-child(3) {
+    bottom: 25%;
+    left: 20%;
+    animation: gentle-float 8s ease-in-out infinite 1s;
+}
+
+[data-theme="halloween"] .emoji-decoration:nth-child(1) {
+    top: 25%;
+    left: 12%;
+    animation: spooky-sway 7s ease-in-out infinite;
+}
+[data-theme="halloween"] .emoji-decoration:nth-child(2) {
+    top: 55%;
+    right: 18%;
+    animation: spooky-sway 8s ease-in-out infinite 1.5s;
+}
+[data-theme="halloween"] .emoji-decoration:nth-child(3) {
+    bottom: 30%;
+    left: 25%;
+    animation: spooky-sway 6s ease-in-out infinite 0.5s;
+}
+
+[data-theme="christmas"] .emoji-decoration:nth-child(1) {
+    top: 15%;
+    left: 8%;
+    animation: snowfall 14s linear infinite;
+}
+[data-theme="christmas"] .emoji-decoration:nth-child(2) {
+    top: 10%;
+    right: 12%;
+    animation: snowfall 16s linear infinite 2s;
+}
+[data-theme="christmas"] .emoji-decoration:nth-child(3) {
+    top: 5%;
+    left: 45%;
+    animation: snowfall 18s linear infinite 4s;
+}
+
+[data-theme]:hover .emoji-decoration {
+    pointer-events: auto;
+    opacity: 0.6;
+    transform: scale(1.3);
+    cursor: pointer;
+    filter: blur(0px) brightness(1.3);
+}
+
+[data-theme] .emoji-decoration:active {
+    transform: scale(0.9) rotate(10deg);
+    opacity: 0.1;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    [data-theme]::before,
+    [data-theme]::after,
+    [data-theme] .emoji-decoration {
+        animation: none !important;
+        transition: none !important;
+    }
+
+    [data-theme]:hover::before,
+    [data-theme]:hover::after,
+    [data-theme]:hover .emoji-decoration {
+        transform: none !important;
+        filter: none !important;
+    }
 }
