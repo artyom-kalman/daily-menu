@@ -53,19 +53,17 @@ func run() error {
 	}
 	defer db.Close()
 
-	if err := config.InitApp(cfg.DatabasePath, cfg.PeonyURL, cfg.AzileaURL); err != nil {
-		return fmt.Errorf("failed to initialize app: %w", err)
-	}
-
 	migrator := database.NewMigrator(db)
 	migrationPath := config.GetEnvWithDefault("MIGRATION_PATH", "database/migrations")
-	// dir := filepath.Dir(migrationPath)
-	// subdir := filepath.Base(migrationPath)
 	if err := migrator.LoadMigrationsFromFS(os.DirFS("./"), "migrations"); err != nil {
 		return fmt.Errorf("failed to load migrations from %s: %w", migrationPath, err)
 	}
 	if err := migrator.Up(); err != nil {
 		return fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	if err := config.InitApp(cfg.DatabasePath, cfg.PeonyURL, cfg.AzileaURL); err != nil {
+		return fmt.Errorf("failed to initialize app: %w", err)
 	}
 
 	botRepo := bot.NewSubscriptionRepository(db)
