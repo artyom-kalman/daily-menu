@@ -50,7 +50,12 @@ func NewMenuFromDishes(dishes []string, time *time.Time) *Menu {
 }
 
 func (m *Menu) Date() *time.Time {
-	truncatedDate := m.Time.Truncate(24 * time.Hour)
+	if m.Time == nil {
+		return nil
+	}
+	kst, _ := time.LoadLocation("Asia/Seoul")
+	koreanTime := m.Time.In(kst)
+	truncatedDate := koreanTime.Truncate(24 * time.Hour)
 	return &truncatedDate
 }
 

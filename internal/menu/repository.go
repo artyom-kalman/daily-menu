@@ -2,7 +2,7 @@ package menu
 
 import (
 	"encoding/json"
-	"fmt"
+	"time"
 
 	"github.com/artyom-kalman/kbu-daily-menu/internal/database"
 )
@@ -17,15 +17,15 @@ func NewMenuRepository(d *database.Database) *MenuRepository {
 	}
 }
 
-func (r *MenuRepository) GetMenu(cafeteria string) ([]*MenuItem, error) {
+func (r *MenuRepository) GetMenu(cafeteria string, targetDate time.Time) ([]*MenuItem, error) {
 	err := r.db.Connect()
 	if err != nil {
 		return nil, err
 	}
 	defer r.db.Close()
 
-	selectQuery := fmt.Sprintf("SELECT dishes FROM menu WHERE cafeteria = '%s' AND date = DATE('now');", cafeteria)
-	rows, err := r.db.Conn.Query(selectQuery)
+	selectQuery := "SELECT dishes FROM menu WHERE cafeteria = $1 AND date = $2"
+	rows, err := r.db.Conn.Query(selectQuery, cafeteria, targetDate.Format("2006-01-02"))
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +49,7 @@ func (r *MenuRepository) GetMenu(cafeteria string) ([]*MenuItem, error) {
 	return dishes, nil
 }
 
-func (r *MenuRepository) SaveMenu(cafeteria string, dishes []*MenuItem) error {
+func (r *MenuRepository) SaveMenu(cafeteria string, dishes []*MenuItem, targetDate time.Time) error {
 	err := r.db.Connect()
 	if err != nil {
 		return err
@@ -61,8 +61,8 @@ func (r *MenuRepository) SaveMenu(cafeteria string, dishes []*MenuItem) error {
 		return err
 	}
 
-	insertQuery := "INSERT INTO menu (cafeteria, dishes, date) VALUES ($1, $2, DATE('now'))"
-	_, err = r.db.Conn.Exec(insertQuery, cafeteria, string(dishesJson))
+	insertQuery := "INSERT INTO menu (cafeteria, dishes, date) VALUES ($1, $2, $3)"
+	_, err = r.db.Conn.Exec(insertQuery, cafeteria, string(dishesJson), targetDate.Format("2006-01-02"))
 	if err != nil {
 		return err
 	}

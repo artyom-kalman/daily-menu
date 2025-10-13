@@ -18,8 +18,14 @@ func NewMenuPersistenceService(repo *MenuRepository) *MenuPersistenceService {
 	}
 }
 
+func getKoreanTime() time.Time {
+	kst, _ := time.LoadLocation("Asia/Seoul")
+	return time.Now().In(kst)
+}
+
 func (p *MenuPersistenceService) LoadMenu(cafeteria Cafeteria) (*Menu, error) {
-	dishes, err := p.repo.GetMenu(string(cafeteria))
+	koreanToday := getKoreanTime().Truncate(24 * time.Hour)
+	dishes, err := p.repo.GetMenu(string(cafeteria), koreanToday)
 	if err != nil {
 		logger.ErrorErrWithFields("Failed to load menu from database", err,
 			slog.String("cafeteria", string(cafeteria)))
@@ -30,7 +36,6 @@ func (p *MenuPersistenceService) LoadMenu(cafeteria Cafeteria) (*Menu, error) {
 		return nil, nil
 	}
 
-	today := time.Now().Truncate(24 * time.Hour)
 	menuItems := make([]*MenuItem, len(dishes))
 	for i, dish := range dishes {
 		menuItems[i] = &MenuItem{
@@ -42,12 +47,13 @@ func (p *MenuPersistenceService) LoadMenu(cafeteria Cafeteria) (*Menu, error) {
 
 	return &Menu{
 		Items: menuItems,
-		Time:  &today,
+		Time:  &koreanToday,
 	}, nil
 }
 
 func (p *MenuPersistenceService) SaveMenu(cafeteria Cafeteria, menu *Menu) error {
-	err := p.repo.SaveMenu(string(cafeteria), menu.Items)
+	koreanToday := getKoreanTime().Truncate(24 * time.Hour)
+	err := p.repo.SaveMenu(string(cafeteria), menu.Items, koreanToday)
 	if err != nil {
 		logger.ErrorErrWithFields("Failed to save menu to database", err,
 			slog.String("cafeteria", string(cafeteria)))
