@@ -178,6 +178,26 @@ func IsInitialized() bool {
 	return isInitialized
 }
 
+func InitializeScheduler(menuService *menu.MenuService) (*menu.MenuScheduler, error) {
+	// Get cache service from existing initialization
+	cacheService := menu.NewMenuCacheService()
+
+	updater := menu.NewMenuUpdater(menuService, cacheService)
+	scheduler := menu.NewMenuScheduler(updater)
+
+	// Check if scheduler is enabled
+	enabled := GetEnvWithDefault("MENU_SCHEDULER_ENABLED", "true") == "true"
+	if enabled {
+		if err := scheduler.Start(); err != nil {
+			return nil, fmt.Errorf("failed to start scheduler: %w", err)
+		}
+	} else {
+		logger.Info("Menu scheduler disabled")
+	}
+
+	return scheduler, nil
+}
+
 func Shutdown() {
 	initMutex.Lock()
 	defer initMutex.Unlock()

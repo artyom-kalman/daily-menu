@@ -16,6 +16,7 @@ import (
 	"github.com/artyom-kalman/kbu-daily-menu/internal/bot"
 	"github.com/artyom-kalman/kbu-daily-menu/internal/database"
 	"github.com/artyom-kalman/kbu-daily-menu/internal/http/handlers"
+	"github.com/artyom-kalman/kbu-daily-menu/internal/menu"
 	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
 	"github.com/gin-gonic/gin"
 )
@@ -30,8 +31,9 @@ const (
 )
 
 type App struct {
-	router *gin.Engine
-	server *http.Server
+	router    *gin.Engine
+	server    *http.Server
+	scheduler *menu.MenuScheduler
 }
 
 func main() {
@@ -78,7 +80,22 @@ func run() error {
 		}
 	}()
 
-	app := &App{}
+	// Initialize scheduler
+	menuService, err := config.MenuService()
+	if err != nil {
+		return fmt.Errorf("failed to get menu service: %w", err)
+	}
+
+	scheduler, err := config.InitializeScheduler(menuService)
+	if err != nil {
+		logger.ErrorErr("Failed to initialize scheduler", err)
+		// Continue without scheduler - non-critical
+		scheduler = nil
+	}
+
+	app := &App{
+		scheduler: scheduler,
+	}
 	app.setupRouter()
 	app.setupServer(cfg.Port)
 
@@ -217,6 +234,13 @@ func (a *App) waitForShutdown(errChan chan error) error {
 func (a *App) gracefulShutdown() error {
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
+
+	// Stop scheduler first
+	if a.scheduler != nil {
+		if err := a.scheduler.Stop(); err != nil {
+			logger.ErrorErr("Failed to stop scheduler", err)
+		}
+	}
 
 	if err := a.server.Shutdown(ctx); err != nil {
 		return fmt.Errorf("server forced to shutdown: %w", err)

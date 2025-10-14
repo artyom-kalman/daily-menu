@@ -56,3 +56,9 @@ func (c *MenuCacheService) Clear(cafeteria Cafeteria) {
 	defer c.mu.Unlock()
 	delete(c.cache, cafeteria)
 }
+
+func (c *MenuCacheService) ClearAll() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.cache = make(map[Cafeteria]*CachedMenu)
+}
