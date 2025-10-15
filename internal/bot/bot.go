@@ -1,22 +1,25 @@
 package bot
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/artyom-kalman/kbu-daily-menu/config"
 	"github.com/artyom-kalman/kbu-daily-menu/internal/menu"
 	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
-	"github.com/go-co-op/gocron"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 type Bot struct {
-	bot       *tgbotapi.BotAPI
-	repo      *SubscriptionRepository
-	scheduler *gocron.Scheduler
+	bot    *tgbotapi.BotAPI
+	repo   *SubscriptionRepository
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
 }
 
 func NewBot(token string, repo *SubscriptionRepository) (*Bot, error) {
@@ -25,12 +28,13 @@ func NewBot(token string, repo *SubscriptionRepository) (*Bot, error) {
 		return nil, err
 	}
 
-	scheduler := gocron.NewScheduler(time.Local)
+	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Bot{
-		bot:       bot,
-		repo:      repo,
-		scheduler: scheduler,
+		bot:    bot,
+		repo:   repo,
+		ctx:    ctx,
+		cancel: cancel,
 	}, nil
 }
 
@@ -58,19 +62,51 @@ func (b *Bot) scheduleDailyMessages(message string) {
 		return
 	}
 
-	b.scheduler.Every(1).Day().At("10:00").Do(func() {
-		for _, chatID := range subscribers {
-			if err := b.sendMenuWithButtons(chatID, message); err != nil {
-				logger.ErrorErrWithFields("Failed to send message to chat", err,
-					slog.Int64("chat_id", chatID))
-			}
-		}
-	})
+	b.wg.Add(1)
+	go func() {
+		defer b.wg.Done()
+		b.runDailyScheduler(subscribers, message)
+	}()
 
-	b.scheduler.StartAsync()
 	logger.InfoWithFields("Scheduled daily messages for subscribers",
 		slog.Int("subscriber_count", len(subscribers)),
 		slog.String("schedule_time", "10:00"))
+}
+
+func (b *Bot) runDailyScheduler(subscribers []int64, message string) {
+	kst, _ := time.LoadLocation("Asia/Seoul")
+
+	for {
+		nextRun := b.getNextRunTime(kst)
+		timer := time.NewTimer(time.Until(nextRun))
+
+		select {
+		case <-b.ctx.Done():
+			timer.Stop()
+			return
+		case <-timer.C:
+			for _, chatID := range subscribers {
+				if err := b.sendMenuWithButtons(chatID, message); err != nil {
+					logger.ErrorErrWithFields("Failed to send message to chat", err,
+						slog.Int64("chat_id", chatID))
+				}
+			}
+		}
+	}
+}
+
+func (b *Bot) getNextRunTime(kst *time.Location) time.Time {
+	now := time.Now().In(kst)
+
+	// Get today at 10:00 AM KST
+	today10AM := time.Date(now.Year(), now.Month(), now.Day(), 10, 0, 0, 0, kst)
+
+	// If today's 10:00 AM has passed, schedule for tomorrow
+	if now.After(today10AM) {
+		return today10AM.Add(24 * time.Hour)
+	}
+
+	return today10AM
 }
 
 func (b *Bot) subscribeChat(chatID int64) error {
