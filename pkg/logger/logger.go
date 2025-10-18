@@ -96,6 +96,7 @@ func init() {
 
 	Logger = slog.New(handler)
 
+	slog.SetDefault(Logger)
 	Logger.Info("Logger initialized", "level", level.String())
 }
 
