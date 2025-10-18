@@ -5,8 +5,6 @@ import (
 	"log/slog"
 	"sync"
 	"time"
-
-	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
 )
 
 type MenuUpdater struct {
@@ -26,7 +24,7 @@ func NewMenuUpdater(menuService *MenuService, cacheService *MenuCacheService) *M
 }
 
 func (u *MenuUpdater) UpdateAll() error {
-	logger.Info("Starting scheduled menu update for all cafeterias")
+	slog.Info("Starting scheduled menu update for all cafeterias")
 
 	// Clear cache first
 	u.cacheService.ClearAll()
@@ -58,15 +56,19 @@ func (u *MenuUpdater) UpdateAll() error {
 	var errors []error
 	for err := range errChan {
 		errors = append(errors, err)
-		logger.ErrorErr("Cafeteria update failed", err)
+		slog.Error("Cafeteria update failed", "error", err)
 	}
 
 	if len(errors) > 0 {
 		return fmt.Errorf("update completed with %d errors", len(errors))
 	}
 
-	logger.Info("All menus updated successfully")
+	slog.Info("All menus updated successfully")
 	return nil
+}
+
+func (u *MenuUpdater) UpdateCafeteria(cafeteria Cafeteria) error {
+	return u.updateCafeteria(cafeteria)
 }
 
 func (u *MenuUpdater) updateCafeteria(cafeteria Cafeteria) error {
@@ -74,23 +76,24 @@ func (u *MenuUpdater) updateCafeteria(cafeteria Cafeteria) error {
 
 	for attempt := 1; attempt <= u.retryCount; attempt++ {
 		if attempt > 1 {
-			logger.InfoWithFields("Retry attempt",
-				slog.Int("attempt", attempt),
-				slog.String("cafeteria", string(cafeteria)))
+			slog.Info("Retry attempt",
+				"attempt", attempt,
+				"cafeteria", string(cafeteria))
 			time.Sleep(u.retryDelay)
 		}
 
 		_, err := u.menuService.getMenu(cafeteria)
 		if err == nil {
-			logger.InfoWithFields("Successfully updated",
-				slog.String("cafeteria", string(cafeteria)))
+			slog.Info("Successfully updated",
+				"cafeteria", string(cafeteria))
 			return nil
 		}
 
 		lastErr = err
-		logger.ErrorErrWithFields("Update attempt failed", err,
-			slog.Int("attempt", attempt),
-			slog.String("cafeteria", string(cafeteria)))
+		slog.Error("Update attempt failed",
+			"error", err,
+			"attempt", attempt,
+			"cafeteria", string(cafeteria))
 	}
 
 	return lastErr

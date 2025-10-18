@@ -3,12 +3,12 @@ package menu
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/artyom-kalman/kbu-daily-menu/internal/http/fetcher"
-	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
 )
 
 type MenuParser struct {
@@ -24,7 +24,7 @@ func NewMenuParser(url string) *MenuParser {
 func (p *MenuParser) ParseMenu() (*Menu, error) {
 	body, err := p.fetcher.Fetch()
 	if err != nil {
-		logger.ErrorErr("Failed to fetch HTML content", err)
+		slog.Error("Failed to fetch HTML content", "error", err)
 		return nil, fmt.Errorf("failed to fetch menu: %w", err)
 	}
 
@@ -61,7 +61,9 @@ func (p *MenuParser) extractFoodList(body string, dayOfWeek int) (string, error)
 	}
 
 	if len(matches) < targetDay {
-		logger.Debug(fmt.Sprintf("Found %d foodList elements, but need day %d", len(matches), targetDay))
+		slog.Debug("Found foodList elements, but need day",
+			"found", len(matches),
+			"target_day", targetDay)
 		return "", errors.New("error parsing body")
 	}
 
@@ -85,7 +87,7 @@ func (p *MenuParser) extractFoodItems(foodList string) ([]string, error) {
 
 	// If no valid dishes found, it might be a holiday
 	if len(dishes) == 0 {
-		logger.Info("No valid menu items found - likely holiday or weekend")
+		slog.Info("No valid menu items found - likely holiday or weekend")
 		return []string{}, nil
 	}
 

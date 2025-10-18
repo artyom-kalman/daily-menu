@@ -7,8 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
-
-	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
 )
 
 const (
@@ -47,10 +45,10 @@ func (f *HTTPFetcher) FetchWithContext(ctx context.Context) (string, error) {
 	var lastErr error
 	for attempt := 1; attempt <= httpRetryAttempts; attempt++ {
 		if attempt > 1 {
-			logger.WarnWithFields("Retry attempt for URL",
-				slog.Int("attempt", attempt),
-				slog.Int("max_attempts", httpRetryAttempts),
-				slog.String("url", f.url))
+			slog.Warn("Retry attempt for URL",
+				"attempt", attempt,
+				"max_attempts", httpRetryAttempts,
+				"url", f.url)
 			select {
 			case <-ctx.Done():
 				return "", ctx.Err()
@@ -60,18 +58,20 @@ func (f *HTTPFetcher) FetchWithContext(ctx context.Context) (string, error) {
 
 		body, err := f.fetchAttempt(ctx)
 		if err == nil {
-			logger.DebugWithFields("Successfully fetched content",
-				slog.Int("bytes", len(body)))
+			slog.Debug("Successfully fetched content",
+				"bytes", len(body))
 			return body, nil
 		}
 
 		lastErr = err
-		logger.ErrorErrWithFields("Fetch attempt failed", err,
-			slog.Int("attempt", attempt))
+		slog.Error("Fetch attempt failed",
+			"error", err,
+			"attempt", attempt)
 	}
 
-	logger.ErrorErrWithFields("All fetch attempts failed for URL", lastErr,
-		slog.String("url", f.url))
+	slog.Error("All fetch attempts failed for URL",
+		"error", lastErr,
+		"url", f.url)
 	return "", fmt.Errorf("failed to fetch content after %d attempts: %w", httpRetryAttempts, lastErr)
 }
 
@@ -90,14 +90,14 @@ func (f *HTTPFetcher) fetchAttempt(ctx context.Context) (string, error) {
 	}
 	defer func() {
 		if closeErr := resp.Body.Close(); closeErr != nil {
-			logger.ErrorErr("Failed to close response body", closeErr)
+			slog.Error("Failed to close response body", "error", closeErr)
 		}
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		logger.ErrorWithFields("Received non-200 status code",
-			slog.Int("status_code", resp.StatusCode),
-			slog.String("url", f.url))
+		slog.Error("Received non-200 status code",
+			"status_code", resp.StatusCode,
+			"url", f.url)
 		return "", fmt.Errorf("HTTP request failed with status %d", resp.StatusCode)
 	}
 
@@ -117,8 +117,8 @@ func (f *HTTPFetcher) readResponseBody(body io.Reader) (string, error) {
 	}
 
 	if len(data) == httpMaxResponseSize {
-		logger.WarnWithFields("Response body may be truncated",
-			slog.Int("max_bytes", httpMaxResponseSize))
+		slog.Warn("Response body may be truncated",
+			"max_bytes", httpMaxResponseSize)
 	}
 
 	return string(data), nil

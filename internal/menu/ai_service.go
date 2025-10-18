@@ -11,7 +11,6 @@ import (
 	"sync"
 
 	"github.com/artyom-kalman/kbu-daily-menu/internal/ai"
-	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
 )
 
 type AIService interface {
@@ -106,9 +105,10 @@ func (s *MenuAIService) parseSingleItem(ctx context.Context, item *MenuItem) (*M
 
 	parsedItem, err := s.ParseSingleItem(respStr)
 	if err != nil {
-		logger.ErrorErrWithFields("Failed to parse AI response for menu item", err,
-			slog.String("item_name", item.Name),
-			slog.String("response", respStr))
+		slog.Error("Failed to parse AI response for menu item",
+			"error", err,
+			"item_name", item.Name,
+			"response", respStr)
 		return nil, err
 	}
 

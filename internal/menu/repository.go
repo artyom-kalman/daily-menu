@@ -18,12 +18,6 @@ func NewMenuRepository(d *database.Database) *MenuRepository {
 }
 
 func (r *MenuRepository) GetMenu(cafeteria string, targetDate time.Time) ([]*MenuItem, error) {
-	err := r.db.Connect()
-	if err != nil {
-		return nil, err
-	}
-	defer r.db.Close()
-
 	selectQuery := "SELECT dishes FROM menu WHERE cafeteria = $1 AND date = $2"
 	rows, err := r.db.Conn.Query(selectQuery, cafeteria, targetDate.Format("2006-01-02"))
 	if err != nil {
@@ -50,12 +44,6 @@ func (r *MenuRepository) GetMenu(cafeteria string, targetDate time.Time) ([]*Men
 }
 
 func (r *MenuRepository) SaveMenu(cafeteria string, dishes []*MenuItem, targetDate time.Time) error {
-	err := r.db.Connect()
-	if err != nil {
-		return err
-	}
-	defer r.db.Close()
-
 	dishesJson, err := json.Marshal(dishes)
 	if err != nil {
 		return err

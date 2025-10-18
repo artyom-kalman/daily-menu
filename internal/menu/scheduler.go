@@ -2,10 +2,9 @@ package menu
 
 import (
 	"context"
+	"log/slog"
 	"sync"
 	"time"
-
-	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
 )
 
 type MenuScheduler struct {
@@ -40,7 +39,9 @@ func (s *MenuScheduler) Start() error {
 	s.wg.Add(1)
 	go s.runScheduler()
 	s.isRunning = true
-	logger.Info("Menu scheduler started - daily updates at 6:00 AM KST")
+	slog.Info("Menu scheduler started - daily updates at 6:00 AM KST")
+
+	go s.warmup()
 	return nil
 }
 
@@ -55,7 +56,7 @@ func (s *MenuScheduler) Stop() error {
 	s.cancel()
 	s.wg.Wait()
 	s.isRunning = false
-	logger.Info("Menu scheduler stopped")
+	slog.Info("Menu scheduler stopped")
 	return nil
 }
 
@@ -71,12 +72,30 @@ func (s *MenuScheduler) runScheduler() {
 			timer.Stop()
 			return
 		case <-timer.C:
-			logger.Info("Starting scheduled menu update")
+			slog.Info("Starting scheduled menu update")
 			if err := s.updater.UpdateAll(); err != nil {
-				logger.ErrorErr("Scheduled update failed", err)
+				slog.Error("Scheduled update failed", "error", err)
 			}
 		}
 	}
+}
+
+func (s *MenuScheduler) warmup() {
+	slog.Info("Starting service warmup")
+
+	go func() {
+		if err := s.updater.UpdateCafeteria(PEONY); err != nil {
+			slog.Error("Failed to warmup Peony menu", "error", err)
+		}
+	}()
+
+	go func() {
+		if err := s.updater.UpdateCafeteria(AZILEA); err != nil {
+			slog.Error("Failed to warmup Azilea menu", "error", err)
+		}
+	}()
+
+	slog.Info("Service warmup initiated")
 }
 
 func (s *MenuScheduler) getNextRunTime() time.Time {

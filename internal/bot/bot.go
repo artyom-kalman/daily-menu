@@ -1,40 +1,38 @@
 package bot
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/artyom-kalman/kbu-daily-menu/config"
 	"github.com/artyom-kalman/kbu-daily-menu/internal/menu"
-	"github.com/artyom-kalman/kbu-daily-menu/pkg/logger"
+
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 type Bot struct {
-	bot    *tgbotapi.BotAPI
-	repo   *SubscriptionRepository
-	ctx    context.Context
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
+	bot         *tgbotapi.BotAPI
+	repo        *SubscriptionRepository
+	wg          sync.WaitGroup
+	menuService MenuService
 }
 
-func NewBot(token string, repo *SubscriptionRepository) (*Bot, error) {
+type MenuService interface {
+	GetMenus() (*menu.Menu, *menu.Menu, error)
+}
+
+func NewBot(token string, repo *SubscriptionRepository, menuService MenuService) (*Bot, error) {
 	bot, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
 		return nil, err
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-
 	return &Bot{
-		bot:    bot,
-		repo:   repo,
-		ctx:    ctx,
-		cancel: cancel,
+		bot:         bot,
+		repo:        repo,
+		menuService: menuService,
 	}, nil
 }
 
@@ -53,12 +51,12 @@ func (b *Bot) loadSubscribers() ([]int64, error) {
 func (b *Bot) scheduleDailyMessages(message string) {
 	subscribers, err := b.loadSubscribers()
 	if err != nil {
-		logger.ErrorErr("Failed to load subscribers", err)
+		slog.Error("Failed to load subscribers", "error", err)
 		return
 	}
 
 	if len(subscribers) == 0 {
-		logger.Info("No active subscribers found")
+		slog.Info("No active subscribers found")
 		return
 	}
 
@@ -68,9 +66,9 @@ func (b *Bot) scheduleDailyMessages(message string) {
 		b.runDailyScheduler(subscribers, message)
 	}()
 
-	logger.InfoWithFields("Scheduled daily messages for subscribers",
-		slog.Int("subscriber_count", len(subscribers)),
-		slog.String("schedule_time", "10:00"))
+	slog.Info("Scheduled daily messages for subscribers",
+		"subscriber_count", len(subscribers),
+		"schedule_time", "10:00")
 }
 
 func (b *Bot) runDailyScheduler(subscribers []int64, message string) {
@@ -78,21 +76,30 @@ func (b *Bot) runDailyScheduler(subscribers []int64, message string) {
 
 	for {
 		nextRun := b.getNextRunTime(kst)
-		timer := time.NewTimer(time.Until(nextRun))
 
-		select {
-		case <-b.ctx.Done():
-			timer.Stop()
-			return
-		case <-timer.C:
-			for _, chatID := range subscribers {
-				if err := b.sendMenuWithButtons(chatID, message); err != nil {
-					logger.ErrorErrWithFields("Failed to send message to chat", err,
-						slog.Int64("chat_id", chatID))
-				}
-			}
-		}
+		slog.Info("Next daily message scheduled", "time", nextRun.Format(time.RFC3339))
+
+		time.Sleep(time.Until(nextRun))
+
+		b.sendDailyMenu(subscribers, message)
 	}
+}
+
+func (b *Bot) sendDailyMenu(subscribers []int64, message string) error {
+	var wg sync.WaitGroup
+
+	for _, chatID := range subscribers {
+		wg.Add(1)
+		go func(chatID int64) {
+			if err := b.sendMenuWithButtons(chatID, message); err != nil {
+				slog.Error("Failed to send daily menu", "chat_id", chatID, "error", err)
+			}
+		}(chatID)
+	}
+
+	wg.Wait()
+
+	return nil
 }
 
 func (b *Bot) getNextRunTime(kst *time.Location) time.Time {
@@ -270,7 +277,7 @@ func (b *Bot) HandleMessages(text string) error {
 		if update.Message != nil {
 			if update.Message.IsCommand() {
 				if err := b.handleCommand(update, text); err != nil {
-					logger.ErrorErr("Failed to handle command", err)
+					slog.Error("Failed to handle command", "error", err)
 				}
 			} else {
 				if err := b.sendMenuWithButtons(update.Message.Chat.ID, text); err != nil {
@@ -279,12 +286,12 @@ func (b *Bot) HandleMessages(text string) error {
 			}
 		} else if update.CallbackQuery != nil {
 			if err := b.handleCallbackQuery(update.CallbackQuery); err != nil {
-				logger.ErrorErr("Failed to handle callback query", err)
+				slog.Error("Failed to handle callback query", "error", err)
 			}
 
 			callbackCfg := tgbotapi.NewCallback(update.CallbackQuery.ID, "")
 			if _, err := b.bot.Request(callbackCfg); err != nil {
-				logger.ErrorErr("Failed to answer callback query", err)
+				slog.Error("Failed to answer callback query", "error", err)
 			}
 		}
 	}
@@ -325,12 +332,7 @@ func FormatMenuMessage(peony, azilea *menu.Menu) string {
 }
 
 func (b *Bot) Run() error {
-	menuService, err := config.MenuService()
-	if err != nil {
-		return err
-	}
-
-	peony, azilea, err := menuService.GetMenus()
+	peony, azilea, err := b.menuService.GetMenus()
 	if err != nil {
 		return fmt.Errorf("error getting menus: %w", err)
 	}
