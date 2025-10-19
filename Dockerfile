@@ -13,7 +13,6 @@ RUN go mod download && go mod verify
 # Copy source code
 COPY cmd/ ./cmd/
 COPY internal/ ./internal/
-COPY config/ ./config/
 COPY pkg/ ./pkg/
 COPY migrations/ ./migrations/
 COPY templates/ ./templates/
@@ -29,7 +28,7 @@ RUN CGO_ENABLED=1 GOOS=linux go build \
 FROM alpine:latest
 
 # Install runtime dependencies
-RUN apk --no-cache add ca-certificates tzdata sqlite
+RUN apk --no-cache add ca-certificates tzdata sqlite wget
 
 # Create non-root user
 RUN addgroup -g 1001 -S appgroup && \
