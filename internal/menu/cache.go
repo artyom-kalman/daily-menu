@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	cacheTTL = 24 * time.Hour
+	cacheTTL = 2 * time.Hour
 )
 
 type CachedMenu struct {
