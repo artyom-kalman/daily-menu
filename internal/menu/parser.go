@@ -1,35 +1,43 @@
 package menu
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/artyom-kalman/kbu-daily-menu/internal/http/fetcher"
 )
 
 type MenuParser struct {
 	fetcher *fetcher.HTTPFetcher
+	clock   Clock
 }
 
-func NewMenuParser(url string) *MenuParser {
+func NewMenuParser(url string, clock Clock) *MenuParser {
+	if clock == nil {
+		clock = NewKSTClock()
+	}
 	return &MenuParser{
 		fetcher: fetcher.NewHTTPFetcher(url),
+		clock:   clock,
 	}
 }
 
-func (p *MenuParser) ParseMenu() (*Menu, error) {
-	body, err := p.fetcher.Fetch()
+func (p *MenuParser) ParseMenu(ctx context.Context) (*Menu, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	body, err := p.fetcher.FetchWithContext(ctx)
 	if err != nil {
 		slog.Error("Failed to fetch HTML content", "error", err)
 		return nil, fmt.Errorf("failed to fetch menu: %w", err)
 	}
 
-	loc, _ := time.LoadLocation("Asia/Seoul")
-	now := time.Now().In(loc)
+	now := p.clock.Now()
 
 	foodList, err := p.extractFoodList(body, int(now.Weekday()))
 	if err != nil {

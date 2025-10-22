@@ -8,26 +8,21 @@ import (
 )
 
 type MenuUpdater struct {
-	menuService  *MenuService
-	cacheService *MenuCacheService
-	retryCount   int
-	retryDelay   time.Duration
+	menuService *MenuService
+	retryCount  int
+	retryDelay  time.Duration
 }
 
-func NewMenuUpdater(menuService *MenuService, cacheService *MenuCacheService) *MenuUpdater {
+func NewMenuUpdater(menuService *MenuService) *MenuUpdater {
 	return &MenuUpdater{
-		menuService:  menuService,
-		cacheService: cacheService,
-		retryCount:   3,
-		retryDelay:   5 * time.Minute,
+		menuService: menuService,
+		retryCount:  3,
+		retryDelay:  5 * time.Minute,
 	}
 }
 
 func (u *MenuUpdater) UpdateAll() error {
 	slog.Info("Starting scheduled menu update for all cafeterias")
-
-	// Clear cache first
-	u.cacheService.ClearAll()
 
 	// Update both cafeterias
 	var wg sync.WaitGroup
@@ -82,7 +77,7 @@ func (u *MenuUpdater) updateCafeteria(cafeteria Cafeteria) error {
 			time.Sleep(u.retryDelay)
 		}
 
-		_, err := u.menuService.getMenu(cafeteria)
+		_, err := u.menuService.RefreshMenu(cafeteria)
 		if err == nil {
 			slog.Info("Successfully updated",
 				"cafeteria", string(cafeteria))

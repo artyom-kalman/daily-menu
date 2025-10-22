@@ -4,18 +4,54 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"time"
 )
 
-type MenuFetcherService struct {
-	htmlParser *MenuParser
-	aiService  *MenuAIService
+type MenuSource interface {
+	FetchMenu(ctx context.Context) (*Menu, error)
 }
 
-func NewMenuFetcherService(url string, aiService AIService) *MenuFetcherService {
+type MenuValidator interface {
+	Validate(ctx context.Context, menu *Menu) (*MenuValidationResponse, error)
+}
+
+type MenuEnricher interface {
+	Enrich(ctx context.Context, menu *Menu) error
+}
+
+type MenuFetcherService struct {
+	source    MenuSource
+	validator MenuValidator
+	enricher  MenuEnricher
+	clock     Clock
+}
+
+func NewMenuFetcherService(url string, aiService AIService, clock Clock) *MenuFetcherService {
+	if clock == nil {
+		clock = NewKSTClock()
+	}
+
+	parser := NewMenuParser(url, clock)
+	source := &parserMenuSource{parser: parser}
+
+	aiProcessor := &aiMenuProcessor{service: NewMenuAIService(aiService)}
+
+	return NewMenuFetcherPipeline(source, aiProcessor, aiProcessor, clock)
+}
+
+func NewMenuFetcherPipeline(source MenuSource, validator MenuValidator, enricher MenuEnricher, clock Clock) *MenuFetcherService {
+	if source == nil {
+		panic("menu source must not be nil")
+	}
+
+	if clock == nil {
+		clock = NewKSTClock()
+	}
+
 	return &MenuFetcherService{
-		htmlParser: NewMenuParser(url),
-		aiService:  NewMenuAIService(aiService),
+		source:    source,
+		validator: validator,
+		enricher:  enricher,
+		clock:     clock,
 	}
 }
 
@@ -24,44 +60,55 @@ func (s *MenuFetcherService) FetchMenu() (*Menu, error) {
 }
 
 func (s *MenuFetcherService) FetchMenuWithContext(ctx context.Context) (*Menu, error) {
-	menu, err := s.htmlParser.ParseMenu()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	menu, err := s.source.FetchMenu(ctx)
 	if err != nil {
-		slog.Error("Failed to parse HTML content", "error", err)
-		return nil, fmt.Errorf("failed to parse menu: %w", err)
+		slog.Error("Failed to fetch menu from source", "error", err)
+		return nil, fmt.Errorf("failed to fetch menu: %w", err)
 	}
 
-	// Validate menu with AI
-	validation, err := s.aiService.ValidateMenu(ctx, menu)
-	if err != nil {
-		slog.Error("Failed to validate menu", "error", err)
-		// Fallback to basic validation
-		return s.handleValidationFailure(menu)
+	if s.validator != nil {
+		validation, err := s.validator.Validate(ctx, menu)
+		if err != nil {
+			slog.Error("Failed to validate menu", "error", err)
+			return s.handleValidationFailure(ctx, menu)
+		}
+
+		if !validation.IsValid {
+			slog.Info("Menu validation failed", "reason", validation.Reason)
+			return s.createEmptyMenu(validation.Message), nil
+		}
 	}
 
-	if !validation.IsValid {
-		slog.Info("Menu validation failed", "reason", validation.Reason)
-		return s.createEmptyMenu(validation.Message), nil
-	}
-
-	// Continue with description generation for valid menus
-	if err := s.aiService.GenerateDescriptions(ctx, menu); err != nil {
-		slog.Error("Failed to add descriptions to menu", "error", err)
-		return nil, fmt.Errorf("failed to add menu descriptions: %w", err)
+	if s.enricher != nil {
+		if err := s.enricher.Enrich(ctx, menu); err != nil {
+			slog.Error("Failed to enrich menu", "error", err)
+			return nil, fmt.Errorf("failed to enrich menu: %w", err)
+		}
 	}
 
 	slog.Debug("Successfully processed menu", "item_count", len(menu.Items))
 	return menu, nil
 }
 
-func (s *MenuFetcherService) handleValidationFailure(menu *Menu) (*Menu, error) {
-	// Fallback logic if AI validation fails
+func (s *MenuFetcherService) handleValidationFailure(ctx context.Context, menu *Menu) (*Menu, error) {
 	if len(menu.Items) == 0 {
 		return s.createEmptyMenu("Не удалось проверить меню"), nil
 	}
 
-	// If menu has items but validation failed, proceed with description generation
-	if err := s.aiService.GenerateDescriptions(context.Background(), menu); err != nil {
-		slog.Error("Failed to add descriptions during fallback", "error", err)
+	if s.enricher == nil {
+		return menu, nil
+	}
+
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	if err := s.enricher.Enrich(ctx, menu); err != nil {
+		slog.Error("Failed to enrich menu during fallback", "error", err)
 		return s.createEmptyMenu("Ошибка при обработке меню"), nil
 	}
 
@@ -73,7 +120,7 @@ func (s *MenuFetcherService) createEmptyMenu(message string) *Menu {
 		message = "Сегодня меню недоступно"
 	}
 
-	now := time.Now()
+	now := s.clock.Now()
 	return &Menu{
 		Items: []*MenuItem{
 			{
@@ -84,4 +131,24 @@ func (s *MenuFetcherService) createEmptyMenu(message string) *Menu {
 		},
 		Time: &now,
 	}
+}
+
+type parserMenuSource struct {
+	parser *MenuParser
+}
+
+func (p *parserMenuSource) FetchMenu(ctx context.Context) (*Menu, error) {
+	return p.parser.ParseMenu(ctx)
+}
+
+type aiMenuProcessor struct {
+	service *MenuAIService
+}
+
+func (p *aiMenuProcessor) Validate(ctx context.Context, menu *Menu) (*MenuValidationResponse, error) {
+	return p.service.ValidateMenu(ctx, menu)
+}
+
+func (p *aiMenuProcessor) Enrich(ctx context.Context, menu *Menu) error {
+	return p.service.GenerateDescriptions(ctx, menu)
 }

@@ -7,22 +7,22 @@ import (
 )
 
 type MenuPersistenceService struct {
-	repo *MenuRepository
+	repo  *MenuRepository
+	clock Clock
 }
 
-func NewMenuPersistenceService(repo *MenuRepository) *MenuPersistenceService {
+func NewMenuPersistenceService(repo *MenuRepository, clock Clock) *MenuPersistenceService {
+	if clock == nil {
+		clock = NewKSTClock()
+	}
 	return &MenuPersistenceService{
-		repo: repo,
+		repo:  repo,
+		clock: clock,
 	}
 }
 
-func getKoreanTime() time.Time {
-	kst, _ := time.LoadLocation("Asia/Seoul")
-	return time.Now().In(kst)
-}
-
 func (p *MenuPersistenceService) LoadMenu(cafeteria Cafeteria) (*Menu, error) {
-	koreanToday := getKoreanTime().Truncate(24 * time.Hour)
+	koreanToday := p.clock.Now().Truncate(24 * time.Hour)
 	dishes, err := p.repo.GetMenu(string(cafeteria), koreanToday)
 	if err != nil {
 		slog.Error("Failed to load menu from database",
@@ -51,7 +51,7 @@ func (p *MenuPersistenceService) LoadMenu(cafeteria Cafeteria) (*Menu, error) {
 }
 
 func (p *MenuPersistenceService) SaveMenu(cafeteria Cafeteria, menu *Menu) error {
-	koreanToday := getKoreanTime().Truncate(24 * time.Hour)
+	koreanToday := p.clock.Now().Truncate(24 * time.Hour)
 	err := p.repo.SaveMenu(string(cafeteria), menu.Items, koreanToday)
 	if err != nil {
 		slog.Error("Failed to save menu to database",
@@ -59,6 +59,8 @@ func (p *MenuPersistenceService) SaveMenu(cafeteria Cafeteria, menu *Menu) error
 			"cafeteria", string(cafeteria))
 		return fmt.Errorf("database update failed for %s: %w", string(cafeteria), err)
 	}
+
+	menu.Time = &koreanToday
 
 	return nil
 }

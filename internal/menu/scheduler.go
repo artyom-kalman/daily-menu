@@ -8,23 +8,34 @@ import (
 )
 
 type MenuScheduler struct {
-	updater     *MenuUpdater
-	kstLocation *time.Location
-	isRunning   bool
-	mu          sync.RWMutex
-	ctx         context.Context
-	cancel      context.CancelFunc
-	wg          sync.WaitGroup
+	updater   *MenuUpdater
+	clock     Clock
+	location  *time.Location
+	isRunning bool
+	mu        sync.RWMutex
+	ctx       context.Context
+	cancel    context.CancelFunc
+	wg        sync.WaitGroup
 }
 
-func NewMenuScheduler(updater *MenuUpdater) *MenuScheduler {
-	kst, _ := time.LoadLocation("Asia/Seoul")
+func NewMenuScheduler(updater *MenuUpdater, clock Clock) *MenuScheduler {
+	if clock == nil {
+		clock = NewKSTClock()
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
+	now := clock.Now()
+	location := now.Location()
+	if location == nil {
+		location = time.FixedZone("KST", 9*60*60)
+	}
+
 	return &MenuScheduler{
-		updater:     updater,
-		kstLocation: kst,
-		ctx:         ctx,
-		cancel:      cancel,
+		updater:  updater,
+		clock:    clock,
+		location: location,
+		ctx:      ctx,
+		cancel:   cancel,
 	}
 }
 
@@ -39,7 +50,9 @@ func (s *MenuScheduler) Start() error {
 	s.wg.Add(1)
 	go s.runScheduler()
 	s.isRunning = true
-	slog.Info("Menu scheduler started - daily updates at 6:00 AM KST")
+	slog.Info("Menu scheduler started",
+		"run_time", "06:00",
+		"timezone", s.location.String())
 
 	go s.warmup()
 	return nil
@@ -99,10 +112,10 @@ func (s *MenuScheduler) warmup() {
 }
 
 func (s *MenuScheduler) getNextRunTime() time.Time {
-	now := time.Now().In(s.kstLocation)
+	now := s.clock.Now().In(s.location)
 
 	// Get today at 6:00 AM KST
-	today6AM := time.Date(now.Year(), now.Month(), now.Day(), 6, 0, 0, 0, s.kstLocation)
+	today6AM := time.Date(now.Year(), now.Month(), now.Day(), 6, 0, 0, 0, s.location)
 
 	// If today's 6:00 AM has passed, schedule for tomorrow
 	if now.After(today6AM) {

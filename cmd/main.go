@@ -34,20 +34,20 @@ func main() {
 	defer db.Close()
 
 	gptService := ai.NewGptService(cfg.GPTToken, cfg.GPTURL)
-	peonyFetcher := menu.NewMenuFetcherService(cfg.PeonyURL, gptService)
-	azileaFetcher := menu.NewMenuFetcherService(cfg.AzileaURL, gptService)
+	menuClock := menu.NewKSTClock()
+	peonyFetcher := menu.NewMenuFetcherService(cfg.PeonyURL, gptService, menuClock)
+	azileaFetcher := menu.NewMenuFetcherService(cfg.AzileaURL, gptService, menuClock)
 
 	menuRepo := menu.NewMenuRepository(db)
-	cacheService := menu.NewMenuCacheService()
-	persistenceService := menu.NewMenuPersistenceService(menuRepo)
+	persistenceService := menu.NewMenuPersistenceService(menuRepo, menuClock)
 
-	peonyOrchestration := menu.NewCafeteriaService(cacheService, persistenceService, peonyFetcher)
-	azileaOrchestration := menu.NewCafeteriaService(cacheService, persistenceService, azileaFetcher)
+	menuService := menu.NewMenuService(persistenceService, map[menu.Cafeteria]*menu.MenuFetcherService{
+		menu.PEONY:  peonyFetcher,
+		menu.AZILEA: azileaFetcher,
+	})
 
-	menuService := menu.NewMenuService(peonyOrchestration, azileaOrchestration)
-
-	updater := menu.NewMenuUpdater(menuService, cacheService)
-	scheduler := menu.NewMenuScheduler(updater)
+	updater := menu.NewMenuUpdater(menuService)
+	scheduler := menu.NewMenuScheduler(updater, menuClock)
 
 	if err := scheduler.Start(); err != nil {
 		slog.Error("Failed to start scheduler", "error", err)
