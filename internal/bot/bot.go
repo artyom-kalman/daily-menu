@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/artyom-kalman/kbu-daily-menu/internal/menu"
-
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+
+	"github.com/artyom-kalman/kbu-daily-menu/internal/menu"
 )
 
 type Bot struct {
@@ -48,31 +48,30 @@ func (b *Bot) loadSubscribers() ([]int64, error) {
 	return b.repo.LoadSubscribers()
 }
 
-func (b *Bot) scheduleDailyMessages(message string) {
-	subscribers, err := b.loadSubscribers()
-	if err != nil {
-		slog.Error("Failed to load subscribers", "error", err)
-		return
-	}
-
-	if len(subscribers) == 0 {
-		slog.Info("No active subscribers found")
-		return
-	}
-
+func (b *Bot) scheduleDailyMessages() {
 	b.wg.Add(1)
 	go func() {
 		defer b.wg.Done()
-		b.runDailyScheduler(subscribers, message)
+		b.runDailyScheduler()
 	}()
+
+	subscribers, err := b.loadSubscribers()
+	if err != nil {
+		slog.Error("Failed to load subscribers for scheduler summary", "error", err)
+		return
+	}
 
 	slog.Info("Scheduled daily messages for subscribers",
 		"subscriber_count", len(subscribers),
 		"schedule_time", "10:00")
 }
 
-func (b *Bot) runDailyScheduler(subscribers []int64, message string) {
-	kst, _ := time.LoadLocation("Asia/Seoul")
+func (b *Bot) runDailyScheduler() {
+	kst, err := time.LoadLocation("Asia/Seoul")
+	if err != nil {
+		slog.Error("Failed to load scheduler timezone", "error", err)
+		return
+	}
 
 	for {
 		nextRun := b.getNextRunTime(kst)
@@ -81,8 +80,29 @@ func (b *Bot) runDailyScheduler(subscribers []int64, message string) {
 
 		time.Sleep(time.Until(nextRun))
 
-		b.sendDailyMenu(subscribers, message)
+		if err := b.dispatchDailyMenu(); err != nil {
+			slog.Error("Failed to dispatch daily menu", "error", err)
+		}
 	}
+}
+
+func (b *Bot) dispatchDailyMenu() error {
+	subscribers, err := b.loadSubscribers()
+	if err != nil {
+		return fmt.Errorf("load subscribers: %w", err)
+	}
+
+	if len(subscribers) == 0 {
+		slog.Info("No active subscribers found")
+		return nil
+	}
+
+	message, err := b.buildMenuMessage()
+	if err != nil {
+		return fmt.Errorf("build menu message: %w", err)
+	}
+
+	return b.sendDailyMenu(subscribers, message)
 }
 
 func (b *Bot) sendDailyMenu(subscribers []int64, message string) error {
@@ -171,6 +191,14 @@ func (b *Bot) sendMenuWithButtons(chatID int64, menuText string) error {
 	return err
 }
 
+func (b *Bot) sendLatestMenu(chatID int64) error {
+	message, err := b.buildMenuMessage()
+	if err != nil {
+		return fmt.Errorf("build menu message: %w", err)
+	}
+	return b.sendMenuWithButtons(chatID, message)
+}
+
 func (b *Bot) sendUnsubscribeConfirmation(chatID int64) error {
 	msg := tgbotapi.NewMessage(chatID, "Вы уверены, что хотите отписаться от ежедневных обновлений меню?")
 
@@ -230,7 +258,7 @@ func (b *Bot) handleCallbackQuery(callback *tgbotapi.CallbackQuery) error {
 	}
 }
 
-func (b *Bot) handleCommand(update tgbotapi.Update, defaultMessage string) error {
+func (b *Bot) handleCommand(update tgbotapi.Update) error {
 	chatID := update.Message.Chat.ID
 	command := update.Message.Command()
 
@@ -263,13 +291,11 @@ func (b *Bot) handleCommand(update tgbotapi.Update, defaultMessage string) error
 		return b.SendMessage(int(chatID), fmt.Sprintf("Статус подписки: %s\nЕжедневные обновления меню в 10:00", status))
 
 	default:
-		msg := tgbotapi.NewMessage(chatID, defaultMessage)
-		_, err := b.bot.Send(msg)
-		return err
+		return b.sendLatestMenu(chatID)
 	}
 }
 
-func (b *Bot) HandleMessages(text string) error {
+func (b *Bot) HandleMessages() error {
 	updateConf := tgbotapi.NewUpdate(0)
 	updateConf.Timeout = 60
 
@@ -277,12 +303,15 @@ func (b *Bot) HandleMessages(text string) error {
 	for update := range updates {
 		if update.Message != nil {
 			if update.Message.IsCommand() {
-				if err := b.handleCommand(update, text); err != nil {
+				if err := b.handleCommand(update); err != nil {
 					slog.Error("Failed to handle command", "error", err)
 				}
 			} else {
-				if err := b.sendMenuWithButtons(update.Message.Chat.ID, text); err != nil {
-					return err
+				if err := b.sendLatestMenu(update.Message.Chat.ID); err != nil {
+					slog.Error("Failed to send menu for message", "chat_id", update.Message.Chat.ID, "error", err)
+					if sendErr := b.SendMessage(int(update.Message.Chat.ID), "Не удалось получить меню. Попробуйте позже."); sendErr != nil {
+						slog.Error("Failed to send fallback message", "chat_id", update.Message.Chat.ID, "error", sendErr)
+					}
 				}
 			}
 		} else if update.CallbackQuery != nil {
@@ -297,6 +326,15 @@ func (b *Bot) HandleMessages(text string) error {
 		}
 	}
 	return nil
+}
+
+func (b *Bot) buildMenuMessage() (string, error) {
+	peony, azilea, err := b.menuService.GetMenus()
+	if err != nil {
+		return "", fmt.Errorf("get menus: %w", err)
+	}
+
+	return FormatMenuMessage(peony, azilea), nil
 }
 
 func FormatMenuMessage(peony, azilea *menu.Menu) string {
@@ -333,16 +371,17 @@ func FormatMenuMessage(peony, azilea *menu.Menu) string {
 }
 
 func (b *Bot) Run() error {
-	peony, azilea, err := b.menuService.GetMenus()
-	if err != nil {
-		return fmt.Errorf("error getting menus: %w", err)
+	if _, err := b.buildMenuMessage(); err != nil {
+		return fmt.Errorf("initialize menu message: %w", err)
 	}
 
-	message := FormatMenuMessage(peony, azilea)
+	b.scheduleDailyMessages()
 
-	b.scheduleDailyMessages(message)
-
-	go b.HandleMessages(message)
+	go func() {
+		if err := b.HandleMessages(); err != nil {
+			slog.Error("Message handler stopped", "error", err)
+		}
+	}()
 
 	return nil
 }
