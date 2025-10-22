@@ -44,13 +44,17 @@ func (r *MenuRepository) GetMenu(cafeteria string, targetDate time.Time) ([]*Men
 }
 
 func (r *MenuRepository) SaveMenu(cafeteria string, dishes []*MenuItem, targetDate time.Time) error {
-	dishesJson, err := json.Marshal(dishes)
+	dishesJSON, err := json.Marshal(dishes)
 	if err != nil {
 		return err
 	}
 
-	insertQuery := "INSERT INTO menu (cafeteria, dishes, date) VALUES ($1, $2, $3)"
-	_, err = r.db.Conn.Exec(insertQuery, cafeteria, string(dishesJson), targetDate.Format("2006-01-02"))
+	insertQuery := `
+		INSERT INTO menu (date, cafeteria, dishes)
+		VALUES ($1, $2, $3)
+		ON CONFLICT(date, cafeteria) DO UPDATE SET dishes = excluded.dishes
+	`
+	_, err = r.db.Conn.Exec(insertQuery, targetDate.Format("2006-01-02"), cafeteria, string(dishesJSON))
 	if err != nil {
 		return err
 	}
