@@ -91,6 +91,7 @@ func (b *Bot) sendDailyMenu(subscribers []int64, message string) error {
 	for _, chatID := range subscribers {
 		wg.Add(1)
 		go func(chatID int64) {
+			defer wg.Done()
 			if err := b.sendMenuWithButtons(chatID, message); err != nil {
 				slog.Error("Failed to send daily menu", "chat_id", chatID, "error", err)
 			}
