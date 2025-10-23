@@ -78,10 +78,10 @@ func main() {
 		}
 	}()
 
-	waitForShutdown(errChan, scheduler)
+	waitForShutdown(errChan, scheduler, botInstance)
 }
 
-func waitForShutdown(errChan chan error, scheduler *menu.MenuScheduler) {
+func waitForShutdown(errChan chan error, scheduler *menu.MenuScheduler, botInstance *bot.Bot) {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
@@ -95,6 +95,12 @@ func waitForShutdown(errChan chan error, scheduler *menu.MenuScheduler) {
 
 	// Graceful shutdown
 	slog.Info("Shutting down application")
+
+	if botInstance != nil {
+		if err := botInstance.Stop(); err != nil {
+			slog.Error("Failed to stop bot", "error", err)
+		}
+	}
 
 	if scheduler != nil {
 		if err := scheduler.Stop(); err != nil {

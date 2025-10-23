@@ -45,6 +45,11 @@ func (p *MenuParser) ParseMenu(ctx context.Context) (*Menu, error) {
 	}
 
 	foodItems, err := p.extractFoodItems(foodList)
+	if err != nil {
+		slog.Error("Failed to extract menu items", "error", err)
+		return nil, fmt.Errorf("failed to extract menu items: %w", err)
+	}
+
 	menu := NewMenuFromDishes(foodItems, &now)
 
 	return menu, nil

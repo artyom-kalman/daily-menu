@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -17,6 +18,8 @@ type Bot struct {
 	repo        *SubscriptionRepository
 	wg          sync.WaitGroup
 	menuService MenuService
+	ctx         context.Context
+	cancel      context.CancelFunc
 }
 
 type MenuService interface {
@@ -48,11 +51,11 @@ func (b *Bot) loadSubscribers() ([]int64, error) {
 	return b.repo.LoadSubscribers()
 }
 
-func (b *Bot) scheduleDailyMessages() {
+func (b *Bot) scheduleDailyMessages(ctx context.Context) {
 	b.wg.Add(1)
 	go func() {
 		defer b.wg.Done()
-		b.runDailyScheduler()
+		b.runDailyScheduler(ctx)
 	}()
 
 	subscribers, err := b.loadSubscribers()
@@ -66,7 +69,7 @@ func (b *Bot) scheduleDailyMessages() {
 		"schedule_time", "10:00")
 }
 
-func (b *Bot) runDailyScheduler() {
+func (b *Bot) runDailyScheduler(ctx context.Context) {
 	kst, err := time.LoadLocation("Asia/Seoul")
 	if err != nil {
 		slog.Error("Failed to load scheduler timezone", "error", err)
@@ -74,11 +77,30 @@ func (b *Bot) runDailyScheduler() {
 	}
 
 	for {
+		select {
+		case <-ctx.Done():
+			slog.Info("Daily message scheduler received shutdown signal")
+			return
+		default:
+		}
+
 		nextRun := b.getNextRunTime(kst)
 
 		slog.Info("Next daily message scheduled", "time", nextRun.Format(time.RFC3339))
 
-		time.Sleep(time.Until(nextRun))
+		waitDuration := max(time.Until(nextRun), 0)
+
+		timer := time.NewTimer(waitDuration)
+
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				<-timer.C
+			}
+			slog.Info("Daily message scheduler stopped")
+			return
+		case <-timer.C:
+		}
 
 		if err := b.dispatchDailyMenu(); err != nil {
 			slog.Error("Failed to dispatch daily menu", "error", err)
@@ -300,32 +322,41 @@ func (b *Bot) HandleMessages() error {
 	updateConf.Timeout = 60
 
 	updates := b.bot.GetUpdatesChan(updateConf)
-	for update := range updates {
-		if update.Message != nil {
-			if update.Message.IsCommand() {
-				if err := b.handleCommand(update); err != nil {
-					slog.Error("Failed to handle command", "error", err)
-				}
-			} else {
-				if err := b.sendLatestMenu(update.Message.Chat.ID); err != nil {
-					slog.Error("Failed to send menu for message", "chat_id", update.Message.Chat.ID, "error", err)
-					if sendErr := b.SendMessage(int(update.Message.Chat.ID), "Не удалось получить меню. Попробуйте позже."); sendErr != nil {
-						slog.Error("Failed to send fallback message", "chat_id", update.Message.Chat.ID, "error", sendErr)
-					}
-				}
-			}
-		} else if update.CallbackQuery != nil {
-			if err := b.handleCallbackQuery(update.CallbackQuery); err != nil {
-				slog.Error("Failed to handle callback query", "error", err)
+	for {
+		select {
+		case <-b.ctx.Done():
+			slog.Info("Stopping Telegram updates handler")
+			return nil
+		case update, ok := <-updates:
+			if !ok {
+				return nil
 			}
 
-			callbackCfg := tgbotapi.NewCallback(update.CallbackQuery.ID, "")
-			if _, err := b.bot.Request(callbackCfg); err != nil {
-				slog.Error("Failed to answer callback query", "error", err)
+			if update.Message != nil {
+				if update.Message.IsCommand() {
+					if err := b.handleCommand(update); err != nil {
+						slog.Error("Failed to handle command", "error", err)
+					}
+				} else {
+					if err := b.sendLatestMenu(update.Message.Chat.ID); err != nil {
+						slog.Error("Failed to send menu for message", "chat_id", update.Message.Chat.ID, "error", err)
+						if sendErr := b.SendMessage(int(update.Message.Chat.ID), "Не удалось получить меню. Попробуйте позже."); sendErr != nil {
+							slog.Error("Failed to send fallback message", "chat_id", update.Message.Chat.ID, "error", sendErr)
+						}
+					}
+				}
+			} else if update.CallbackQuery != nil {
+				if err := b.handleCallbackQuery(update.CallbackQuery); err != nil {
+					slog.Error("Failed to handle callback query", "error", err)
+				}
+
+				callbackCfg := tgbotapi.NewCallback(update.CallbackQuery.ID, "")
+				if _, err := b.bot.Request(callbackCfg); err != nil {
+					slog.Error("Failed to answer callback query", "error", err)
+				}
 			}
 		}
 	}
-	return nil
 }
 
 func (b *Bot) buildMenuMessage() (string, error) {
@@ -371,17 +402,43 @@ func FormatMenuMessage(peony, azilea *menu.Menu) string {
 }
 
 func (b *Bot) Run() error {
+	if b.cancel != nil {
+		return fmt.Errorf("bot already running")
+	}
+
 	if _, err := b.buildMenuMessage(); err != nil {
 		return fmt.Errorf("initialize menu message: %w", err)
 	}
 
-	b.scheduleDailyMessages()
+	ctx, cancel := context.WithCancel(context.Background())
+	b.ctx = ctx
+	b.cancel = cancel
 
+	b.scheduleDailyMessages(ctx)
+
+	b.wg.Add(1)
 	go func() {
+		defer b.wg.Done()
 		if err := b.HandleMessages(); err != nil {
 			slog.Error("Message handler stopped", "error", err)
 		}
 	}()
 
+	return nil
+}
+
+func (b *Bot) Stop() error {
+	if b.cancel == nil {
+		return nil
+	}
+
+	b.cancel()
+	b.bot.StopReceivingUpdates()
+	b.wg.Wait()
+
+	b.cancel = nil
+	b.ctx = nil
+
+	slog.Info("Telegram bot shutdown complete")
 	return nil
 }
