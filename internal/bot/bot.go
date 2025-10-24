@@ -372,7 +372,7 @@ func FormatMenuMessage(peony, azilea *menu.Menu) string {
 	var message strings.Builder
 	message.WriteString("🍽️ Меню на сегодня.\n\n")
 
-	message.WriteString("🌸 Peony (нижняя столовая):\n")
+	message.WriteString("🌸 Peony (верхняя столовая):\n")
 	if len(peony.Items) <= 1 {
 		message.WriteString("Сегодня выходной\n")
 	} else {
@@ -385,7 +385,7 @@ func FormatMenuMessage(peony, azilea *menu.Menu) string {
 		}
 	}
 
-	message.WriteString("\n🌺 Azilea (верхняя столовая):\n")
+	message.WriteString("\n🌺 Azilea (нижняя столовая):\n")
 	if len(azilea.Items) <= 1 {
 		message.WriteString("Сегодня выходной\n")
 	} else {

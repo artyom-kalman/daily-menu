@@ -26,15 +26,63 @@
     </head>
     <body class="min-h-screen flex flex-col" data-theme="halloween">
         <!-- Background Emoji Decorations -->
-        <div class="emoji-decoration" aria-hidden="true" style="top: 15%; left: 8%;">🌟</div>
-        <div class="emoji-decoration" aria-hidden="true" style="top: 25%; right: 12%;">✨</div>
-        <div class="emoji-decoration" aria-hidden="true" style="top: 45%; left: 5%;">🌸</div>
-        <div class="emoji-decoration" aria-hidden="true" style="top: 55%; right: 8%;">🎃</div>
-        <div class="emoji-decoration" aria-hidden="true" style="top: 70%; left: 15%;">👻</div>
-        <div class="emoji-decoration" aria-hidden="true" style="bottom: 30%; right: 20%;">🦇</div>
-        <div class="emoji-decoration" aria-hidden="true" style="bottom: 20%; left: 25%;">🍬</div>
-        <div class="emoji-decoration" aria-hidden="true" style="bottom: 10%; right: 5%;">🌙</div>
-        
+        <div
+            class="emoji-decoration"
+            aria-hidden="true"
+            style="top: 15%; left: 8%"
+        >
+            🌟
+        </div>
+        <div
+            class="emoji-decoration"
+            aria-hidden="true"
+            style="top: 25%; right: 12%"
+        >
+            ✨
+        </div>
+        <div
+            class="emoji-decoration"
+            aria-hidden="true"
+            style="top: 45%; left: 5%"
+        >
+            🌸
+        </div>
+        <div
+            class="emoji-decoration"
+            aria-hidden="true"
+            style="top: 55%; right: 8%"
+        >
+            🎃
+        </div>
+        <div
+            class="emoji-decoration"
+            aria-hidden="true"
+            style="top: 70%; left: 15%"
+        >
+            👻
+        </div>
+        <div
+            class="emoji-decoration"
+            aria-hidden="true"
+            style="bottom: 30%; right: 20%"
+        >
+            🦇
+        </div>
+        <div
+            class="emoji-decoration"
+            aria-hidden="true"
+            style="bottom: 20%; left: 25%"
+        >
+            🍬
+        </div>
+        <div
+            class="emoji-decoration"
+            aria-hidden="true"
+            style="bottom: 10%; right: 5%"
+        >
+            🌙
+        </div>
+
         <!-- Header -->
         <header class="bg-white shadow-sm border-b border-gray-200">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -79,7 +127,9 @@
                                 <h2 class="text-2xl font-bold text-white">
                                     Peony
                                 </h2>
-                                <p class="text-purple-100">Азиатская кухня</p>
+                                <p class="text-purple-100">
+                                    Верхняя столовая, азиатская кухня
+                                </p>
                             </div>
                             <div
                                 class="bg-white/20 backdrop-blur-sm rounded-full p-3"
@@ -217,7 +267,9 @@
                                 <h2 class="text-2xl font-bold text-white">
                                     Azilea
                                 </h2>
-                                <p class="text-green-100">Европейская кухня</p>
+                                <p class="text-green-100">
+                                    Нижняя столовая, европейская кухня
+                                </p>
                             </div>
                             <div
                                 class="bg-white/20 backdrop-blur-sm rounded-full p-3"
@@ -378,6 +430,44 @@
                             Открыть Telegram бот
                         </a>
                     </div>
+                    <div class="flex flex-col items-center gap-4">
+                        <h3
+                            class="text-lg font-semibold text-gray-900 text-adaptive-primary"
+                        >
+                            Университетские стикеры в Telegram
+                        </h3>
+                        <a
+                            href="https://t.me/addstickers/kto326"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="group sticker-card flex flex-col items-center text-adaptive-secondary"
+                        >
+                            <img
+                                src="/static/stickers/kto.webp"
+                                alt="Университетский стикер из набора Telegram"
+                                class="sticker-preview h-32 w-auto drop-shadow-lg transition duration-300 transform group-hover:scale-110 group-hover:-rotate-3 group-hover:drop-shadow-2xl"
+                                loading="lazy"
+                            />
+                            <span
+                                class="mt-3 inline-flex items-center text-sm font-medium text-blue-600 transition duration-300 group-hover:text-blue-500 group-hover:translate-x-1"
+                            >
+                                Открыть набор стикеров
+                                <svg
+                                    class="ml-2 h-4 w-4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M14 3h7m0 0v7m0-7L10 14"
+                                    ></path>
+                                </svg>
+                            </span>
+                        </a>
+                    </div>
                 </div>
             </div>
         </footer>
@@ -391,14 +481,15 @@
             const themeEmojis = {
                 default: ["🍕", "🥗", "🍰", "☕", "🍎"],
                 halloween: ["🎃", "👻", "🦇", "🍬", "🌙"],
-                christmas: ["❄️", "🎄", "⭐", "🎁", "🔔"]
+                christmas: ["❄️", "🎄", "⭐", "🎁", "🔔"],
             };
 
             // Update emoji decorations based on theme
             function updateEmojiDecorations(theme) {
-                const decorations = document.querySelectorAll('.emoji-decoration');
+                const decorations =
+                    document.querySelectorAll(".emoji-decoration");
                 const emojis = themeEmojis[theme] || themeEmojis.default;
-                
+
                 decorations.forEach((decoration, index) => {
                     decoration.textContent = emojis[index % emojis.length];
                 });
@@ -438,13 +529,13 @@
             }, 300000);
 
             // Add click effects to emoji decorations
-            document.querySelectorAll('.emoji-decoration').forEach(emoji => {
-                emoji.addEventListener('click', function() {
-                    this.style.transform = 'scale(1.5) rotate(360deg)';
-                    this.style.opacity = '0.2';
+            document.querySelectorAll(".emoji-decoration").forEach((emoji) => {
+                emoji.addEventListener("click", function () {
+                    this.style.transform = "scale(1.5) rotate(360deg)";
+                    this.style.opacity = "0.2";
                     setTimeout(() => {
-                        this.style.transform = '';
-                        this.style.opacity = '';
+                        this.style.transform = "";
+                        this.style.opacity = "";
                     }, 300);
                 });
             });
