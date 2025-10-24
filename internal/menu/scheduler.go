@@ -86,7 +86,7 @@ func (s *MenuScheduler) runScheduler() {
 			return
 		case <-timer.C:
 			slog.Info("Starting scheduled menu update")
-			if err := s.updater.UpdateAll(); err != nil {
+			if err := s.updater.UpdateAll(s.ctx); err != nil {
 				slog.Error("Scheduled update failed", "error", err)
 			}
 		}
@@ -96,14 +96,16 @@ func (s *MenuScheduler) runScheduler() {
 func (s *MenuScheduler) warmup() {
 	slog.Info("Starting service warmup")
 
+	ctx := s.ctx
+
 	go func() {
-		if err := s.updater.UpdateCafeteria(PEONY); err != nil {
+		if err := s.updater.UpdateCafeteria(ctx, PEONY); err != nil {
 			slog.Error("Failed to warmup Peony menu", "error", err)
 		}
 	}()
 
 	go func() {
-		if err := s.updater.UpdateCafeteria(AZILEA); err != nil {
+		if err := s.updater.UpdateCafeteria(ctx, AZILEA); err != nil {
 			slog.Error("Failed to warmup Azilea menu", "error", err)
 		}
 	}()

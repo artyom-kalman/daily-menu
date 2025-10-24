@@ -1,6 +1,7 @@
 package menu
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"maps"
@@ -21,7 +22,11 @@ func NewMenuService(persistence *MenuPersistenceService, fetchers map[Cafeteria]
 	}
 }
 
-func (s *MenuService) GetMenu(cafeteria Cafeteria) (*Menu, error) {
+func (s *MenuService) GetMenuWithContext(ctx context.Context, cafeteria Cafeteria) (*Menu, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	menu, err := s.persistence.LoadMenu(cafeteria)
 	if err != nil {
 		return nil, err
@@ -34,10 +39,26 @@ func (s *MenuService) GetMenu(cafeteria Cafeteria) (*Menu, error) {
 		return menu, nil
 	}
 
-	return s.RefreshMenu(cafeteria)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	return s.RefreshMenuWithContext(ctx, cafeteria)
+}
+
+func (s *MenuService) GetMenu(cafeteria Cafeteria) (*Menu, error) {
+	return s.GetMenuWithContext(context.Background(), cafeteria)
 }
 
 func (s *MenuService) RefreshMenu(cafeteria Cafeteria) (*Menu, error) {
+	return s.RefreshMenuWithContext(context.Background(), cafeteria)
+}
+
+func (s *MenuService) RefreshMenuWithContext(ctx context.Context, cafeteria Cafeteria) (*Menu, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	fetcher, ok := s.fetchers[cafeteria]
 	if !ok {
 		return nil, fmt.Errorf("no fetcher configured for cafeteria: %s", string(cafeteria))
@@ -46,7 +67,7 @@ func (s *MenuService) RefreshMenu(cafeteria Cafeteria) (*Menu, error) {
 	slog.Info("Fetching fresh menu from external source",
 		"cafeteria", string(cafeteria))
 
-	menu, err := fetcher.FetchMenu()
+	menu, err := fetcher.FetchMenuWithContext(ctx)
 	if err != nil {
 		slog.Error("Failed to fetch menu from external source",
 			"error", err,

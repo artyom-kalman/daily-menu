@@ -23,6 +23,7 @@ func (r *MenuRepository) GetMenu(cafeteria string, targetDate time.Time) ([]*Men
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	if !rows.Next() {
 		return nil, nil
@@ -37,6 +38,10 @@ func (r *MenuRepository) GetMenu(cafeteria string, targetDate time.Time) ([]*Men
 	var dishes []*MenuItem
 	err = json.Unmarshal([]byte(dishesJson), &dishes)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 

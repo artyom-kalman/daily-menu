@@ -1,6 +1,7 @@
 package menu
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -21,7 +22,11 @@ func NewMenuUpdater(menuService *MenuService) *MenuUpdater {
 	}
 }
 
-func (u *MenuUpdater) UpdateAll() error {
+func (u *MenuUpdater) UpdateAll(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	slog.Info("Starting scheduled menu update for all cafeterias")
 
 	// Update both cafeterias
@@ -32,14 +37,14 @@ func (u *MenuUpdater) UpdateAll() error {
 
 	go func() {
 		defer wg.Done()
-		if err := u.updateCafeteria(PEONY); err != nil {
+		if err := u.updateCafeteria(ctx, PEONY); err != nil {
 			errChan <- fmt.Errorf("Peony update failed: %w", err)
 		}
 	}()
 
 	go func() {
 		defer wg.Done()
-		if err := u.updateCafeteria(AZILEA); err != nil {
+		if err := u.updateCafeteria(ctx, AZILEA); err != nil {
 			errChan <- fmt.Errorf("Azilea update failed: %w", err)
 		}
 	}()
@@ -62,22 +67,34 @@ func (u *MenuUpdater) UpdateAll() error {
 	return nil
 }
 
-func (u *MenuUpdater) UpdateCafeteria(cafeteria Cafeteria) error {
-	return u.updateCafeteria(cafeteria)
+func (u *MenuUpdater) UpdateCafeteria(ctx context.Context, cafeteria Cafeteria) error {
+	return u.updateCafeteria(ctx, cafeteria)
 }
 
-func (u *MenuUpdater) updateCafeteria(cafeteria Cafeteria) error {
+func (u *MenuUpdater) updateCafeteria(ctx context.Context, cafeteria Cafeteria) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	var lastErr error
 
 	for attempt := 1; attempt <= u.retryCount; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
 		if attempt > 1 {
 			slog.Info("Retry attempt",
 				"attempt", attempt,
 				"cafeteria", string(cafeteria))
-			time.Sleep(u.retryDelay)
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(u.retryDelay):
+			}
 		}
 
-		_, err := u.menuService.RefreshMenu(cafeteria)
+		_, err := u.menuService.RefreshMenuWithContext(ctx, cafeteria)
 		if err == nil {
 			slog.Info("Successfully updated",
 				"cafeteria", string(cafeteria))
@@ -89,6 +106,10 @@ func (u *MenuUpdater) updateCafeteria(cafeteria Cafeteria) error {
 			"error", err,
 			"attempt", attempt,
 			"cafeteria", string(cafeteria))
+	}
+
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	return lastErr
