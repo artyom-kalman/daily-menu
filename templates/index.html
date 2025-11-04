@@ -24,7 +24,7 @@
         </script>
         <link rel="stylesheet" href="/static/styles.css" />
     </head>
-    <body class="min-h-screen flex flex-col" data-theme="halloween">
+    <body class="min-h-screen flex flex-col" data-theme="default">
         <!-- Background Emoji Decorations -->
         <div
             class="emoji-decoration"
@@ -496,7 +496,7 @@
             }
 
             // Load saved theme from localStorage
-            const savedTheme = localStorage.getItem("theme") || "halloween";
+            const savedTheme = localStorage.getItem("theme") || "default";
             body.setAttribute("data-theme", savedTheme);
             if (themeSwitcher) themeSwitcher.value = savedTheme;
             updateEmojiDecorations(savedTheme);
