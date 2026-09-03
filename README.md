@@ -80,6 +80,22 @@ curl -F "url=https://<deployment>.convex.site/telegram/webhook" \
      "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook"
 ```
 
+## GitLab CI/CD
+
+`.gitlab-ci.yml` runs tests on every branch and merge request, then deploys to Convex production only when tests pass on the default branch.
+
+One-time setup:
+
+1. In the [Convex dashboard](https://dashboard.convex.dev), open the **production** deployment → **Settings → Deploy keys**, generate a key with `deployment:deploy`, and copy it.
+2. In GitLab: **Settings → CI/CD → Variables**, add:
+   - Key: `CONVEX_DEPLOY_KEY`
+   - Value: the production deploy key
+   - Protect variable
+   - Mask variable
+3. Protect the default branch so production deploys (and the deploy key) only run from it.
+
+The deploy job runs `npx convex deploy --yes`, which uses `CONVEX_DEPLOY_KEY` to target production. Convex env secrets (`OPENROUTER_API_KEY`, `TELEGRAM_BOT_TOKEN`, …) stay in the Convex dashboard; they are not needed in GitLab.
+
 ## Tests
 
 Cloud-agent-friendly E2E (no Convex deploy / real Telegram required):

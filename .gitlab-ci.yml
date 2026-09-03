@@ -1,0 +1,57 @@
+# Test on every pipeline. Deploy to Convex production only after tests pass
+# on the default branch.
+#
+# Required GitLab CI/CD variable (Settings → CI/CD → Variables):
+#   CONVEX_DEPLOY_KEY  — production deploy key from the Convex dashboard
+#                        (Deployment Settings → Deploy keys, permission: deployment:deploy)
+# Mark it Protected + Masked, and protect the default branch so the key is
+# only available on production deploys.
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+
+stages:
+  - test
+  - deploy
+
+variables:
+  npm_config_cache: "$CI_PROJECT_DIR/.npm"
+
+default:
+  image: node:22
+  interruptible: true
+  cache:
+    key:
+      files:
+        - package-lock.json
+    paths:
+      - .npm/
+  before_script:
+    - npm ci
+
+test:
+  stage: test
+  script:
+    - npm test
+
+deploy_prod:
+  stage: deploy
+  needs:
+    - test
+  interruptible: false
+  resource_group: production
+  environment:
+    name: production
+  script:
+    - |
+      if [ -z "$CONVEX_DEPLOY_KEY" ]; then
+        echo "Missing CONVEX_DEPLOY_KEY. Add it in GitLab → Settings → CI/CD → Variables."
+        exit 1
+      fi
+    - npx convex deploy --yes
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
