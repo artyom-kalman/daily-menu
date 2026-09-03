@@ -1,10 +1,17 @@
 import type { Dish } from "./types";
+import { looksLikeCafeteriaNotice } from "./notices";
+
+export const NO_MENU_INFO = "Нет информации";
 
 type MenuLike = { dishes: Dish[] } | null;
 
 function formatBlock(menu: MenuLike): string {
   if (!menu || menu.dishes.length === 0) {
-    return "Сегодня выходной";
+    return NO_MENU_INFO;
+  }
+  const names = menu.dishes.map((d) => d.name);
+  if (looksLikeCafeteriaNotice(names)) {
+    return names.join("\n");
   }
   return menu.dishes
     .map((d, i) => {

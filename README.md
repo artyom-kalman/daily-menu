@@ -17,7 +17,7 @@ and serves them through a Telegram bot with **one button**: «Сегодняшн
 convex/
   schema.ts            tables: appConfig, menus, fetchAttempts
   appConfig.ts         singleton peonyUrl / azileaUrl
-  crons.ts             daily 06:00 KST fetch
+  crons.ts             daily 09:00 KST fetch (retries until 12:30)
   http.ts              /telegram/webhook
   telegram.ts          webhook httpAction
   telegramHandlers.ts  one-button bot logic (testable)
@@ -100,7 +100,8 @@ npx convex run menus:seedToday '{"peonyDishes":[{"name":"Test","description":"x"
 
 ## Schedule
 
-- **06:00 KST (21:00 UTC)** — cron fetches both menus from `appConfig` URLs.
-- Empty / "holiday" scrapes are retried every 30 minutes until **12:30 KST**. An empty 06:00 page usually means the university has not posted yet, not that the cafeteria is closed.
-- Tapping **Сегодняшнее меню** re-fetches if the cached row is empty/holiday or older than 30 minutes, so a late-posted menu is not stuck until the next morning.
+- **09:00 KST (00:00 UTC)** — cron starts fetching both menus from `appConfig` URLs.
+- Retries every **30 minutes** until a menu is found or **12:30 KST**. If the page is still empty at 12:30, the bot shows «Нет информации» (not a holiday).
+- If the cafeteria posts a closed/holiday notice as a menu item, that text is shown as-is and fetching stops.
+- Tapping **Сегодняшнее меню** re-fetches only when there is still no live menu.
 - Fetch errors retry until **12:30 KST**, then alert `ADMIN_CHAT_ID`.

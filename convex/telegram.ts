@@ -27,9 +27,8 @@ export const handleWebhook = httpAction(async (ctx, request) => {
 
   await processTelegramUpdate(update, {
     getTodayMenus: async () => {
-      // Re-fetch the cafeteria pages when the cached row is empty/holiday
-      // or older than 30 minutes, so a late-posted menu is not stuck as
-      // "выходной" until the next morning cron.
+      // Re-fetch only when there is still no live menu. If the cafeteria
+      // posted a closed notice, that counts as a menu and we stop.
       await ctx.runAction(internal.menus.refreshStaleForToday, {});
       const today = await ctx.runQuery(api.menus.getTodayBoth, {});
       return { peony: today.peony, azilea: today.azilea };
