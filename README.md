@@ -87,9 +87,11 @@ curl -F "url=https://<deployment>.convex.site/telegram/webhook" \
 One-time setup:
 
 1. In the [Convex dashboard](https://dashboard.convex.dev), open the **production** deployment → **Settings → Deploy keys**, generate a key with `deployment:deploy`, and copy it.
-2. In GitHub: **Settings → Secrets and variables → Actions**, add a repository secret:
+2. In GitHub: **Settings → Environments → production → Add environment secret**:
    - Name: `CONVEX_DEPLOY_KEY`
    - Value: the production deploy key
+
+   The deploy job uses `environment: production`, so this environment secret is available there and not to pull-request test jobs.
 
 The deploy job runs `npx convex deploy --yes`, which uses `CONVEX_DEPLOY_KEY` to target production. Convex env secrets (`OPENROUTER_API_KEY`, `TELEGRAM_BOT_TOKEN`, …) stay in the Convex dashboard; they are not needed in GitHub Actions.
 
