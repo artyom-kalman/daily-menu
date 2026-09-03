@@ -1,5 +1,8 @@
-database/*.db
-
+node_modules/
 .env
-/.kamal/
-/tmp
+.env.local
+.convex/
+convex/_generated/
+dist/
+*.log
+.DS_Store

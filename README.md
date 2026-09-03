@@ -1,85 +1,104 @@
-# Daily Menu Tracker
+# daily-menu
 
-![Daily Menu Tracker Banner](./web/img/main-page-demo.png)
+Convex backend that scrapes two Korean university cafeteria menus (Peony / Azilea),
+enriches each dish with a Russian description and spiciness rating via OpenRouter,
+and serves them through a Telegram bot with **one button**: «Сегодняшнее меню».
 
-Daily Menu Tracker is a Go service that fetches cafeteria menus, normalizes them with the help of an AI assistant, persists the results, and exposes them through a web page and a Telegram bot. The application keeps students up to date with what is being served in the Peony and Azilea cafeterias every day.
+## Stack
 
-## Highlights
-- **Automated fetcher**: Scrapes the Peony and Azilea menu pages, validates them, and falls back gracefully if a cafeteria is closed.
-- **AI enrichment**: Uses a GPT-compatible endpoint to validate extracted dishes and enrich them with descriptions.
-- **Persistent storage**: Stores the normalized menu in SQLite and ships with migrations that run automatically on startup.
-- **Telegram notifications**: Sends out a daily digest at 10:00 KST and allows users to subscribe/unsubscribe via inline buttons.
+- **Convex** — TypeScript backend (queries, mutations, actions, crons, HTTP actions)
+- **OpenRouter** — LLM enrichment
+- **cheerio** — HTML parsing
+- **Telegram Bot API** — webhook → Convex `httpAction`
 
-## Prerequisites
-- Go 1.23+
-- SQLite (automatically bundled when running via Docker; required locally for tooling support)
-- A GPT-compatible endpoint and token that follow the `internal/ai` response schema
-- Telegram bot token (create via [@BotFather](https://t.me/BotFather))
+## Layout
 
-## Quick Start
-1. Install dependencies listed in the prerequisites.
-2. Create a `.env` file in the project root:
+```
+convex/
+  schema.ts            tables: appConfig, menus, fetchAttempts
+  appConfig.ts         singleton peonyUrl / azileaUrl
+  crons.ts             daily 06:00 KST fetch
+  http.ts              /telegram/webhook
+  telegram.ts          webhook httpAction
+  telegramHandlers.ts  one-button bot logic (testable)
+  telegramClient.ts    Telegram API client (TELEGRAM_API_BASE overridable)
+  menus.ts             scrape / enrich / seed
+  scraper.ts           fetch + parse
+  openrouter.ts        LLM enrichment
+  format.ts            Russian message formatter
+  dates.ts             KST helpers
+  types.ts             shared types
+tests/
+  e2e-telegram.test.ts mock Telegram API + button flow
+```
 
-   ```dotenv
-   PORT=8080
-   DATABASE_PATH=./database/daily-menu.db
-   MIGRATION_PATH=migrations
-   PEONY_URL=https://example.com/peony
-   AZILEA_URL=https://example.com/azilea
-   TELEGRAM_BOT_TOKEN=000000000:example-token
-   GPT_URL=https://ai.example.com/v1/chat
-   GPT_TOKEN=example-secret
-   ```
+## Bot UX
 
-3. Start the application:
+1. User sends any message (e.g. `/start`) → bot replies with one inline button.
+2. User taps **Сегодняшнее меню** → bot sends today's Peony + Azilea menus.
 
-   ```bash
-   go run cmd/main.go
-   ```
+## Config
 
-4. Open http://localhost:8080 to view the latest menu. The Telegram bot and scheduler start automatically in the same process.
-
-### Running with Docker Compose
+**Secrets** (Convex env):
 
 ```bash
-docker compose up --build
+npx convex env set OPENROUTER_API_KEY ...
+npx convex env set OPENROUTER_MODEL meta-llama/llama-3.3-70b-instruct:free
+npx convex env set TELEGRAM_BOT_TOKEN ...
+npx convex env set TELEGRAM_WEBHOOK_SECRET "$(openssl rand -hex 32)"
+npx convex env set ADMIN_CHAT_ID ...   # optional
 ```
 
-The container exposes port `3030` by default and uses the `.env` file for configuration. Menu data is persisted in the named volume `daily-menu-data`.
+**Cafeteria URLs** live in the `appConfig` table (not env):
 
-## Scheduler & Bot
-- Menus are refreshed on a cron-like schedule via `internal/menu/scheduler.go`.
-- The Telegram bot sends a daily summary at **10:00 KST** and respects user subscriptions stored in SQLite.
-- Subscribers can manage their status with inline buttons rendered by the bot (`🔔 Подписаться`, `❌ Отписаться`).
-
-## HTTP Endpoints
-- `GET /` – Landing page with the latest menu rendered via Go templates.
-- `GET /up` – Health probe responding with `{"status":"ok"}` for liveness checks.
-- Static assets are served from `/dist`, `/static`, and `/img`.
-
-## Development Workflow
-- Run locally: `go run cmd/main.go`
-- Build binary: `go build -o tmp/main cmd/main.go`
-- Tests (none yet): `go test ./...`
-- Lint/format: `gofmt -d .` and `go vet ./...`
-
-During development you can send yourself a preview through the Telegram bot by subscribing with `/start` and using the inline buttons in the chat.
-
-## Project Structure
-
-```
-.
-├── cmd/                # Application entrypoint
-├── internal/
-│   ├── ai/             # GPT client abstraction
-│   ├── bot/            # Telegram bot and subscription repository
-│   ├── config/         # Environment-backed configuration loader
-│   ├── database/       # SQLite initialization and migrations
-│   ├── http/           # Gin server, middlewares, handlers
-│   └── menu/           # Menu parsing, validation, enrichment, scheduler
-├── migrations/         # SQL migrations applied on startup
-├── pkg/logger/         # Structured logging setup
-├── templates/          # HTML templates for the web UI
-└── web/                # Static assets served by the HTTP server
+```bash
+npx convex run appConfig:upsert '{
+  "peonyUrl": "https://example.com/peony",
+  "azileaUrl": "https://example.com/azilea"
+}'
 ```
 
+Optional for local E2E against a mock Telegram server:
+
+```bash
+TELEGRAM_API_BASE=http://127.0.0.1:PORT
+```
+
+## Setup
+
+```bash
+npm install
+npx convex dev          # provisions a dev deployment + codegen
+npx convex deploy
+```
+
+Register the Telegram webhook once:
+
+```bash
+curl -F "url=https://<deployment>.convex.site/telegram/webhook" \
+     -F "secret_token=$TELEGRAM_WEBHOOK_SECRET" \
+     "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook"
+```
+
+## Tests
+
+Cloud-agent-friendly E2E (no Convex deploy / real Telegram required):
+
+```bash
+npm test
+```
+
+This spins up a mock Telegram HTTP API, drives `processTelegramUpdate` through
+message → button → callback, and asserts the outbound `sendMessage` text.
+
+Against a real deployment (secrets required):
+
+```bash
+npx convex run menus:seedToday '{"peonyDishes":[{"name":"Test","description":"x","spiciness":0}],"azileaDishes":[]}'
+# then POST a callback_query update to the webhook URL
+```
+
+## Schedule
+
+- **06:00 KST (21:00 UTC)** — cron fetches both menus from `appConfig` URLs.
+- Retries every 30 minutes until success or **12:30 KST**, then alerts `ADMIN_CHAT_ID`.

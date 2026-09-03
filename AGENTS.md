@@ -1,17 +1,14 @@
-# Agent Guidelines for kbu-daily-menu
+# Agent Guidelines for daily-menu (Convex)
 
 ## Build & Test Commands
-- Build: `go build -o tmp/main cmd/main.go`
-- Run: `go run cmd/main.go`
-- Test: `go test ./...` (no tests currently exist)
-- Single test: `go test -run TestName ./package/path`
-- Lint: `gofmt -d .` and `go vet ./...`
+- Install: `npm install`
+- Dev (codegen + sync): `npx convex dev`
+- Deploy: `npx convex deploy`
+- Test: `npm test` (Vitest; includes mock-Telegram button E2E)
+- Typecheck: `npx tsc --noEmit` (after `npx convex codegen`)
 
-## Code Style Guidelines
-- **Imports**: Group standard library, third-party, then local packages
-- **Formatting**: Use standard Go formatting (`gofmt`)
-- **Types**: Use explicit types in function signatures and struct fields
-- **Naming**: CamelCase for exported, camelCase for unexported
-- **Error Handling**: Wrap errors with `fmt.Errorf` and `%w` verb
-- **Logging**: Use `pkg/logger` package with Info/Debug/Error functions
-- **Structure**: Follow domain-driven design with internal/ packages
+## Code Style
+- TypeScript, Convex query/mutation/action patterns
+- Secrets in Convex env; cafeteria URLs in `appConfig` singleton (`key: "default"`)
+- Telegram UX: one inline button (`today_menu`) for today's menu
+- Keep bot logic in `telegramHandlers.ts` so E2E can run without a live deploy
