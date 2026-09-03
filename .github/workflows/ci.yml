@@ -1,0 +1,59 @@
+# Test on every pull request. Deploy to Convex production only after tests
+# pass on a push to the default branch.
+#
+# Required GitHub Actions secret (Settings → Secrets and variables → Actions):
+#   CONVEX_DEPLOY_KEY — production deploy key from the Convex dashboard
+#                       (Deployment Settings → Deploy keys, permission: deployment:deploy)
+
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_name != github.event.repository.default_branch }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+  deploy:
+    needs:
+      - test
+    if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: convex-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Deploy to Convex production
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+        run: |
+          if [ -z "$CONVEX_DEPLOY_KEY" ]; then
+            echo "Missing CONVEX_DEPLOY_KEY. Add it in GitHub → Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          npx convex deploy --yes
