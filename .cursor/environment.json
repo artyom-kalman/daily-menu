@@ -1,0 +1,10 @@
+{
+  "name": "kbu-daily-menu",
+  "install": "go mod download && CGO_ENABLED=1 go build -o tmp/main ./cmd/main.go",
+  "ports": [
+    {
+      "name": "web",
+      "port": 8080
+    }
+  ]
+}
