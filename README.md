@@ -80,6 +80,21 @@ curl -F "url=https://<deployment>.convex.site/telegram/webhook" \
      "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook"
 ```
 
+## GitHub Actions
+
+`.github/workflows/ci.yml` runs tests on every pull request, then deploys to Convex production only when tests pass on a push to `master`.
+
+One-time setup:
+
+1. In the [Convex dashboard](https://dashboard.convex.dev), open the **production** deployment → **Settings → Deploy keys**, generate a key with `deployment:deploy`, and copy it.
+2. In GitHub: **Settings → Environments → production → Add environment secret**:
+   - Name: `CONVEX_DEPLOY_KEY`
+   - Value: the production deploy key
+
+   The deploy job uses `environment: production`, so this environment secret is available there and not to pull-request test jobs.
+
+The deploy job runs `npx convex deploy --yes`, which uses `CONVEX_DEPLOY_KEY` to target production. Convex env secrets (`OPENROUTER_API_KEY`, `TELEGRAM_BOT_TOKEN`, …) stay in the Convex dashboard; they are not needed in GitHub Actions.
+
 ## Tests
 
 Cloud-agent-friendly E2E (no Convex deploy / real Telegram required):
