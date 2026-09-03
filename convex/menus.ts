@@ -11,6 +11,11 @@ import { fetchHtml, parseMenuHtml } from "./scraper";
 import { enrichDishes } from "./openrouter";
 import { kstHourMinute, kstNow, kstWeekday, todayKst } from "./dates";
 import { sendAdminAlert } from "./telegramClient";
+import {
+  isFreshForServing,
+  needsCronRetry,
+  sameDishNames,
+} from "./refreshPolicy";
 import type { Cafeteria } from "./types";
 
 const CAFETERIAS: Cafeteria[] = ["peony", "azilea"];
@@ -197,8 +202,24 @@ export const scrapeAndEnrich = internalAction({
       const html = await fetchHtml(url);
       const weekday = kstWeekday(kstNow());
       const names = parseMenuHtml(html, weekday);
+      const existing = await ctx.runQuery(internal.menus.getMenuForDate, {
+        date,
+        cafeteria,
+      });
 
       if (names.length === 0) {
+        // Don't clobber a good live menu if a later scrape comes back empty
+        // (parse blip / partial HTML). Keep retrying via cron / stale refresh.
+        if (existing?.source === "live" && existing.dishes.length > 0) {
+          await ctx.runMutation(internal.menus.recordAttempt, {
+            date,
+            cafeteria,
+            attemptedAt: Date.now(),
+            status: "empty",
+            error: "empty parse; kept existing live menu",
+          });
+          return { ok: true, dishCount: existing.dishes.length };
+        }
         await ctx.runMutation(internal.menus.upsertMenu, {
           date,
           cafeteria,
@@ -213,6 +234,29 @@ export const scrapeAndEnrich = internalAction({
           status: "empty",
         });
         return { ok: true, dishCount: 0 };
+      }
+
+      if (
+        existing?.source === "live" &&
+        sameDishNames(
+          existing.dishes.map((d) => d.name),
+          names,
+        )
+      ) {
+        await ctx.runMutation(internal.menus.upsertMenu, {
+          date,
+          cafeteria,
+          dishes: existing.dishes,
+          fetchedAt: Date.now(),
+          source: "live",
+        });
+        await ctx.runMutation(internal.menus.recordAttempt, {
+          date,
+          cafeteria,
+          attemptedAt: Date.now(),
+          status: "success",
+        });
+        return { ok: true, dishCount: existing.dishes.length };
       }
 
       const dishes = await enrichDishes(names);
@@ -252,15 +296,14 @@ export const fetchAllForToday = internalAction({
     const attempt = retryCount ?? 0;
     console.log(`fetchAllForToday: date=${date} attempt=${attempt}`);
 
+    const cutoff = pastCutoff();
     const missing: Cafeteria[] = [];
     for (const cafeteria of CAFETERIAS) {
       const existing = await ctx.runQuery(internal.menus.getMenuForDate, {
         date,
         cafeteria,
       });
-      // A "live" row counts as success. "holiday" also counts (no menu today).
-      // A missing row OR a "fallback" row should be retried.
-      if (!existing || existing.source === "fallback") {
+      if (needsCronRetry(existing, cutoff)) {
         missing.push(cafeteria);
       }
     }
@@ -271,14 +314,16 @@ export const fetchAllForToday = internalAction({
     }
 
     let anyError = false;
+    let stillEmpty = false;
     for (const cafeteria of missing) {
       const result = await ctx.runAction(internal.menus.scrapeAndEnrich, {
         cafeteria,
       });
       if (!result.ok) anyError = true;
+      if (result.dishCount === 0) stillEmpty = true;
     }
 
-    if (!anyError) return;
+    if (!anyError && !stillEmpty) return;
 
     if (!pastCutoff()) {
       console.log(
@@ -292,7 +337,9 @@ export const fetchAllForToday = internalAction({
       return;
     }
 
-    // Past cutoff. Alert admin with a summary.
+    if (!anyError) return;
+
+    // Past cutoff with fetch errors. Alert admin with a summary.
     const attempts = await ctx.runQuery(internal.menus.listAttemptsForDate, {
       date,
     });
@@ -305,5 +352,22 @@ export const fetchAllForToday = internalAction({
     await sendAdminAlert(
       `⚠️ daily-menu: failed to fetch all menus for ${date} by 12:30 KST after ${attempt + 1} attempts.\n\n${summary}`,
     );
+  },
+});
+
+/** Re-scrape cafeterias whose cached row is missing, empty, or older than 30 min. */
+export const refreshStaleForToday = internalAction({
+  args: {},
+  handler: async (ctx): Promise<void> => {
+    const date = todayKst();
+    const now = Date.now();
+    for (const cafeteria of CAFETERIAS) {
+      const existing = await ctx.runQuery(internal.menus.getMenuForDate, {
+        date,
+        cafeteria,
+      });
+      if (isFreshForServing(existing, now)) continue;
+      await ctx.runAction(internal.menus.scrapeAndEnrich, { cafeteria });
+    }
   },
 });

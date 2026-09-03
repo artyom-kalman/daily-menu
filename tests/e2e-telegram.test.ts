@@ -1,6 +1,14 @@
+import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { formatMenuMessage } from "../convex/format";
+import {
+  isFreshForServing,
+  needsCronRetry,
+  sameDishNames,
+} from "../convex/refreshPolicy";
 import { parseMenuHtml, targetWeekdayIndex } from "../convex/scraper";
 import {
   TODAY_MENU_BUTTON_LABEL,
@@ -78,6 +86,78 @@ describe("scraper", () => {
     `;
     expect(parseMenuHtml(html, 2)).toEqual(["Tue A", "Tue B"]);
     expect(parseMenuHtml(html, 0)).toEqual(["Fri A"]);
+  });
+
+  it("parses the live KBU Peony (category=4) Thursday column", () => {
+    const html = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "fixtures/kbu-peony.html"),
+      "utf8",
+    );
+    expect(parseMenuHtml(html, 4)).toEqual([
+      "제육볶음",
+      "쌀밥",
+      "살코기감자탕",
+      "치킨너겟*머스타드",
+      "콩나물무침",
+      "깍두기",
+      "요구르트",
+    ]);
+    expect(parseMenuHtml(html, 5)).toEqual([]);
+  });
+
+  it("parses the live KBU Azilea (category=5) Thursday column, not just the first two dishes", () => {
+    const html = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "fixtures/kbu-azilea.html"),
+      "utf8",
+    );
+    expect(parseMenuHtml(html, 4)).toEqual([
+      "눈꽃치즈닭갈비덮밥",
+      "미역국",
+      "피자고로케&케찹",
+      "어묵채볶음",
+      "숙주나물",
+      "포기김치",
+      "요구르트",
+    ]);
+    expect(parseMenuHtml(html, 1)).toEqual([]);
+  });
+});
+
+describe("refreshPolicy", () => {
+  const holiday = {
+    source: "holiday" as const,
+    dishes: [],
+    fetchedAt: 1,
+  };
+  const live = {
+    source: "live" as const,
+    dishes: [{ name: "미역국" }],
+    fetchedAt: 1_000,
+  };
+
+  it("retries empty holiday scrapes until cutoff, not after", () => {
+    expect(needsCronRetry(holiday, false)).toBe(true);
+    expect(needsCronRetry(holiday, true)).toBe(false);
+    expect(needsCronRetry(null, false)).toBe(true);
+    expect(needsCronRetry(live, false)).toBe(false);
+  });
+
+  it("does not treat a morning holiday as fresh for Telegram serving", () => {
+    expect(isFreshForServing(holiday, 1_000 + 60_000)).toBe(false);
+    expect(isFreshForServing(live, 1_000 + 60_000)).toBe(true);
+    expect(isFreshForServing(live, 1_000 + 31 * 60 * 1000)).toBe(false);
+  });
+
+  it("detects a later-posted longer menu as a change", () => {
+    expect(sameDishNames(["눈꽃치즈닭갈비덮밥", "미역국"], ["눈꽃치즈닭갈비덮밥", "미역국"])).toBe(
+      true,
+    );
+    expect(
+      sameDishNames(
+        ["눈꽃치즈닭갈비덮밥", "미역국"],
+        ["눈꽃치즈닭갈비덮밥", "미역국", "피자고로케&케찹"],
+      ),
+    ).toBe(false);
   });
 });
 

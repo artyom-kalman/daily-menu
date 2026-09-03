@@ -1,5 +1,5 @@
 import { httpAction } from "./_generated/server";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import {
   answerCallbackQuery,
   sendAdminAlert,
@@ -27,6 +27,10 @@ export const handleWebhook = httpAction(async (ctx, request) => {
 
   await processTelegramUpdate(update, {
     getTodayMenus: async () => {
+      // Re-fetch the cafeteria pages when the cached row is empty/holiday
+      // or older than 30 minutes, so a late-posted menu is not stuck as
+      // "выходной" until the next morning cron.
+      await ctx.runAction(internal.menus.refreshStaleForToday, {});
       const today = await ctx.runQuery(api.menus.getTodayBoth, {});
       return { peony: today.peony, azilea: today.azilea };
     },

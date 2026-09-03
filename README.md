@@ -53,8 +53,8 @@ npx convex env set ADMIN_CHAT_ID ...   # optional
 
 ```bash
 npx convex run appConfig:upsert '{
-  "peonyUrl": "https://example.com/peony",
-  "azileaUrl": "https://example.com/azilea"
+  "peonyUrl": "https://www.kbu.ac.kr/kor/CMS/DietMenuMgr/list.do?mCode=MN203&searchDietCategory=4",
+  "azileaUrl": "https://www.kbu.ac.kr/kor/CMS/DietMenuMgr/list.do?mCode=MN203&searchDietCategory=5"
 }'
 ```
 
@@ -101,4 +101,6 @@ npx convex run menus:seedToday '{"peonyDishes":[{"name":"Test","description":"x"
 ## Schedule
 
 - **06:00 KST (21:00 UTC)** — cron fetches both menus from `appConfig` URLs.
-- Retries every 30 minutes until success or **12:30 KST**, then alerts `ADMIN_CHAT_ID`.
+- Empty / "holiday" scrapes are retried every 30 minutes until **12:30 KST**. An empty 06:00 page usually means the university has not posted yet, not that the cafeteria is closed.
+- Tapping **Сегодняшнее меню** re-fetches if the cached row is empty/holiday or older than 30 minutes, so a late-posted menu is not stuck until the next morning.
+- Fetch errors retry until **12:30 KST**, then alert `ADMIN_CHAT_ID`.
