@@ -3,13 +3,14 @@ import {
   internalAction,
   internalMutation,
   internalQuery,
+  mutation,
   query,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { fetchHtml, parseMenuHtml } from "./scraper";
 import { enrichDishes } from "./openrouter";
 import { kstHourMinute, kstNow, kstWeekday, todayKst } from "./dates";
-import { sendAdminAlert } from "./telegram";
+import { sendAdminAlert } from "./telegramClient";
 import type { Cafeteria } from "./types";
 
 const CAFETERIAS: Cafeteria[] = ["peony", "azilea"];
@@ -17,10 +18,6 @@ const RETRY_DELAY_MS = 30 * 60 * 1000; // 30 min
 // Cutoff: stop retrying at 12:30 KST.
 const CUTOFF_HOUR = 12;
 const CUTOFF_MINUTE = 30;
-
-function urlForCafeteria(cafeteria: Cafeteria): string | undefined {
-  return cafeteria === "peony" ? process.env.PEONY_URL : process.env.AZILEA_URL;
-}
 
 function pastCutoff(): boolean {
   const { hour, minute } = kstHourMinute();
@@ -121,6 +118,57 @@ export const recordAttempt = internalMutation({
   },
 });
 
+/** Seed today's menus for E2E / manual checks without scraping. */
+export const seedToday = mutation({
+  args: {
+    peonyDishes: v.array(
+      v.object({
+        name: v.string(),
+        description: v.string(),
+        spiciness: v.number(),
+      }),
+    ),
+    azileaDishes: v.array(
+      v.object({
+        name: v.string(),
+        description: v.string(),
+        spiciness: v.number(),
+      }),
+    ),
+  },
+  handler: async (ctx, { peonyDishes, azileaDishes }) => {
+    const date = todayKst();
+    const fetchedAt = Date.now();
+    for (const [cafeteria, dishes] of [
+      ["peony", peonyDishes],
+      ["azilea", azileaDishes],
+    ] as const) {
+      const existing = await ctx.db
+        .query("menus")
+        .withIndex("by_date_cafeteria", (q) =>
+          q.eq("date", date).eq("cafeteria", cafeteria),
+        )
+        .unique();
+      if (existing) {
+        await ctx.db.patch(existing._id, {
+          dishes,
+          fetchedAt,
+          source: "live",
+        });
+      } else {
+        await ctx.db.insert("menus", {
+          date,
+          cafeteria,
+          dishes,
+          fetchedAt,
+          source: "live",
+        });
+      }
+    }
+    return { date };
+  },
+});
+
 // ---------- Actions ----------
 
 export const scrapeAndEnrich = internalAction({
@@ -129,9 +177,11 @@ export const scrapeAndEnrich = internalAction({
   },
   handler: async (ctx, { cafeteria }): Promise<{ ok: boolean; dishCount: number }> => {
     const date = todayKst();
-    const url = urlForCafeteria(cafeteria);
+    const config = await ctx.runQuery(internal.appConfig.getInternal, {});
+    const url =
+      cafeteria === "peony" ? config?.peonyUrl : config?.azileaUrl;
     if (!url) {
-      const err = `Missing URL env var for ${cafeteria}`;
+      const err = `Missing appConfig URL for ${cafeteria}`;
       console.error(err);
       await ctx.runMutation(internal.menus.recordAttempt, {
         date,

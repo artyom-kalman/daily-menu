@@ -2,6 +2,12 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
+  appConfig: defineTable({
+    key: v.string(), // singleton: "default"
+    peonyUrl: v.string(),
+    azileaUrl: v.string(),
+  }).index("by_key", ["key"]),
+
   menus: defineTable({
     date: v.string(), // YYYY-MM-DD in KST
     cafeteria: v.union(v.literal("peony"), v.literal("azilea")),
