@@ -29,6 +29,7 @@ export async function fetchHtml(url: string): Promise<string> {
 
 /**
  * Returns the 0-indexed `ul.foodList` to use for the given KST weekday.
+ * The KBU weekly table is Mon..Fri columns, each a `ul.foodList`.
  * Mon..Fri (1..5) → that day's index (0..4).
  * Sat (6) and Sun (0) → Friday (4), matching the existing Go behavior.
  */

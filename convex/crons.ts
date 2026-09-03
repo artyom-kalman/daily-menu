@@ -3,10 +3,10 @@ import { internal } from "./_generated/api";
 
 const crons = cronJobs();
 
-// 21:00 UTC = 06:00 KST.
+// 00:00 UTC = 09:00 KST. Retries continue every 30 min until 12:30 KST.
 crons.daily(
   "fetch daily menus",
-  { hourUTC: 21, minuteUTC: 0 },
+  { hourUTC: 0, minuteUTC: 0 },
   internal.menus.fetchAllForToday,
   {},
 );

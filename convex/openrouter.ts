@@ -1,7 +1,7 @@
 import { enrichedDishesSchema, type Dish } from "./types";
 
-const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_MODEL = "meta-llama/llama-3.3-70b-instruct:free";
+export const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+export const DEFAULT_MODEL = "meta-llama/llama-3.3-70b-instruct:free";
 
 const SYSTEM_PROMPT =
   "Ты помощник студенческой столовой при корейском университете. " +

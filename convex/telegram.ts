@@ -1,5 +1,5 @@
 import { httpAction } from "./_generated/server";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import {
   answerCallbackQuery,
   sendAdminAlert,
@@ -27,6 +27,9 @@ export const handleWebhook = httpAction(async (ctx, request) => {
 
   await processTelegramUpdate(update, {
     getTodayMenus: async () => {
+      // Re-fetch only when there is still no live menu. If the cafeteria
+      // posted a closed notice, that counts as a menu and we stop.
+      await ctx.runAction(internal.menus.refreshStaleForToday, {});
       const today = await ctx.runQuery(api.menus.getTodayBoth, {});
       return { peony: today.peony, azilea: today.azilea };
     },

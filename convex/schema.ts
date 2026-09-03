@@ -23,6 +23,7 @@ export default defineSchema({
       v.literal("live"),
       v.literal("fallback"),
       v.literal("holiday"),
+      v.literal("no_info"),
     ),
   })
     .index("by_date_cafeteria", ["date", "cafeteria"])

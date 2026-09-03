@@ -1,27 +1,38 @@
 import { v } from "convex/values";
 import {
+  action,
   internalAction,
   internalMutation,
   internalQuery,
   mutation,
   query,
 } from "./_generated/server";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { fetchHtml, parseMenuHtml } from "./scraper";
 import { enrichDishes } from "./openrouter";
 import { kstHourMinute, kstNow, kstWeekday, todayKst } from "./dates";
 import { sendAdminAlert } from "./telegramClient";
-import type { Cafeteria } from "./types";
+import { looksLikeCafeteriaNotice } from "./notices";
+import { formatMenuMessage } from "./format";
+import {
+  beforeFetchWindow,
+  isFreshForServing,
+  needsCronRetry,
+  nextRetryDelayMs,
+  sameDishNames,
+} from "./refreshPolicy";
+import type { Cafeteria, Dish } from "./types";
 
 const CAFETERIAS: Cafeteria[] = ["peony", "azilea"];
-const RETRY_DELAY_MS = 30 * 60 * 1000; // 30 min
-// Cutoff: stop retrying at 12:30 KST.
-const CUTOFF_HOUR = 12;
-const CUTOFF_MINUTE = 30;
+const MENU_SOURCE = v.union(
+  v.literal("live"),
+  v.literal("fallback"),
+  v.literal("holiday"),
+  v.literal("no_info"),
+);
 
-function pastCutoff(): boolean {
-  const { hour, minute } = kstHourMinute();
-  return hour > CUTOFF_HOUR || (hour === CUTOFF_HOUR && minute >= CUTOFF_MINUTE);
+function bareDishes(names: string[]): Dish[] {
+  return names.map((name) => ({ name, description: "", spiciness: 0 }));
 }
 
 // ---------- Queries ----------
@@ -76,11 +87,7 @@ export const upsertMenu = internalMutation({
       }),
     ),
     fetchedAt: v.number(),
-    source: v.union(
-      v.literal("live"),
-      v.literal("fallback"),
-      v.literal("holiday"),
-    ),
+    source: MENU_SOURCE,
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -174,8 +181,9 @@ export const seedToday = mutation({
 export const scrapeAndEnrich = internalAction({
   args: {
     cafeteria: v.union(v.literal("peony"), v.literal("azilea")),
+    force: v.optional(v.boolean()),
   },
-  handler: async (ctx, { cafeteria }): Promise<{ ok: boolean; dishCount: number }> => {
+  handler: async (ctx, { cafeteria, force }): Promise<{ ok: boolean; dishCount: number }> => {
     const date = todayKst();
     const config = await ctx.runQuery(internal.appConfig.getInternal, {});
     const url =
@@ -197,14 +205,30 @@ export const scrapeAndEnrich = internalAction({
       const html = await fetchHtml(url);
       const weekday = kstWeekday(kstNow());
       const names = parseMenuHtml(html, weekday);
+      const existing = await ctx.runQuery(internal.menus.getMenuForDate, {
+        date,
+        cafeteria,
+      });
 
       if (names.length === 0) {
+        // Don't clobber a good live menu if a later scrape comes back empty
+        // (parse blip / partial HTML). Keep retrying via cron / stale refresh.
+        if (existing?.source === "live" && existing.dishes.length > 0) {
+          await ctx.runMutation(internal.menus.recordAttempt, {
+            date,
+            cafeteria,
+            attemptedAt: Date.now(),
+            status: "empty",
+            error: "empty parse; kept existing live menu",
+          });
+          return { ok: true, dishCount: existing.dishes.length };
+        }
         await ctx.runMutation(internal.menus.upsertMenu, {
           date,
           cafeteria,
           dishes: [],
           fetchedAt: Date.now(),
-          source: "holiday",
+          source: "no_info",
         });
         await ctx.runMutation(internal.menus.recordAttempt, {
           date,
@@ -215,7 +239,33 @@ export const scrapeAndEnrich = internalAction({
         return { ok: true, dishCount: 0 };
       }
 
-      const dishes = await enrichDishes(names);
+      if (
+        !force &&
+        existing?.source === "live" &&
+        sameDishNames(
+          existing.dishes.map((d) => d.name),
+          names,
+        )
+      ) {
+        await ctx.runMutation(internal.menus.upsertMenu, {
+          date,
+          cafeteria,
+          dishes: existing.dishes,
+          fetchedAt: Date.now(),
+          source: "live",
+        });
+        await ctx.runMutation(internal.menus.recordAttempt, {
+          date,
+          cafeteria,
+          attemptedAt: Date.now(),
+          status: "success",
+        });
+        return { ok: true, dishCount: existing.dishes.length };
+      }
+
+      const dishes = looksLikeCafeteriaNotice(names)
+        ? bareDishes(names)
+        : await enrichDishes(names);
       await ctx.runMutation(internal.menus.upsertMenu, {
         date,
         cafeteria,
@@ -250,7 +300,23 @@ export const fetchAllForToday = internalAction({
   handler: async (ctx, { retryCount }): Promise<void> => {
     const date = todayKst();
     const attempt = retryCount ?? 0;
-    console.log(`fetchAllForToday: date=${date} attempt=${attempt}`);
+    const { hour, minute } = kstHourMinute();
+    console.log(
+      `fetchAllForToday: date=${date} attempt=${attempt} kst=${hour}:${String(minute).padStart(2, "0")}`,
+    );
+
+    if (beforeFetchWindow(hour, minute)) {
+      const delay = nextRetryDelayMs(hour, minute);
+      if (delay != null) {
+        console.log(`Before 09:00 KST; scheduling first fetch in ${delay / 60000} min`);
+        await ctx.scheduler.runAfter(
+          delay,
+          internal.menus.fetchAllForToday,
+          { retryCount: attempt },
+        );
+      }
+      return;
+    }
 
     const missing: Cafeteria[] = [];
     for (const cafeteria of CAFETERIAS) {
@@ -258,9 +324,7 @@ export const fetchAllForToday = internalAction({
         date,
         cafeteria,
       });
-      // A "live" row counts as success. "holiday" also counts (no menu today).
-      // A missing row OR a "fallback" row should be retried.
-      if (!existing || existing.source === "fallback") {
+      if (needsCronRetry(existing)) {
         missing.push(cafeteria);
       }
     }
@@ -271,28 +335,35 @@ export const fetchAllForToday = internalAction({
     }
 
     let anyError = false;
+    let stillEmpty = false;
     for (const cafeteria of missing) {
       const result = await ctx.runAction(internal.menus.scrapeAndEnrich, {
         cafeteria,
       });
       if (!result.ok) anyError = true;
+      if (result.dishCount === 0) stillEmpty = true;
     }
 
-    if (!anyError) return;
+    if (!anyError && !stillEmpty) return;
 
-    if (!pastCutoff()) {
+    const delay = nextRetryDelayMs(
+      kstHourMinute().hour,
+      kstHourMinute().minute,
+    );
+    if (delay != null) {
       console.log(
-        `Some cafeterias still missing; scheduling retry in ${RETRY_DELAY_MS / 60000} min`,
+        `Some cafeterias still have no menu; scheduling retry in ${Math.round(delay / 60000)} min`,
       );
       await ctx.scheduler.runAfter(
-        RETRY_DELAY_MS,
+        delay,
         internal.menus.fetchAllForToday,
         { retryCount: attempt + 1 },
       );
       return;
     }
 
-    // Past cutoff. Alert admin with a summary.
+    if (!anyError) return;
+
     const attempts = await ctx.runQuery(internal.menus.listAttemptsForDate, {
       date,
     });
@@ -305,5 +376,44 @@ export const fetchAllForToday = internalAction({
     await sendAdminAlert(
       `⚠️ daily-menu: failed to fetch all menus for ${date} by 12:30 KST after ${attempt + 1} attempts.\n\n${summary}`,
     );
+  },
+});
+
+/** Public scrape so we can re-run enrichment after changing OPENROUTER_MODEL. */
+export const refetchToday = action({
+  args: { force: v.optional(v.boolean()) },
+  handler: async (ctx, { force }) => {
+    const shouldForce = force ?? true;
+    const results: Record<string, { ok: boolean; dishCount: number }> = {};
+    for (const cafeteria of CAFETERIAS) {
+      results[cafeteria] = await ctx.runAction(internal.menus.scrapeAndEnrich, {
+        cafeteria,
+        force: shouldForce,
+      });
+    }
+    const today = await ctx.runQuery(api.menus.getTodayBoth, {});
+    return {
+      results,
+      date: today.date,
+      telegramMessage: formatMenuMessage(today.peony, today.azilea),
+      peony: today.peony,
+      azilea: today.azilea,
+    };
+  },
+});
+
+/** Re-scrape only when we still have no live menu (posted dishes or a closed notice). */
+export const refreshStaleForToday = internalAction({
+  args: {},
+  handler: async (ctx): Promise<void> => {
+    const date = todayKst();
+    for (const cafeteria of CAFETERIAS) {
+      const existing = await ctx.runQuery(internal.menus.getMenuForDate, {
+        date,
+        cafeteria,
+      });
+      if (isFreshForServing(existing)) continue;
+      await ctx.runAction(internal.menus.scrapeAndEnrich, { cafeteria });
+    }
   },
 });

@@ -13,7 +13,7 @@ export type MenuDoc = {
   cafeteria: Cafeteria;
   dishes: Dish[];
   fetchedAt: number;
-  source: "live" | "fallback" | "holiday";
+  source: "live" | "fallback" | "holiday" | "no_info";
 };
 
 export const enrichedDishesSchema = z.object({

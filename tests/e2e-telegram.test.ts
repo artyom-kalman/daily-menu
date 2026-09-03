@@ -1,6 +1,17 @@
+import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { formatMenuMessage } from "../convex/format";
+import { formatMenuMessage, NO_MENU_INFO } from "../convex/format";
+import { looksLikeCafeteriaNotice } from "../convex/notices";
+import { DEFAULT_MODEL } from "../convex/openrouter";
+import {
+  isFreshForServing,
+  needsCronRetry,
+  nextRetryDelayMs,
+  sameDishNames,
+} from "../convex/refreshPolicy";
 import { parseMenuHtml, targetWeekdayIndex } from "../convex/scraper";
 import {
   TODAY_MENU_BUTTON_LABEL,
@@ -79,6 +90,98 @@ describe("scraper", () => {
     expect(parseMenuHtml(html, 2)).toEqual(["Tue A", "Tue B"]);
     expect(parseMenuHtml(html, 0)).toEqual(["Fri A"]);
   });
+
+  it("parses the live KBU Peony (category=4) Thursday column", () => {
+    const html = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "fixtures/kbu-peony.html"),
+      "utf8",
+    );
+    expect(parseMenuHtml(html, 4)).toEqual([
+      "제육볶음",
+      "쌀밥",
+      "살코기감자탕",
+      "치킨너겟*머스타드",
+      "콩나물무침",
+      "깍두기",
+      "요구르트",
+    ]);
+    expect(parseMenuHtml(html, 5)).toEqual([]);
+  });
+
+  it("parses the live KBU Azilea (category=5) Thursday column, not just the first two dishes", () => {
+    const html = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "fixtures/kbu-azilea.html"),
+      "utf8",
+    );
+    expect(parseMenuHtml(html, 4)).toEqual([
+      "눈꽃치즈닭갈비덮밥",
+      "미역국",
+      "피자고로케&케찹",
+      "어묵채볶음",
+      "숙주나물",
+      "포기김치",
+      "요구르트",
+    ]);
+    expect(parseMenuHtml(html, 1)).toEqual([]);
+  });
+});
+
+describe("refreshPolicy", () => {
+  const noInfo = {
+    source: "no_info" as const,
+    dishes: [],
+    fetchedAt: 1,
+  };
+  const live = {
+    source: "live" as const,
+    dishes: [{ name: "미역국" }],
+    fetchedAt: 1_000,
+  };
+
+  it("retries empty/no_info until a live menu exists", () => {
+    expect(needsCronRetry(noInfo)).toBe(true);
+    expect(needsCronRetry(null)).toBe(true);
+    expect(needsCronRetry(live)).toBe(false);
+  });
+
+  it("treats a live menu as final and no_info as not fresh", () => {
+    expect(isFreshForServing(noInfo)).toBe(false);
+    expect(isFreshForServing(live)).toBe(true);
+  });
+
+  it("schedules 30 min retries from 09:00 through 12:30 KST", () => {
+    expect(nextRetryDelayMs(8, 0)).toBe(60 * 60 * 1000);
+    expect(nextRetryDelayMs(9, 0)).toBe(30 * 60 * 1000);
+    expect(nextRetryDelayMs(12, 0)).toBe(30 * 60 * 1000);
+    expect(nextRetryDelayMs(12, 20)).toBe(10 * 60 * 1000);
+    expect(nextRetryDelayMs(12, 30)).toBeNull();
+    expect(nextRetryDelayMs(13, 0)).toBeNull();
+  });
+
+  it("detects a later-posted longer menu as a change", () => {
+    expect(sameDishNames(["눈꽃치즈닭갈비덮밥", "미역국"], ["눈꽃치즈닭갈비덮밥", "미역국"])).toBe(
+      true,
+    );
+    expect(
+      sameDishNames(
+        ["눈꽃치즈닭갈비덮밥", "미역국"],
+        ["눈꽃치즈닭갈비덮밥", "미역국", "피자고로케&케찹"],
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("cafeteria notices", () => {
+  it("recognizes posted closed-day text as a notice, not a missing menu", () => {
+    expect(looksLikeCafeteriaNotice(["추석 연휴 휴무"])).toBe(true);
+    expect(looksLikeCafeteriaNotice(["제육볶음", "쌀밥"])).toBe(false);
+  });
+});
+
+describe("openrouter model", () => {
+  it("defaults to Llama 3.3 70B instruct via OpenRouter", () => {
+    expect(DEFAULT_MODEL).toBe("meta-llama/llama-3.3-70b-instruct:free");
+  });
 });
 
 describe("formatMenuMessage", () => {
@@ -94,7 +197,17 @@ describe("formatMenuMessage", () => {
     expect(text).toContain("Peony");
     expect(text).toContain("Azilea");
     expect(text).toContain("김치찌개");
-    expect(text).toContain("Сегодня выходной");
+    expect(text).toContain(NO_MENU_INFO);
+    expect(text).not.toContain("выходной");
+  });
+
+  it("shows a posted closed notice instead of no-info", () => {
+    const text = formatMenuMessage(
+      { dishes: [{ name: "추석 연휴 휴무", description: "", spiciness: 0 }] },
+      null,
+    );
+    expect(text).toContain("추석 연휴 휴무");
+    expect(text).toMatch(/Peony[\s\S]*추석 연휴 휴무[\s\S]*Azilea[\s\S]*Нет информации/);
   });
 });
 
