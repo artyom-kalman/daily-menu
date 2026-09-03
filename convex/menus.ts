@@ -1,17 +1,19 @@
 import { v } from "convex/values";
 import {
+  action,
   internalAction,
   internalMutation,
   internalQuery,
   mutation,
   query,
 } from "./_generated/server";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { fetchHtml, parseMenuHtml } from "./scraper";
 import { enrichDishes } from "./openrouter";
 import { kstHourMinute, kstNow, kstWeekday, todayKst } from "./dates";
 import { sendAdminAlert } from "./telegramClient";
 import { looksLikeCafeteriaNotice } from "./notices";
+import { formatMenuMessage } from "./format";
 import {
   beforeFetchWindow,
   isFreshForServing,
@@ -179,8 +181,9 @@ export const seedToday = mutation({
 export const scrapeAndEnrich = internalAction({
   args: {
     cafeteria: v.union(v.literal("peony"), v.literal("azilea")),
+    force: v.optional(v.boolean()),
   },
-  handler: async (ctx, { cafeteria }): Promise<{ ok: boolean; dishCount: number }> => {
+  handler: async (ctx, { cafeteria, force }): Promise<{ ok: boolean; dishCount: number }> => {
     const date = todayKst();
     const config = await ctx.runQuery(internal.appConfig.getInternal, {});
     const url =
@@ -237,6 +240,7 @@ export const scrapeAndEnrich = internalAction({
       }
 
       if (
+        !force &&
         existing?.source === "live" &&
         sameDishNames(
           existing.dishes.map((d) => d.name),
@@ -372,6 +376,29 @@ export const fetchAllForToday = internalAction({
     await sendAdminAlert(
       `⚠️ daily-menu: failed to fetch all menus for ${date} by 12:30 KST after ${attempt + 1} attempts.\n\n${summary}`,
     );
+  },
+});
+
+/** Public scrape so we can re-run enrichment after changing OPENROUTER_MODEL. */
+export const refetchToday = action({
+  args: { force: v.optional(v.boolean()) },
+  handler: async (ctx, { force }) => {
+    const shouldForce = force ?? true;
+    const results: Record<string, { ok: boolean; dishCount: number }> = {};
+    for (const cafeteria of CAFETERIAS) {
+      results[cafeteria] = await ctx.runAction(internal.menus.scrapeAndEnrich, {
+        cafeteria,
+        force: shouldForce,
+      });
+    }
+    const today = await ctx.runQuery(api.menus.getTodayBoth, {});
+    return {
+      results,
+      date: today.date,
+      telegramMessage: formatMenuMessage(today.peony, today.azilea),
+      peony: today.peony,
+      azilea: today.azilea,
+    };
   },
 });
 

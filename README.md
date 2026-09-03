@@ -94,6 +94,7 @@ message → button → callback, and asserts the outbound `sendMessage` text.
 Against a real deployment (secrets required):
 
 ```bash
+npx convex run menus:refetchToday '{"force":true}'
 npx convex run menus:seedToday '{"peonyDishes":[{"name":"Test","description":"x","spiciness":0}],"azileaDishes":[]}'
 # then POST a callback_query update to the webhook URL
 ```
