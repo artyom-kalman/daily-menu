@@ -25,6 +25,21 @@ export function formatKstDate(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+/**
+ * Shift a YYYY-MM-DD calendar date by `days` (negative is fine).
+ * The string is a KST calendar date, not an instant.
+ */
+export function addCalendarDays(ymd: string, days: number): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
+  if (!match) {
+    throw new Error(`Invalid YYYY-MM-DD: ${ymd}`);
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  return formatKstDate(new Date(Date.UTC(year, month - 1, day + days)));
+}
+
 /** Current KST hour and minute, as numbers. */
 export function kstHourMinute(): { hour: number; minute: number } {
   const d = nowAsKstWallClock();

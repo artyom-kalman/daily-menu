@@ -17,7 +17,9 @@ and serves them through a Telegram bot with **one button**: «Сегодняшн
 convex/
   schema.ts            tables: appConfig, menus, fetchAttempts
   appConfig.ts         singleton peonyUrl / azileaUrl
-  crons.ts             daily 09:00 KST fetch (retries until 12:30)
+  crons.ts             daily 09:00 KST fetch; 00:00 KST prune
+  prune.ts             delete menus / fetchAttempts older than 30 days
+  prunePolicy.ts       retention cutoff (testable)
   http.ts              /telegram/webhook
   telegram.ts          webhook httpAction + setWebhook / getWebhookInfo
   telegramWebhook.ts   CONVEX_SITE_URL → Telegram setWebhook (testable)
@@ -61,6 +63,7 @@ All Convex queries, mutations, and actions are **internal**. They are not callab
 npx convex run appConfig:upsert '{ ... }'
 npx convex run menus:seedToday '{ ... }'
 npx convex run menus:refetchToday '{"force":true}'
+npx convex run prune:pruneOldData
 ```
 
 **Cafeteria URLs** live in the `appConfig` table (not env):
@@ -164,4 +167,5 @@ npx convex run menus:seedToday '{"peonyDishes":[{"name":"Test","description":"x"
 - Retries every **30 minutes** until a menu is found or **12:30 KST**. If the page is still empty at 12:30, the bot shows «Нет информации» (not a holiday).
 - If the cafeteria posts a closed/holiday notice as a menu item, that text is shown as-is and fetching stops.
 - Tapping **Сегодняшнее меню** re-fetches only when there is still no live menu.
+- **00:00 KST (15:00 UTC)** — prune `menus` and `fetchAttempts` older than **30 days**. Today’s rows are never deleted. Run `npx convex run prune:pruneOldData` to drain a backlog manually.
 - Fetch errors retry until **12:30 KST**, then alert `ADMIN_CHAT_ID`.
