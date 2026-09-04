@@ -19,7 +19,8 @@ convex/
   appConfig.ts         singleton peonyUrl / azileaUrl
   crons.ts             daily 09:00 KST fetch (retries until 12:30)
   http.ts              /telegram/webhook
-  telegram.ts          webhook httpAction
+  telegram.ts          webhook httpAction + setWebhook / getWebhookInfo
+  telegramWebhook.ts   CONVEX_SITE_URL → Telegram setWebhook (testable)
   webhookAuth.ts       required TELEGRAM_WEBHOOK_SECRET check
   telegramHandlers.ts  one-button bot logic (testable)
   telegramClient.ts    Telegram API client (TELEGRAM_API_BASE overridable)
@@ -45,12 +46,14 @@ tests/
 ```bash
 npx convex env set OPENROUTER_API_KEY ...
 npx convex env set OPENROUTER_MODEL meta-llama/llama-3.3-70b-instruct:free
-npx convex env set TELEGRAM_BOT_TOKEN ...
+npx convex env set TELEGRAM_BOT_TOKEN ...          # this deployment's bot only
 npx convex env set TELEGRAM_WEBHOOK_SECRET "$(openssl rand -hex 32)"  # required
 npx convex env set ADMIN_CHAT_ID ...   # optional
 ```
 
 `TELEGRAM_WEBHOOK_SECRET` is required. The webhook returns 401 if the env var is unset or the `x-telegram-bot-api-secret-token` header does not match.
+
+**Dev and production must use different bot tokens.** One Telegram bot has one webhook; sharing `TELEGRAM_BOT_TOKEN` between Convex **dev** and **prod** steals updates. See [Dev vs production bots](#dev-vs-production-bots).
 
 All Convex queries, mutations, and actions are **internal**. They are not callable from the public Convex HTTP API or a client. `npx convex run` still works because the CLI uses deploy credentials:
 
@@ -83,13 +86,42 @@ npx convex dev          # provisions a dev deployment + codegen
 npx convex deploy
 ```
 
-Register the Telegram webhook once:
+`npx convex dev` syncs functions to the **dev** deployment only. It does **not** call Telegram `setWebhook`, so the production bot keeps its webhook.
+
+Register each bot's webhook with the helper (uses that deployment's `CONVEX_SITE_URL` — do not paste a URL):
 
 ```bash
-curl -F "url=https://<deployment>.convex.site/telegram/webhook" \
-     -F "secret_token=$TELEGRAM_WEBHOOK_SECRET" \
-     "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook"
+npx convex run telegram:setWebhook           # Convex dev
+npx convex run telegram:setWebhook --prod    # production
+npx convex run telegram:getWebhookInfo       # confirm the URL
 ```
+
+## Dev vs production bots
+
+| Deployment | Telegram bot | Env + webhook |
+| --- | --- | --- |
+| Convex **prod** | existing production bot | `TELEGRAM_BOT_TOKEN` + `TELEGRAM_WEBHOOK_SECRET` on **prod** only |
+| Convex **dev** | a second bot (e.g. `@daily_menu_dev_bot`) | same vars on the **dev** deployment only |
+
+One-time ops for the **dev** bot:
+
+1. In [@BotFather](https://t.me/BotFather), `/newbot` (name it something like `daily_menu_dev_bot`).
+2. On the **dev** deployment only (default `npx convex env`, **not** `--prod`):
+
+```bash
+npx convex env set TELEGRAM_BOT_TOKEN "<dev bot token>"
+npx convex env set TELEGRAM_WEBHOOK_SECRET "$(openssl rand -hex 32)"
+npx convex env set ADMIN_CHAT_ID "<your chat id>"   # optional
+```
+
+3. Point the **dev** bot at the **dev** HTTP site:
+
+```bash
+npx convex run telegram:setWebhook
+npx convex run telegram:getWebhookInfo
+```
+
+The helper reads `CONVEX_SITE_URL` from the deployment you ran against, so the webhook URL cannot be the other environment's by mistake. Leave the production token and webhook untouched.
 
 ## GitHub Actions
 

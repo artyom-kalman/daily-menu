@@ -24,6 +24,11 @@ import {
   answerCallbackQuery,
   sendMessage,
 } from "../convex/telegramClient";
+import {
+  fetchTelegramWebhookInfo,
+  registerTelegramWebhook,
+  webhookUrlFromSiteUrl,
+} from "../convex/telegramWebhook";
 
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -34,19 +39,38 @@ function readBody(req: IncomingMessage): Promise<string> {
   });
 }
 
+type TelegramCall = { method: string; body: Record<string, unknown> };
+
 async function withMockTelegram<T>(
-  run: (calls: Array<{ method: string; body: Record<string, unknown> }>) => Promise<T>,
+  run: (calls: TelegramCall[]) => Promise<T>,
+  options?: {
+    respond?: (call: TelegramCall) => { status?: number; body: unknown };
+  },
 ): Promise<T> {
-  const calls: Array<{ method: string; body: Record<string, unknown> }> = [];
+  const calls: TelegramCall[] = [];
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     const bodyText = await readBody(req);
     const body = bodyText ? (JSON.parse(bodyText) as Record<string, unknown>) : {};
     const url = req.url ?? "";
     // /bot<token>/<method>
     const method = url.split("/").pop() ?? "unknown";
-    calls.push({ method, body });
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ ok: true, result: true }));
+    const call: TelegramCall = { method, body };
+    calls.push(call);
+    const response = options?.respond?.(call) ?? {
+      status: 200,
+      body:
+        method === "getWebhookInfo"
+          ? {
+              ok: true,
+              result: {
+                url: "https://example.convex.site/telegram/webhook",
+                pending_update_count: 0,
+              },
+            }
+          : { ok: true, result: true },
+    };
+    res.writeHead(response.status ?? 200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(response.body));
   });
 
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -230,12 +254,138 @@ describe("webhook secret", () => {
 
   it("keeps Convex query, mutation, and action functions internal", () => {
     const convexDir = join(dirname(fileURLToPath(import.meta.url)), "../convex");
-    for (const file of ["menus.ts", "appConfig.ts"]) {
+    for (const file of ["menus.ts", "appConfig.ts", "telegram.ts", "telegramWebhook.ts"]) {
       const source = readFileSync(join(convexDir, file), "utf8");
       expect(source).not.toMatch(
         /^\s*export const \w+ = (query|mutation|action)\(/m,
       );
     }
+  });
+
+  it("registers the webhook from CONVEX_SITE_URL, not a pasted URL", () => {
+    const telegramTs = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "../convex/telegram.ts"),
+      "utf8",
+    );
+    expect(telegramTs).toMatch(/export const setWebhook = internalAction\(/);
+    expect(telegramTs).toMatch(/process\.env\.CONVEX_SITE_URL/);
+    expect(telegramTs).not.toMatch(/https:\/\/[^\s"]+\.convex\.site/);
+  });
+
+  it("does not auto-register a webhook on cron or HTTP (npx convex dev is safe)", () => {
+    const convexDir = join(dirname(fileURLToPath(import.meta.url)), "../convex");
+    for (const file of ["crons.ts", "http.ts"]) {
+      const source = readFileSync(join(convexDir, file), "utf8");
+      expect(source).not.toMatch(/setWebhook|registerTelegramWebhook/);
+    }
+  });
+});
+
+describe("telegram webhook registration", () => {
+  it("builds the webhook URL from the deployment site URL", () => {
+    expect(webhookUrlFromSiteUrl("https://happy-animal-123.convex.site")).toBe(
+      "https://happy-animal-123.convex.site/telegram/webhook",
+    );
+    expect(webhookUrlFromSiteUrl("https://happy-animal-123.convex.site/")).toBe(
+      "https://happy-animal-123.convex.site/telegram/webhook",
+    );
+  });
+
+  it("refuses to register without site URL, bot token, or secret", async () => {
+    expect(
+      await registerTelegramWebhook({
+        siteUrl: undefined,
+        botToken: "tok",
+        secretToken: "sec",
+      }),
+    ).toEqual({ ok: false, error: "CONVEX_SITE_URL is not set" });
+    expect(
+      await registerTelegramWebhook({
+        siteUrl: "https://dev.convex.site",
+        botToken: undefined,
+        secretToken: "sec",
+      }),
+    ).toEqual({ ok: false, error: "TELEGRAM_BOT_TOKEN is not set" });
+    expect(
+      await registerTelegramWebhook({
+        siteUrl: "https://dev.convex.site",
+        botToken: "tok",
+        secretToken: undefined,
+      }),
+    ).toEqual({ ok: false, error: "TELEGRAM_WEBHOOK_SECRET is not set" });
+  });
+
+  it("points this token at this deployment's /telegram/webhook", async () => {
+    await withMockTelegram(async (calls) => {
+      const result = await registerTelegramWebhook({
+        siteUrl: "https://dev-only.convex.site",
+        botToken: "dev-bot-token",
+        secretToken: "dev-secret",
+        apiBase: process.env.TELEGRAM_API_BASE,
+      });
+      expect(result).toEqual({
+        ok: true,
+        url: "https://dev-only.convex.site/telegram/webhook",
+      });
+      expect(calls).toHaveLength(1);
+      expect(calls[0].method).toBe("setWebhook");
+      expect(calls[0].body).toEqual({
+        url: "https://dev-only.convex.site/telegram/webhook",
+        secret_token: "dev-secret",
+        allowed_updates: ["message", "callback_query"],
+      });
+    });
+  });
+
+  it("does not send a production site URL when registering the dev bot", async () => {
+    await withMockTelegram(async (calls) => {
+      await registerTelegramWebhook({
+        siteUrl: "https://dev-only.convex.site",
+        botToken: "dev-bot-token",
+        secretToken: "dev-secret",
+        apiBase: process.env.TELEGRAM_API_BASE,
+      });
+      const posted = JSON.stringify(calls[0].body);
+      expect(posted).toContain("https://dev-only.convex.site/telegram/webhook");
+      expect(posted).not.toContain("prod");
+    });
+  });
+
+  it("surfaces a Telegram setWebhook error", async () => {
+    await withMockTelegram(
+      async () => {
+        const result = await registerTelegramWebhook({
+          siteUrl: "https://dev-only.convex.site",
+          botToken: "dev-bot-token",
+          secretToken: "dev-secret",
+          apiBase: process.env.TELEGRAM_API_BASE,
+        });
+        expect(result).toEqual({
+          ok: false,
+          error: "Webhook URL is invalid",
+        });
+      },
+      {
+        respond: () => ({
+          status: 400,
+          body: { ok: false, description: "Webhook URL is invalid" },
+        }),
+      },
+    );
+  });
+
+  it("reads the webhook currently registered for this token", async () => {
+    await withMockTelegram(async () => {
+      const result = await fetchTelegramWebhookInfo({
+        botToken: "dev-bot-token",
+        apiBase: process.env.TELEGRAM_API_BASE,
+      });
+      expect(result).toEqual({
+        ok: true,
+        url: "https://example.convex.site/telegram/webhook",
+        pendingUpdateCount: 0,
+      });
+    });
   });
 });
 

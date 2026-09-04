@@ -1,4 +1,4 @@
-import { httpAction } from "./_generated/server";
+import { httpAction, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import {
   answerCallbackQuery,
@@ -7,8 +7,48 @@ import {
 } from "./telegramClient";
 import { processTelegramUpdate } from "./telegramHandlers";
 import { isAuthorizedWebhook } from "./webhookAuth";
+import {
+  fetchTelegramWebhookInfo,
+  registerTelegramWebhook,
+} from "./telegramWebhook";
 
 export { sendAdminAlert, sendMessage };
+
+/**
+ * Register Telegram's webhook at this deployment's CONVEX_SITE_URL.
+ * Run against **dev** or **prod** separately — each deployment has its own
+ * TELEGRAM_BOT_TOKEN, so this cannot steal the other environment's updates.
+ */
+export const setWebhook = internalAction({
+  args: {},
+  handler: async () => {
+    const result = await registerTelegramWebhook({
+      siteUrl: process.env.CONVEX_SITE_URL,
+      botToken: process.env.TELEGRAM_BOT_TOKEN,
+      secretToken: process.env.TELEGRAM_WEBHOOK_SECRET,
+      apiBase: process.env.TELEGRAM_API_BASE,
+    });
+    if (!result.ok) {
+      throw new Error(result.error);
+    }
+    return result;
+  },
+});
+
+/** Inspect the webhook currently registered for this deployment's bot token. */
+export const getWebhookInfo = internalAction({
+  args: {},
+  handler: async () => {
+    const result = await fetchTelegramWebhookInfo({
+      botToken: process.env.TELEGRAM_BOT_TOKEN,
+      apiBase: process.env.TELEGRAM_API_BASE,
+    });
+    if (!result.ok) {
+      throw new Error(result.error);
+    }
+    return result;
+  },
+});
 
 export const handleWebhook = httpAction(async (ctx, request) => {
   const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
