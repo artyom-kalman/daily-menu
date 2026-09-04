@@ -13,6 +13,8 @@ Read open issues and the [project page](https://app.notion.com/p/3d1252aaf7ec812
 
 ## Code Style
 - TypeScript, Convex query/mutation/action patterns
+- All Convex functions are internal; the only public surface is `POST /telegram/webhook`
+- `TELEGRAM_WEBHOOK_SECRET` is required; the webhook 401s if it is missing or wrong
 - Secrets in Convex env; cafeteria URLs in `appConfig` singleton (`key: "default"`)
 - Telegram UX: one inline button (`today_menu`) for today's menu
 - Keep bot logic in `telegramHandlers.ts` so E2E can run without a live deploy

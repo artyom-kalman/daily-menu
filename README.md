@@ -20,6 +20,7 @@ convex/
   crons.ts             daily 09:00 KST fetch (retries until 12:30)
   http.ts              /telegram/webhook
   telegram.ts          webhook httpAction
+  webhookAuth.ts       required TELEGRAM_WEBHOOK_SECRET check
   telegramHandlers.ts  one-button bot logic (testable)
   telegramClient.ts    Telegram API client (TELEGRAM_API_BASE overridable)
   menus.ts             scrape / enrich / seed
@@ -45,8 +46,18 @@ tests/
 npx convex env set OPENROUTER_API_KEY ...
 npx convex env set OPENROUTER_MODEL meta-llama/llama-3.3-70b-instruct:free
 npx convex env set TELEGRAM_BOT_TOKEN ...
-npx convex env set TELEGRAM_WEBHOOK_SECRET "$(openssl rand -hex 32)"
+npx convex env set TELEGRAM_WEBHOOK_SECRET "$(openssl rand -hex 32)"  # required
 npx convex env set ADMIN_CHAT_ID ...   # optional
+```
+
+`TELEGRAM_WEBHOOK_SECRET` is required. The webhook returns 401 if the env var is unset or the `x-telegram-bot-api-secret-token` header does not match.
+
+All Convex queries, mutations, and actions are **internal**. They are not callable from the public Convex HTTP API or a client. `npx convex run` still works because the CLI uses deploy credentials:
+
+```bash
+npx convex run appConfig:upsert '{ ... }'
+npx convex run menus:seedToday '{ ... }'
+npx convex run menus:refetchToday '{"force":true}'
 ```
 
 **Cafeteria URLs** live in the `appConfig` table (not env):
@@ -106,12 +117,13 @@ npm test
 This spins up a mock Telegram HTTP API, drives `processTelegramUpdate` through
 message → button → callback, and asserts the outbound `sendMessage` text.
 
-Against a real deployment (secrets required):
+Against a real deployment (deploy access + secrets required):
 
 ```bash
 npx convex run menus:refetchToday '{"force":true}'
 npx convex run menus:seedToday '{"peonyDishes":[{"name":"Test","description":"x","spiciness":0}],"azileaDishes":[]}'
 # then POST a callback_query update to the webhook URL
+# (must include header x-telegram-bot-api-secret-token)
 ```
 
 ## Schedule

@@ -13,6 +13,7 @@ import {
   sameDishNames,
 } from "../convex/refreshPolicy";
 import { parseMenuHtml, targetWeekdayIndex } from "../convex/scraper";
+import { isAuthorizedWebhook } from "../convex/webhookAuth";
 import {
   TODAY_MENU_BUTTON_LABEL,
   TODAY_MENU_CALLBACK,
@@ -208,6 +209,33 @@ describe("formatMenuMessage", () => {
     );
     expect(text).toContain("추석 연휴 휴무");
     expect(text).toMatch(/Peony[\s\S]*추석 연휴 휴무[\s\S]*Azilea[\s\S]*Нет информации/);
+  });
+});
+
+describe("webhook secret", () => {
+  it("rejects when the expected secret is missing", () => {
+    expect(isAuthorizedWebhook(undefined, "anything")).toBe(false);
+    expect(isAuthorizedWebhook("", "anything")).toBe(false);
+  });
+
+  it("rejects a missing or wrong provided token", () => {
+    expect(isAuthorizedWebhook("secret", null)).toBe(false);
+    expect(isAuthorizedWebhook("secret", "")).toBe(false);
+    expect(isAuthorizedWebhook("secret", "nope")).toBe(false);
+  });
+
+  it("accepts only an exact match", () => {
+    expect(isAuthorizedWebhook("secret", "secret")).toBe(true);
+  });
+
+  it("keeps Convex query, mutation, and action functions internal", () => {
+    const convexDir = join(dirname(fileURLToPath(import.meta.url)), "../convex");
+    for (const file of ["menus.ts", "appConfig.ts"]) {
+      const source = readFileSync(join(convexDir, file), "utf8");
+      expect(source).not.toMatch(
+        /^\s*export const \w+ = (query|mutation|action)\(/m,
+      );
+    }
   });
 });
 

@@ -1,13 +1,10 @@
 import { v } from "convex/values";
 import {
-  action,
   internalAction,
   internalMutation,
   internalQuery,
-  mutation,
-  query,
 } from "./_generated/server";
-import { api, internal } from "./_generated/api";
+import { internal } from "./_generated/api";
 import { fetchHtml, parseMenuHtml } from "./scraper";
 import { enrichDishes } from "./openrouter";
 import { kstHourMinute, kstNow, kstWeekday, todayKst } from "./dates";
@@ -37,7 +34,7 @@ function bareDishes(names: string[]): Dish[] {
 
 // ---------- Queries ----------
 
-export const getTodayBoth = query({
+export const getTodayBoth = internalQuery({
   args: {},
   handler: async (ctx) => {
     const date = todayKst();
@@ -126,7 +123,7 @@ export const recordAttempt = internalMutation({
 });
 
 /** Seed today's menus for E2E / manual checks without scraping. */
-export const seedToday = mutation({
+export const seedToday = internalMutation({
   args: {
     peonyDishes: v.array(
       v.object({
@@ -185,7 +182,7 @@ export const scrapeAndEnrich = internalAction({
   },
   handler: async (ctx, { cafeteria, force }): Promise<{ ok: boolean; dishCount: number }> => {
     const date = todayKst();
-    const config = await ctx.runQuery(internal.appConfig.getInternal, {});
+    const config = await ctx.runQuery(internal.appConfig.get, {});
     const url =
       cafeteria === "peony" ? config?.peonyUrl : config?.azileaUrl;
     if (!url) {
@@ -379,8 +376,8 @@ export const fetchAllForToday = internalAction({
   },
 });
 
-/** Public scrape so we can re-run enrichment after changing OPENROUTER_MODEL. */
-export const refetchToday = action({
+/** Internal scrape so we can re-run enrichment after changing OPENROUTER_MODEL. */
+export const refetchToday = internalAction({
   args: { force: v.optional(v.boolean()) },
   handler: async (ctx, { force }) => {
     const shouldForce = force ?? true;
@@ -391,7 +388,7 @@ export const refetchToday = action({
         force: shouldForce,
       });
     }
-    const today = await ctx.runQuery(api.menus.getTodayBoth, {});
+    const today = await ctx.runQuery(internal.menus.getTodayBoth, {});
     return {
       results,
       date: today.date,
