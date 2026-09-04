@@ -1,11 +1,8 @@
 # Agent Guidelines for daily-menu (Convex)
 
 ## Project tracking (Notion)
-Issues and project notes live in Notion, not GitHub Issues. Before planning or starting work, open **Side projects → daily-menu**, read open issues and the project page, and update issue status (In progress / Done) as you go.
-
-- Hub: [Side projects](https://app.notion.com/p/3d1252aaf7ec8190a8efcbdd344b198f)
-- This project: [daily-menu](https://app.notion.com/p/3d1252aaf7ec8126a3fed2445aebc5da)
-- Issues board: [Issues](https://app.notion.com/p/315f27f5015a42dcac8ceb94d26b5c57)
+Issues and project notes live in Notion.
+Read open issues and the [project page](https://app.notion.com/p/3d1252aaf7ec8126a3fed2445aebc5da), and update issue status (In progress / Done) as you go.
 
 ## Build & Test Commands
 - Install: `npm install`
