@@ -1,5 +1,9 @@
 # Agent Guidelines for daily-menu (Convex)
 
+## Project tracking (Notion)
+Issues and project notes live in Notion.
+Read open issues and the [project page](https://app.notion.com/p/3d1252aaf7ec8126a3fed2445aebc5da), and update issue status (In progress / Done) as you go.
+
 ## Build & Test Commands
 - Install: `npm install`
 - Dev (codegen + sync): `npx convex dev`
