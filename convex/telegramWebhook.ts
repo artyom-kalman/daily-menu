@@ -88,7 +88,7 @@ export async function registerTelegramWebhook(opts: {
         allowed_updates: ["message", "callback_query"],
       },
     );
-    if (!httpOk || parsed.ok === false) {
+    if (!httpOk || parsed.ok !== true || parsed.result !== true) {
       return { ok: false, error: telegramError(parsed, status, text, "setWebhook") };
     }
     return { ok: true, url };
@@ -111,14 +111,14 @@ export async function fetchTelegramWebhookInfo(opts: {
       "getWebhookInfo",
       {},
     );
-    if (!httpOk || parsed.ok === false) {
-      return { ok: false, error: telegramError(parsed, status, text, "getWebhookInfo") };
-    }
     const result =
       parsed.result && typeof parsed.result === "object"
         ? (parsed.result as Record<string, unknown>)
-        : {};
-    const url = typeof result.url === "string" ? result.url : "";
+        : null;
+    const url = result?.url;
+    if (!httpOk || parsed.ok !== true || result === null || typeof url !== "string") {
+      return { ok: false, error: telegramError(parsed, status, text, "getWebhookInfo") };
+    }
     const pendingUpdateCount =
       typeof result.pending_update_count === "number"
         ? result.pending_update_count

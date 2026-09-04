@@ -387,6 +387,66 @@ describe("telegram webhook registration", () => {
       });
     });
   });
+
+  it("rejects a 2xx setWebhook body that is not { ok: true, result: true }", async () => {
+    const malformedBodies = [
+      { ok: true, result: "Webhook was set" },
+      { result: true },
+      { ok: 1, result: true },
+    ];
+    for (const body of malformedBodies) {
+      await withMockTelegram(
+        async () => {
+          const result = await registerTelegramWebhook({
+            siteUrl: "https://dev-only.convex.site",
+            botToken: "dev-bot-token",
+            secretToken: "dev-secret",
+            apiBase: process.env.TELEGRAM_API_BASE,
+          });
+          expect(result.ok).toBe(false);
+        },
+        { respond: () => ({ status: 200, body }) },
+      );
+    }
+  });
+
+  it("rejects a 2xx getWebhookInfo body without a result object and string url", async () => {
+    const malformedBodies = [
+      { ok: true, result: { pending_update_count: 0 } },
+      { ok: true },
+      { ok: true, result: { url: 1 } },
+    ];
+    for (const body of malformedBodies) {
+      await withMockTelegram(
+        async () => {
+          const result = await fetchTelegramWebhookInfo({
+            botToken: "dev-bot-token",
+            apiBase: process.env.TELEGRAM_API_BASE,
+          });
+          expect(result.ok).toBe(false);
+        },
+        { respond: () => ({ status: 200, body }) },
+      );
+    }
+  });
+
+  it("accepts getWebhookInfo with an empty url when the result shape is valid", async () => {
+    await withMockTelegram(
+      async () => {
+        const result = await fetchTelegramWebhookInfo({
+          botToken: "dev-bot-token",
+          apiBase: process.env.TELEGRAM_API_BASE,
+        });
+        expect(result).toEqual({ ok: true, url: "" });
+      },
+      {
+        respond: () => ({
+          status: 200,
+          body: { ok: true, result: { url: "" } },
+        }),
+      },
+    );
+  });
 });
 
 describe("telegram button e2e", () => {
