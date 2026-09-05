@@ -320,7 +320,7 @@ describe("aptabase analytics", () => {
         isDebug: true,
         fetchImpl: (async (url: string, init?: RequestInit) => {
           calls.push({ url: String(url), init: init ?? {} });
-          return new Response("ok", { status: 204 });
+          return new Response(null, { status: 200 });
         }) as typeof fetch,
       },
     );

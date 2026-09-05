@@ -1,6 +1,5 @@
 import { v } from "convex/values";
 import {
-  type ActionCtx,
   internalAction,
   internalMutation,
   internalQuery,
@@ -132,8 +131,15 @@ type AttemptArgs = {
   error?: string;
 };
 
+type AttemptWriter = {
+  runMutation: (
+    fn: typeof internal.menus.recordAttempt,
+    args: AttemptArgs,
+  ) => Promise<unknown>;
+};
+
 async function recordAttemptAndTrack(
-  ctx: ActionCtx,
+  ctx: AttemptWriter,
   args: AttemptArgs,
 ): Promise<void> {
   await ctx.runMutation(internal.menus.recordAttempt, args);
