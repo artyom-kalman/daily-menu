@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { formatMenuMessage, NO_MENU_INFO } from "../convex/format";
 import { looksLikeCafeteriaNotice } from "../convex/notices";
 import { DEFAULT_MODEL } from "../convex/openrouter";
@@ -20,6 +20,24 @@ import {
   retentionCutoffDate,
   shouldPruneDate,
 } from "../convex/prunePolicy";
+import {
+  APP_VERSION,
+  APTABASE_FETCH_TIMEOUT_MS,
+  CONVEX_DEV_DEPLOYMENT_HOST,
+  EVENT_SCRAPE_EMPTY,
+  EVENT_SCRAPE_ERROR,
+  EVENT_SCRAPE_OK,
+  EVENT_START,
+  EVENT_TODAY_MENU,
+  analyticsPropsOf,
+  buildAptabaseEvent,
+  hostFromAppKey,
+  isDebugFromEnv,
+  newSessionId,
+  resolveAptabaseHost,
+  scrapeEventForStatus,
+  trackAptabaseEvent,
+} from "../convex/analytics";
 import { parseMenuHtml, targetWeekdayIndex } from "../convex/scraper";
 import { isAuthorizedWebhook } from "../convex/webhookAuth";
 import {
@@ -237,6 +255,155 @@ describe("prunePolicy", () => {
   });
 });
 
+describe("aptabase analytics", () => {
+  it("sends Aptabase Debug from the Convex dev deployment URL", () => {
+    expect(
+      isDebugFromEnv({
+        CONVEX_CLOUD_URL: `https://${CONVEX_DEV_DEPLOYMENT_HOST}.eu-west-1.convex.cloud`,
+      }),
+    ).toBe(true);
+    expect(
+      isDebugFromEnv({
+        CONVEX_SITE_URL: `https://${CONVEX_DEV_DEPLOYMENT_HOST}.convex.site`,
+      }),
+    ).toBe(true);
+    expect(
+      isDebugFromEnv({
+        CONVEX_CLOUD_URL: "https://some-other-prod.convex.cloud",
+      }),
+    ).toBe(false);
+    expect(isDebugFromEnv({ CONVEX_DEPLOYMENT: "dev:enchanted-goshawk-667" })).toBe(
+      true,
+    );
+    expect(isDebugFromEnv({ APTABASE_DEBUG: "0", CONVEX_DEPLOYMENT: "dev:x" })).toBe(
+      false,
+    );
+    expect(
+      isDebugFromEnv({
+        APTABASE_DEBUG: "1",
+        CONVEX_CLOUD_URL: "https://some-other-prod.convex.cloud",
+      }),
+    ).toBe(true);
+  });
+
+  it("maps scrape status to event names", () => {
+    expect(scrapeEventForStatus("success")).toBe(EVENT_SCRAPE_OK);
+    expect(scrapeEventForStatus("empty")).toBe(EVENT_SCRAPE_EMPTY);
+    expect(scrapeEventForStatus("error")).toBe(EVENT_SCRAPE_ERROR);
+  });
+
+  it("picks the Aptabase host from the app key region", () => {
+    expect(hostFromAppKey("A-EU-0000000000")).toBe("https://eu.aptabase.com");
+    expect(hostFromAppKey("A-US-0000000000")).toBe("https://us.aptabase.com");
+    expect(hostFromAppKey("A-DEV-0000000000")).toBe("http://localhost:3000");
+    expect(hostFromAppKey("A-SH-0000000000")).toBeUndefined();
+    expect(hostFromAppKey("not-a-key")).toBeUndefined();
+  });
+
+  it("prefers APTABASE_HOST over the key region", () => {
+    expect(resolveAptabaseHost("A-EU-0000000000", "https://self.example/")).toBe(
+      "https://self.example",
+    );
+    expect(resolveAptabaseHost("A-EU-0000000000")).toBe("https://eu.aptabase.com");
+  });
+
+  it("builds session ids as unix seconds plus 8 digits", () => {
+    expect(newSessionId(1_713_516_247_065)).toMatch(/^1713516247\d{8}$/);
+  });
+
+  it("keeps only cafeteria and date props — no chatId or menu text", () => {
+    expect(
+      analyticsPropsOf({
+        cafeteria: "peony",
+        date: "2026-09-05",
+      }),
+    ).toEqual({ cafeteria: "peony", date: "2026-09-05" });
+    const event = buildAptabaseEvent({
+      eventName: EVENT_TODAY_MENU,
+      now: new Date("2026-09-05T00:00:00.000Z"),
+      sessionId: "171351624700000001",
+    });
+    expect(JSON.stringify(event)).not.toMatch(/chatId|chat_id|비빔밥/);
+    expect(event.eventName).toBe(EVENT_TODAY_MENU);
+    expect(event.systemProps.appVersion).toBe(APP_VERSION);
+    expect(event.systemProps.osName).toBe("Telegram");
+  });
+
+  it("does not call Aptabase when the app key is missing", async () => {
+    const calls: unknown[] = [];
+    await trackAptabaseEvent(EVENT_START, undefined, {
+      appKey: undefined,
+      fetchImpl: (async (...args: unknown[]) => {
+        calls.push(args);
+        return new Response("ok", { status: 200 });
+      }) as typeof fetch,
+    });
+    expect(calls).toHaveLength(0);
+  });
+
+  it("POSTs a one-event batch to /api/v0/events", async () => {
+    const calls: { url: string; init: RequestInit }[] = [];
+    await trackAptabaseEvent(
+      EVENT_SCRAPE_OK,
+      { cafeteria: "azilea", date: "2026-09-05" },
+      {
+        appKey: "A-EU-0000000000",
+        now: new Date("2026-09-05T01:02:03.000Z"),
+        sessionId: "171351624700000001",
+        isDebug: true,
+        fetchImpl: (async (url: string, init?: RequestInit) => {
+          calls.push({ url: String(url), init: init ?? {} });
+          return new Response(null, { status: 200 });
+        }) as typeof fetch,
+      },
+    );
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe("https://eu.aptabase.com/api/v0/events");
+    expect(calls[0].init.method).toBe("POST");
+    expect(calls[0].init.signal).toBeInstanceOf(AbortSignal);
+    const headers = calls[0].init.headers as Record<string, string>;
+    expect(headers["App-Key"]).toBe("A-EU-0000000000");
+    const body = JSON.parse(String(calls[0].init.body));
+    expect(body).toHaveLength(1);
+    expect(body[0].eventName).toBe(EVENT_SCRAPE_OK);
+    expect(body[0].props).toEqual({ cafeteria: "azilea", date: "2026-09-05" });
+    expect(JSON.stringify(body)).not.toMatch(/chatId|chat_id/);
+  });
+
+  it("swallows Aptabase HTTP errors so the bot still works", async () => {
+    await expect(
+      trackAptabaseEvent(EVENT_START, undefined, {
+        appKey: "A-EU-0000000000",
+        fetchImpl: (async () => new Response("nope", { status: 500 })) as typeof fetch,
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("aborts a hung Aptabase request and still resolves", async () => {
+    vi.useFakeTimers();
+    try {
+      let signal: AbortSignal | undefined;
+      const pending = trackAptabaseEvent(EVENT_START, undefined, {
+        appKey: "A-EU-0000000000",
+        fetchImpl: ((_url, init) => {
+          signal = init?.signal;
+          return new Promise((_resolve, reject) => {
+            signal?.addEventListener("abort", () => {
+              reject(new DOMException("The operation was aborted.", "AbortError"));
+            });
+          });
+        }) as typeof fetch,
+      });
+      expect(signal?.aborted).toBe(false);
+      await vi.advanceTimersByTimeAsync(APTABASE_FETCH_TIMEOUT_MS);
+      expect(signal?.aborted).toBe(true);
+      await expect(pending).resolves.toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
 describe("cafeteria notices", () => {
   it("recognizes posted closed-day text as a notice, not a missing menu", () => {
     expect(looksLikeCafeteriaNotice(["추석 연휴 휴무"])).toBe(true);
@@ -295,7 +462,14 @@ describe("webhook secret", () => {
 
   it("keeps Convex query, mutation, and action functions internal", () => {
     const convexDir = join(dirname(fileURLToPath(import.meta.url)), "../convex");
-    for (const file of ["menus.ts", "appConfig.ts", "telegram.ts", "telegramWebhook.ts", "prune.ts"]) {
+    for (const file of [
+      "menus.ts",
+      "appConfig.ts",
+      "telegram.ts",
+      "telegramWebhook.ts",
+      "prune.ts",
+      "analytics.ts",
+    ]) {
       const source = readFileSync(join(convexDir, file), "utf8");
       expect(source).not.toMatch(
         /^\s*export const \w+ = (query|mutation|action)\(/m,
@@ -506,10 +680,14 @@ describe("telegram button e2e", () => {
         },
       };
 
+      const tracked: string[] = [];
       const deps = {
         getTodayMenus: async () => menus,
         sendMessage,
         answerCallbackQuery,
+        trackEvent: async (eventName: string) => {
+          tracked.push(eventName);
+        },
       };
 
       const start = await processTelegramUpdate(
@@ -517,6 +695,7 @@ describe("telegram button e2e", () => {
         deps,
       );
       expect(start).toBe("ok");
+      expect(tracked).toEqual([EVENT_START]);
       expect(calls).toHaveLength(1);
       expect(calls[0].method).toBe("sendMessage");
       expect(calls[0].body.chat_id).toBe(42);
@@ -550,6 +729,50 @@ describe("telegram button e2e", () => {
       expect(menuText).toBe(formatMenuMessage(menus.peony, menus.azilea));
       expect(menuText).toContain("비빔밥");
       expect(menuText).toContain("된장찌개");
+      expect(tracked).toEqual([EVENT_START, EVENT_TODAY_MENU]);
+    });
+  });
+
+  it("does not track today_menu for an unknown callback", async () => {
+    const tracked: string[] = [];
+    await processTelegramUpdate(
+      {
+        callback_query: {
+          id: "cb-other",
+          data: "not_today",
+          message: { chat: { id: 7 } },
+        },
+      },
+      {
+        getTodayMenus: async () => {
+          throw new Error("should not fetch menus");
+        },
+        sendMessage: async () => undefined,
+        answerCallbackQuery: async () => undefined,
+        trackEvent: async (eventName) => {
+          tracked.push(eventName);
+        },
+      },
+    );
+    expect(tracked).toEqual([]);
+  });
+
+  it("still sends the start button if trackEvent throws", async () => {
+    await withMockTelegram(async (calls) => {
+      const result = await processTelegramUpdate(
+        { message: { chat: { id: 9 }, text: "hi" } },
+        {
+          getTodayMenus: async () => ({ peony: null, azilea: null }),
+          sendMessage,
+          answerCallbackQuery,
+          trackEvent: async () => {
+            throw new Error("aptabase down");
+          },
+        },
+      );
+      expect(result).toBe("ok");
+      expect(calls).toHaveLength(1);
+      expect(calls[0].method).toBe("sendMessage");
     });
   });
 });
