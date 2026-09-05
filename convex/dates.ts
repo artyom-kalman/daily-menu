@@ -46,6 +46,14 @@ export function kstHourMinute(): { hour: number; minute: number } {
   return { hour: d.getUTCHours(), minute: d.getUTCMinutes() };
 }
 
+/** HH:MM in KST for an epoch millisecond instant. */
+export function formatKstClock(ms: number): string {
+  const d = new Date(ms + KST_OFFSET_MS);
+  const hour = String(d.getUTCHours()).padStart(2, "0");
+  const minute = String(d.getUTCMinutes()).padStart(2, "0");
+  return `${hour}:${minute}`;
+}
+
 /** Current KST wall-clock Date (UTC fields = KST fields). */
 export function kstNow(): Date {
   return nowAsKstWallClock();
