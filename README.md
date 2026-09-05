@@ -41,7 +41,7 @@ tests/
 ## Bot UX
 
 1. User sends any message (e.g. `/start`) → bot replies with one inline button.
-2. User taps **Сегодняшнее меню** → bot sends today's Peony + Azilea menus.
+2. User taps **Сегодняшнее меню** → short Peony + Azilea list (`이름 — clause`, chili for heat). The same button stays on the menu so they can tap again.
 
 ## Config
 
