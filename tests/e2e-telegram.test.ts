@@ -3,9 +3,14 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
-import { formatMenuMessage, NO_MENU_INFO } from "../convex/format";
+import {
+  formatMenuMessage,
+  formatSpiciness,
+  NO_MENU_INFO,
+  shortenDescription,
+} from "../convex/format";
 import { looksLikeCafeteriaNotice } from "../convex/notices";
-import { DEFAULT_MODEL } from "../convex/openrouter";
+import { DEFAULT_MODEL, SYSTEM_PROMPT } from "../convex/openrouter";
 import {
   isFreshForServing,
   needsCronRetry,
@@ -415,10 +420,44 @@ describe("openrouter model", () => {
   it("defaults to Llama 3.3 70B instruct via OpenRouter", () => {
     expect(DEFAULT_MODEL).toBe("meta-llama/llama-3.3-70b-instruct:free");
   });
+
+  it("asks for one short clause, not two marketing sentences", () => {
+    expect(SYSTEM_PROMPT).toMatch(/6–10 слов/);
+    expect(SYSTEM_PROMPT).toMatch(/Не пиши второе предложение/);
+    expect(SYSTEM_PROMPT).not.toMatch(/максимум 2 предложения/);
+  });
 });
 
 describe("formatMenuMessage", () => {
-  it("formats both cafeterias", () => {
+  const longJjidmdak =
+    "Нежная курица, тушённая в ароматном соевом соусе с овощами, стеклянной лапшой и картофелем. Сытное и согревающее блюдо, которое обязательно стоит попробовать.";
+
+  it("keeps the first sentence and drops the marketing tail", () => {
+    const short = shortenDescription(longJjidmdak);
+    expect(short).not.toContain("обязательно");
+    expect(short.length).toBeLessThan(longJjidmdak.length);
+    expect(short.endsWith("…") || short.length <= 56).toBe(true);
+  });
+
+  it("leaves a short clause alone", () => {
+    expect(shortenDescription("острый суп")).toBe("острый суп");
+  });
+
+  it("keeps the clause before an em dash", () => {
+    expect(
+      shortenDescription(
+        "Аппетитный рассыпчатый белый рис — идеальное дополнение к любому блюду. Заряжает энергией на весь день.",
+      ),
+    ).toBe("Аппетитный рассыпчатый белый рис");
+  });
+
+  it("omits chili at 0 and repeats it for 1–5", () => {
+    expect(formatSpiciness(0)).toBe("");
+    expect(formatSpiciness(3)).toBe(" 🌶🌶🌶");
+    expect(formatSpiciness(5)).toBe(" 🌶🌶🌶🌶🌶");
+  });
+
+  it("formats both cafeterias as a short scannable list", () => {
     const text = formatMenuMessage(
       {
         dishes: [
@@ -427,19 +466,38 @@ describe("formatMenuMessage", () => {
       },
       { dishes: [] },
     );
-    expect(text).toContain("Peony");
-    expect(text).toContain("Azilea");
-    expect(text).toContain("김치찌개");
+    expect(text).toContain("🍽️ Сегодня");
+    expect(text).toContain("Peony · верхняя");
+    expect(text).toContain("Azilea · нижняя");
+    expect(text).toContain("김치찌개 🌶🌶🌶 — острый суп");
     expect(text).toContain(NO_MENU_INFO);
+    expect(text).not.toContain("1)");
     expect(text).not.toContain("выходной");
   });
 
-  it("shows a posted closed notice instead of no-info", () => {
+  it("shortens already-stored long blurbs and hides zero spice", () => {
+    const text = formatMenuMessage(
+      {
+        dishes: [
+          { name: "찜닭", description: longJjidmdak, spiciness: 2 },
+          { name: "쌀밥", description: "белый рис", spiciness: 0 },
+        ],
+      },
+      null,
+    );
+    expect(text).toContain("찜닭 🌶🌶 — ");
+    expect(text).not.toContain("обязательно");
+    expect(text).toContain("쌀밥 — белый рис");
+    expect(text).not.toMatch(/쌀밥 🌶/);
+  });
+
+  it("shows a posted closed notice instead of no-info, without chili", () => {
     const text = formatMenuMessage(
       { dishes: [{ name: "추석 연휴 휴무", description: "", spiciness: 0 }] },
       null,
     );
     expect(text).toContain("추석 연휴 휴무");
+    expect(text).not.toContain("🌶");
     expect(text).toMatch(/Peony[\s\S]*추석 연휴 휴무[\s\S]*Azilea[\s\S]*Нет информации/);
   });
 });
@@ -727,9 +785,37 @@ describe("telegram button e2e", () => {
       expect(calls[0].body.callback_query_id).toBe("cb-1");
       const menuText = String(calls[1].body.text);
       expect(menuText).toBe(formatMenuMessage(menus.peony, menus.azilea));
-      expect(menuText).toContain("비빔밥");
-      expect(menuText).toContain("된장찌개");
+      expect(menuText).toContain("비빔밥 🌶 — рис с овощами");
+      expect(menuText).toContain("된장찌개 — соевый суп");
+      expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard());
       expect(tracked).toEqual([EVENT_START, EVENT_TODAY_MENU]);
+    });
+  });
+
+  it("keeps the button on the error fallback", async () => {
+    await withMockTelegram(async (calls) => {
+      await processTelegramUpdate(
+        {
+          callback_query: {
+            id: "cb-err",
+            data: TODAY_MENU_CALLBACK,
+            message: { chat: { id: 42 } },
+          },
+        },
+        {
+          getTodayMenus: async () => {
+            throw new Error("db down");
+          },
+          sendMessage,
+          answerCallbackQuery,
+        },
+      );
+      expect(calls.map((c) => c.method)).toEqual([
+        "answerCallbackQuery",
+        "sendMessage",
+      ]);
+      expect(String(calls[1].body.text)).toContain("Не удалось получить меню");
+      expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard());
     });
   });
 
