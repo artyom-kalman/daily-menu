@@ -84,7 +84,9 @@ Optional for local E2E against a mock Telegram server:
 TELEGRAM_API_BASE=http://127.0.0.1:PORT
 ```
 
-**Aptabase** (optional). If `APTABASE_APP_KEY` is unset, tracking is a no-op. Events: `start` (any message / button shown), `today_menu` (button tap), `scrape_ok` / `scrape_empty` / `scrape_error` (with `cafeteria` + `date` props). No `chatId` or menu text is sent. Host is inferred from the key (`A-EU-…` / `A-US-…`); override with `APTABASE_HOST` for self-host. Set `APTABASE_DEBUG=1` or use a Convex `dev:` deployment to send events to Aptabase’s debug view.
+**Aptabase** (optional). If `APTABASE_APP_KEY` is unset, tracking is a no-op. Events: `start` (any message / button shown), `today_menu` (button tap), `scrape_ok` / `scrape_empty` / `scrape_error` (with `cafeteria` + `date` props). No `chatId` or menu text is sent. Host is inferred from the key (`A-EU-…` / `A-US-…`); override with `APTABASE_HOST` for self-host.
+
+Convex **dev** (`enchanted-goshawk-667`) sends Aptabase **Debug** events. Production sends **Release**. Override with `APTABASE_DEBUG=1` or `=0`. In the Aptabase dashboard, use the bug icon (top right) to view Debug data — it is separate from the Release dashboard.
 
 ## Setup
 

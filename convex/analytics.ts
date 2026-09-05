@@ -31,6 +31,9 @@ export type ScrapeStatus = "success" | "empty" | "error";
 export const APP_VERSION = "0.1.0";
 export const SDK_VERSION = "daily-menu/0.1.0";
 
+/** Convex cloud **dev** deployment (`artyom:daily-menu:dev/artyom`). Prod uses a different host. */
+export const CONVEX_DEV_DEPLOYMENT_HOST = "enchanted-goshawk-667";
+
 const HOSTS: Record<string, string> = {
   EU: "https://eu.aptabase.com",
   US: "https://us.aptabase.com",
@@ -136,12 +139,25 @@ export function resolveAptabaseHost(
   return hostFromAppKey(appKey);
 }
 
-function isDebugFromEnv(): boolean {
-  if (process.env.APTABASE_DEBUG === "1" || process.env.APTABASE_DEBUG === "true") {
-    return true;
-  }
-  const deployment = process.env.CONVEX_DEPLOYMENT ?? "";
-  return deployment.startsWith("dev:");
+/**
+ * Aptabase Debug vs Release (`systemProps.isDebug`).
+ * `CONVEX_DEPLOYMENT` is only set in the local CLI, not in Convex functions,
+ * so cloud **dev** is detected from CONVEX_CLOUD_URL / CONVEX_SITE_URL.
+ * `APTABASE_DEBUG=0` forces Release; `=1` forces Debug.
+ */
+export function isDebugFromEnv(
+  env: NodeJS.Dict<string> = process.env,
+): boolean {
+  const flag = env.APTABASE_DEBUG;
+  if (flag === "0" || flag === "false") return false;
+  if (flag === "1" || flag === "true") return true;
+  if ((env.CONVEX_DEPLOYMENT ?? "").startsWith("dev:")) return true;
+  const cloud = env.CONVEX_CLOUD_URL ?? "";
+  const site = env.CONVEX_SITE_URL ?? "";
+  return (
+    cloud.includes(CONVEX_DEV_DEPLOYMENT_HOST) ||
+    site.includes(CONVEX_DEV_DEPLOYMENT_HOST)
+  );
 }
 
 export async function trackAptabaseEvent(

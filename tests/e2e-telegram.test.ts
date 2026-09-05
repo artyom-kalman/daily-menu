@@ -22,6 +22,7 @@ import {
 } from "../convex/prunePolicy";
 import {
   APP_VERSION,
+  CONVEX_DEV_DEPLOYMENT_HOST,
   EVENT_SCRAPE_EMPTY,
   EVENT_SCRAPE_ERROR,
   EVENT_SCRAPE_OK,
@@ -30,6 +31,7 @@ import {
   analyticsPropsOf,
   buildAptabaseEvent,
   hostFromAppKey,
+  isDebugFromEnv,
   newSessionId,
   resolveAptabaseHost,
   scrapeEventForStatus,
@@ -253,6 +255,36 @@ describe("prunePolicy", () => {
 });
 
 describe("aptabase analytics", () => {
+  it("sends Aptabase Debug from the Convex dev deployment URL", () => {
+    expect(
+      isDebugFromEnv({
+        CONVEX_CLOUD_URL: `https://${CONVEX_DEV_DEPLOYMENT_HOST}.eu-west-1.convex.cloud`,
+      }),
+    ).toBe(true);
+    expect(
+      isDebugFromEnv({
+        CONVEX_SITE_URL: `https://${CONVEX_DEV_DEPLOYMENT_HOST}.convex.site`,
+      }),
+    ).toBe(true);
+    expect(
+      isDebugFromEnv({
+        CONVEX_CLOUD_URL: "https://some-other-prod.convex.cloud",
+      }),
+    ).toBe(false);
+    expect(isDebugFromEnv({ CONVEX_DEPLOYMENT: "dev:enchanted-goshawk-667" })).toBe(
+      true,
+    );
+    expect(isDebugFromEnv({ APTABASE_DEBUG: "0", CONVEX_DEPLOYMENT: "dev:x" })).toBe(
+      false,
+    );
+    expect(
+      isDebugFromEnv({
+        APTABASE_DEBUG: "1",
+        CONVEX_CLOUD_URL: "https://some-other-prod.convex.cloud",
+      }),
+    ).toBe(true);
+  });
+
   it("maps scrape status to event names", () => {
     expect(scrapeEventForStatus("success")).toBe(EVENT_SCRAPE_OK);
     expect(scrapeEventForStatus("empty")).toBe(EVENT_SCRAPE_EMPTY);

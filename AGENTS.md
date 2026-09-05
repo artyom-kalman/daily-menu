@@ -20,4 +20,4 @@ Read open issues and the [project page](https://app.notion.com/p/3d1252aaf7ec812
 - Telegram UX: one inline button (`today_menu`) for today's menu
 - Keep bot logic in `telegramHandlers.ts` so E2E can run without a live deploy
 - Prune `menus` and `fetchAttempts` older than 30 days at 00:00 KST; never delete today's rows
-- Product events go to Aptabase (`start`, `today_menu`, `scrape_ok` / `scrape_empty` / `scrape_error`). Optional `APTABASE_APP_KEY`; no-op if unset. Do not send `chatId` or menu text.
+- Product events go to Aptabase (`start`, `today_menu`, `scrape_ok` / `scrape_empty` / `scrape_error`). Optional `APTABASE_APP_KEY`; no-op if unset. Do not send `chatId` or menu text. Convex **dev** (`enchanted-goshawk-667`) uses Aptabase Debug; prod uses Release.
