@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { formatMenuMessage, NO_MENU_INFO } from "../convex/format";
 import { looksLikeCafeteriaNotice } from "../convex/notices";
 import { DEFAULT_MODEL } from "../convex/openrouter";
@@ -22,6 +22,7 @@ import {
 } from "../convex/prunePolicy";
 import {
   APP_VERSION,
+  APTABASE_FETCH_TIMEOUT_MS,
   CONVEX_DEV_DEPLOYMENT_HOST,
   EVENT_SCRAPE_EMPTY,
   EVENT_SCRAPE_ERROR,
@@ -359,6 +360,7 @@ describe("aptabase analytics", () => {
     expect(calls).toHaveLength(1);
     expect(calls[0].url).toBe("https://eu.aptabase.com/api/v0/events");
     expect(calls[0].init.method).toBe("POST");
+    expect(calls[0].init.signal).toBeInstanceOf(AbortSignal);
     const headers = calls[0].init.headers as Record<string, string>;
     expect(headers["App-Key"]).toBe("A-EU-0000000000");
     const body = JSON.parse(String(calls[0].init.body));
@@ -375,6 +377,30 @@ describe("aptabase analytics", () => {
         fetchImpl: (async () => new Response("nope", { status: 500 })) as typeof fetch,
       }),
     ).resolves.toBeUndefined();
+  });
+
+  it("aborts a hung Aptabase request and still resolves", async () => {
+    vi.useFakeTimers();
+    try {
+      let signal: AbortSignal | undefined;
+      const pending = trackAptabaseEvent(EVENT_START, undefined, {
+        appKey: "A-EU-0000000000",
+        fetchImpl: ((_url, init) => {
+          signal = init?.signal;
+          return new Promise((_resolve, reject) => {
+            signal?.addEventListener("abort", () => {
+              reject(new DOMException("The operation was aborted.", "AbortError"));
+            });
+          });
+        }) as typeof fetch,
+      });
+      expect(signal?.aborted).toBe(false);
+      await vi.advanceTimersByTimeAsync(APTABASE_FETCH_TIMEOUT_MS);
+      expect(signal?.aborted).toBe(true);
+      await expect(pending).resolves.toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

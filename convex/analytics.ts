@@ -34,6 +34,9 @@ export const SDK_VERSION = "daily-menu/0.1.0";
 /** Convex cloud **dev** deployment (`artyom:daily-menu:dev/artyom`). Prod uses a different host. */
 export const CONVEX_DEV_DEPLOYMENT_HOST = "enchanted-goshawk-667";
 
+/** Short enough that a hung Aptabase call cannot stall the Telegram webhook. */
+export const APTABASE_FETCH_TIMEOUT_MS = 8_000;
+
 const HOSTS: Record<string, string> = {
   EU: "https://eu.aptabase.com",
   US: "https://us.aptabase.com",
@@ -186,6 +189,8 @@ export async function trackAptabaseEvent(
   });
 
   const fetchImpl = options.fetchImpl ?? fetch;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), APTABASE_FETCH_TIMEOUT_MS);
   try {
     const res = await fetchImpl(`${host}/api/v0/events`, {
       method: "POST",
@@ -194,6 +199,7 @@ export async function trackAptabaseEvent(
         "App-Key": appKey,
       },
       body: JSON.stringify([event]),
+      signal: controller.signal,
     });
     if (!res.ok) {
       const text = await res.text().catch(() => "");
@@ -201,5 +207,7 @@ export async function trackAptabaseEvent(
     }
   } catch (err) {
     console.warn(`Aptabase track failed: ${(err as Error).message}`);
+  } finally {
+    clearTimeout(timer);
   }
 }
