@@ -12,7 +12,7 @@ import {
   nextRetryDelayMs,
   sameDishNames,
 } from "../convex/refreshPolicy";
-import { addCalendarDays } from "../convex/dates";
+import { addCalendarDays, formatKstClock } from "../convex/dates";
 import {
   PRUNE_HOUR_UTC,
   PRUNE_MINUTE_UTC,
@@ -41,9 +41,17 @@ import {
 import { parseMenuHtml, targetWeekdayIndex } from "../convex/scraper";
 import { isAuthorizedWebhook } from "../convex/webhookAuth";
 import {
+  REFETCHING_MESSAGE,
+  START_PROMPT,
+  STATS_UNSET_MESSAGE,
   TODAY_MENU_BUTTON_LABEL,
   TODAY_MENU_CALLBACK,
+  formatAdminStatus,
+  formatRefetchSummary,
+  isAdminChat,
+  parseAdminCommand,
   processTelegramUpdate,
+  toAdminStatus,
   todayMenuKeyboard,
 } from "../convex/telegramHandlers";
 import {
@@ -664,6 +672,57 @@ describe("telegram webhook registration", () => {
   });
 });
 
+describe("admin command helpers", () => {
+  it("parses slash commands and strips a bot mention", () => {
+    expect(parseAdminCommand("/status")).toBe("status");
+    expect(parseAdminCommand("/status@daily_menu_dev_bot extra")).toBe("status");
+    expect(parseAdminCommand("/Refetch")).toBe("refetch");
+    expect(parseAdminCommand("/stats")).toBe("stats");
+    expect(parseAdminCommand("/start")).toBeNull();
+    expect(parseAdminCommand("status")).toBeNull();
+  });
+
+  it("matches ADMIN_CHAT_ID as a string", () => {
+    expect(isAdminChat(99, "99")).toBe(true);
+    expect(isAdminChat(99, " 99 ")).toBe(true);
+    expect(isAdminChat(42, "99")).toBe(false);
+    expect(isAdminChat(99, undefined)).toBe(false);
+  });
+
+  it("formats status and refetch replies", () => {
+    const fetchedAt = Date.parse("2026-09-05T00:12:00.000Z");
+    const attemptedAt = Date.parse("2026-09-05T02:30:00.000Z");
+    expect(formatKstClock(fetchedAt)).toBe("09:12");
+    const status = toAdminStatus(
+      "2026-09-05",
+      { source: "live", dishes: [{}, {}, {}, {}, {}, {}], fetchedAt },
+      null,
+      [
+        { cafeteria: "peony", status: "success", attemptedAt: fetchedAt },
+        {
+          cafeteria: "azilea",
+          status: "error",
+          attemptedAt,
+          error: "HTTP 500 from x",
+        },
+      ],
+    );
+    expect(formatAdminStatus(status)).toBe(
+      "2026-09-05 KST\n\n" +
+        "Peony  live  6 dishes  fetched 09:12\n" +
+        "  last: success 09:12  (1 attempt)\n\n" +
+        "Azilea  missing\n" +
+        "  last: error 11:30 — HTTP 500 from x  (1 attempt)",
+    );
+    expect(
+      formatRefetchSummary("2026-09-05", {
+        peony: { ok: true, dishCount: 6 },
+        azilea: { ok: false, dishCount: 0, error: "HTTP 500 from x" },
+      }),
+    ).toBe("Refetch 2026-09-05\nPeony: ok (6)\nAzilea: error (HTTP 500 from x)");
+  });
+});
+
 describe("telegram button e2e", () => {
   it("message shows one button; callback returns today's menu via Telegram API", async () => {
     await withMockTelegram(async (calls) => {
@@ -755,6 +814,156 @@ describe("telegram button e2e", () => {
       },
     );
     expect(tracked).toEqual([]);
+  });
+
+  it("admin /status /refetch /stats; students still get the button", async () => {
+    const fetchedAt = Date.parse("2026-09-05T00:12:00.000Z");
+    const attemptedAt = Date.parse("2026-09-05T02:30:00.000Z");
+    const status = toAdminStatus(
+      "2026-09-05",
+      { source: "live", dishes: [{}, {}, {}, {}, {}, {}], fetchedAt },
+      { source: "no_info", dishes: [], fetchedAt: attemptedAt },
+      [
+        {
+          cafeteria: "peony",
+          status: "success",
+          attemptedAt: fetchedAt,
+        },
+        {
+          cafeteria: "peony",
+          status: "success",
+          attemptedAt: fetchedAt + 1,
+        },
+        {
+          cafeteria: "peony",
+          status: "success",
+          attemptedAt: fetchedAt + 2,
+        },
+        {
+          cafeteria: "azilea",
+          status: "empty",
+          attemptedAt,
+          error: "empty parse; kept existing live menu",
+        },
+      ],
+    );
+    const menus = {
+      peony: {
+        dishes: [{ name: "비빔밥", description: "рис", spiciness: 1 }],
+      },
+      azilea: { dishes: [] },
+    };
+    const refetchResult = {
+      date: "2026-09-05",
+      results: {
+        peony: { ok: true, dishCount: 6 },
+        azilea: { ok: false, dishCount: 0, error: "HTTP 500 from x" },
+      },
+      telegramMessage: formatMenuMessage(menus.peony, menus.azilea),
+    };
+
+    await withMockTelegram(async (calls) => {
+      const tracked: string[] = [];
+      let refetchCalls = 0;
+      const deps = {
+        getTodayMenus: async () => menus,
+        sendMessage,
+        answerCallbackQuery,
+        adminChatId: "99",
+        aptabaseDashboardUrl: "https://app.aptabase.com/demo",
+        getAdminStatus: async () => status,
+        refetchToday: async () => {
+          refetchCalls += 1;
+          return refetchResult;
+        },
+        trackEvent: async (eventName: string) => {
+          tracked.push(eventName);
+        },
+      };
+
+      expect(await processTelegramUpdate(
+        { message: { chat: { id: 99 }, text: "/status@daily_menu_dev_bot" } },
+        deps,
+      )).toBe("ok");
+      expect(calls).toHaveLength(1);
+      expect(calls[0].body.chat_id).toBe(99);
+      expect(calls[0].body.text).toBe(formatAdminStatus(status));
+      expect(calls[0].body.reply_markup).toBeUndefined();
+      expect(tracked).toEqual([]);
+
+      calls.length = 0;
+      expect(await processTelegramUpdate(
+        { message: { chat: { id: 99 }, text: "/refetch" } },
+        deps,
+      )).toBe("ok");
+      expect(refetchCalls).toBe(1);
+      expect(calls.map((c) => c.body.text)).toEqual([
+        REFETCHING_MESSAGE,
+        formatRefetchSummary(refetchResult.date, refetchResult.results),
+        refetchResult.telegramMessage,
+      ]);
+      expect(tracked).toEqual([]);
+
+      calls.length = 0;
+      expect(await processTelegramUpdate(
+        { message: { chat: { id: 99 }, text: "/stats" } },
+        deps,
+      )).toBe("ok");
+      expect(calls[0].body.text).toBe("Analytics: https://app.aptabase.com/demo");
+
+      calls.length = 0;
+      expect(await processTelegramUpdate(
+        { message: { chat: { id: 42 }, text: "/status" } },
+        deps,
+      )).toBe("ok");
+      expect(calls[0].body.text).toBe(START_PROMPT);
+      expect(calls[0].body.reply_markup).toEqual(todayMenuKeyboard());
+      expect(refetchCalls).toBe(1);
+      expect(tracked).toEqual([EVENT_START]);
+
+      calls.length = 0;
+      expect(await processTelegramUpdate(
+        { message: { chat: { id: 99 }, text: "hello" } },
+        deps,
+      )).toBe("ok");
+      expect(calls[0].body.reply_markup).toEqual(todayMenuKeyboard());
+    });
+  });
+
+  it("admin /stats without a dashboard URL says the env var is unset", async () => {
+    await withMockTelegram(async (calls) => {
+      await processTelegramUpdate(
+        { message: { chat: { id: 7 }, text: "/stats" } },
+        {
+          getTodayMenus: async () => ({ peony: null, azilea: null }),
+          sendMessage,
+          answerCallbackQuery,
+          adminChatId: "7",
+        },
+      );
+      expect(calls[0].body.text).toBe(STATS_UNSET_MESSAGE);
+    });
+  });
+
+  it("treats every chat as a student when ADMIN_CHAT_ID is unset", async () => {
+    let refetchCalls = 0;
+    await withMockTelegram(async (calls) => {
+      await processTelegramUpdate(
+        { message: { chat: { id: 7 }, text: "/refetch" } },
+        {
+          getTodayMenus: async () => ({ peony: null, azilea: null }),
+          sendMessage,
+          answerCallbackQuery,
+          refetchToday: async () => {
+            refetchCalls += 1;
+            throw new Error("should not refetch");
+          },
+        },
+      );
+      expect(refetchCalls).toBe(0);
+      expect(calls[0].body.text).toBe(START_PROMPT);
+      expect(calls[0].body.reply_markup).toEqual(todayMenuKeyboard());
+    });
   });
 
   it("still sends the start button if trackEvent throws", async () => {

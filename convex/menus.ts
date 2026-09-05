@@ -19,7 +19,7 @@ import {
   nextRetryDelayMs,
   sameDishNames,
 } from "./refreshPolicy";
-import type { Cafeteria, Dish } from "./types";
+import type { Cafeteria, Dish, ScrapeResult } from "./types";
 
 const CAFETERIAS: Cafeteria[] = ["peony", "azilea"];
 const MENU_SOURCE = v.union(
@@ -207,7 +207,7 @@ export const scrapeAndEnrich = internalAction({
     cafeteria: v.union(v.literal("peony"), v.literal("azilea")),
     force: v.optional(v.boolean()),
   },
-  handler: async (ctx, { cafeteria, force }): Promise<{ ok: boolean; dishCount: number }> => {
+  handler: async (ctx, { cafeteria, force }): Promise<ScrapeResult> => {
     const date = todayKst();
     const config = await ctx.runQuery(internal.appConfig.get, {});
     const url =
@@ -222,7 +222,7 @@ export const scrapeAndEnrich = internalAction({
         status: "error",
         error: err,
       });
-      return { ok: false, dishCount: 0 };
+      return { ok: false, dishCount: 0, error: err };
     }
 
     try {
@@ -314,7 +314,7 @@ export const scrapeAndEnrich = internalAction({
         status: "error",
         error: message,
       });
-      return { ok: false, dishCount: 0 };
+      return { ok: false, dishCount: 0, error: message };
     }
   },
 });
@@ -408,7 +408,10 @@ export const refetchToday = internalAction({
   args: { force: v.optional(v.boolean()) },
   handler: async (ctx, { force }) => {
     const shouldForce = force ?? true;
-    const results: Record<string, { ok: boolean; dishCount: number }> = {};
+    const results: Record<Cafeteria, ScrapeResult> = {
+      peony: { ok: false, dishCount: 0 },
+      azilea: { ok: false, dishCount: 0 },
+    };
     for (const cafeteria of CAFETERIAS) {
       results[cafeteria] = await ctx.runAction(internal.menus.scrapeAndEnrich, {
         cafeteria,

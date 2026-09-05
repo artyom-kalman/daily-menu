@@ -6,7 +6,7 @@ import {
   sendAdminAlert,
   sendMessage,
 } from "./telegramClient";
-import { processTelegramUpdate } from "./telegramHandlers";
+import { processTelegramUpdate, toAdminStatus } from "./telegramHandlers";
 import { isAuthorizedWebhook } from "./webhookAuth";
 import {
   fetchTelegramWebhookInfo,
@@ -79,6 +79,25 @@ export const handleWebhook = httpAction(async (ctx, request) => {
     sendMessage,
     answerCallbackQuery,
     trackEvent: trackAptabaseEvent,
+    adminChatId: process.env.ADMIN_CHAT_ID,
+    aptabaseDashboardUrl: process.env.APTABASE_DASHBOARD_URL,
+    getAdminStatus: async () => {
+      const today = await ctx.runQuery(internal.menus.getTodayBoth, {});
+      const attempts = await ctx.runQuery(internal.menus.listAttemptsForDate, {
+        date: today.date,
+      });
+      return toAdminStatus(today.date, today.peony, today.azilea, attempts);
+    },
+    refetchToday: async () => {
+      const result = await ctx.runAction(internal.menus.refetchToday, {
+        force: true,
+      });
+      return {
+        date: result.date,
+        results: result.results,
+        telegramMessage: result.telegramMessage,
+      };
+    },
   });
 
   return new Response("ok", { status: 200 });
