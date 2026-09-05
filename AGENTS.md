@@ -19,3 +19,4 @@ Read open issues and the [project page](https://app.notion.com/p/3d1252aaf7ec812
 - Secrets in Convex env; cafeteria URLs in `appConfig` singleton (`key: "default"`)
 - Telegram UX: one inline button (`today_menu`) for today's menu
 - Keep bot logic in `telegramHandlers.ts` so E2E can run without a live deploy
+- Prune `menus` and `fetchAttempts` older than 30 days at 00:00 KST; never delete today's rows

@@ -12,6 +12,14 @@ import {
   nextRetryDelayMs,
   sameDishNames,
 } from "../convex/refreshPolicy";
+import { addCalendarDays } from "../convex/dates";
+import {
+  PRUNE_HOUR_UTC,
+  PRUNE_MINUTE_UTC,
+  RETENTION_DAYS,
+  retentionCutoffDate,
+  shouldPruneDate,
+} from "../convex/prunePolicy";
 import { parseMenuHtml, targetWeekdayIndex } from "../convex/scraper";
 import { isAuthorizedWebhook } from "../convex/webhookAuth";
 import {
@@ -196,6 +204,39 @@ describe("refreshPolicy", () => {
   });
 });
 
+describe("prunePolicy", () => {
+  const today = "2026-09-04";
+
+  it("keeps a 30-day window and never prunes today", () => {
+    expect(RETENTION_DAYS).toBe(30);
+    expect(retentionCutoffDate(today)).toBe("2026-08-05");
+    expect(shouldPruneDate("2026-08-04", today)).toBe(true);
+    expect(shouldPruneDate("2026-08-05", today)).toBe(false);
+    expect(shouldPruneDate("2026-09-03", today)).toBe(false);
+    expect(shouldPruneDate(today, today)).toBe(false);
+    expect(shouldPruneDate(today, today, 0)).toBe(false);
+  });
+
+  it("shifts YYYY-MM-DD across month, year, and leap-day boundaries", () => {
+    expect(addCalendarDays("2026-03-01", -1)).toBe("2026-02-28");
+    expect(addCalendarDays("2024-03-01", -1)).toBe("2024-02-29");
+    expect(addCalendarDays("2026-01-15", -30)).toBe("2025-12-16");
+    expect(addCalendarDays("2026-09-04", 0)).toBe("2026-09-04");
+  });
+
+  it("schedules prune at 00:00 KST (15:00 UTC)", () => {
+    expect(PRUNE_HOUR_UTC).toBe(15);
+    expect(PRUNE_MINUTE_UTC).toBe(0);
+    const crons = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "../convex/crons.ts"),
+      "utf8",
+    );
+    expect(crons).toMatch(/internal\.prune\.pruneOldData/);
+    expect(crons).toMatch(/hourUTC:\s*PRUNE_HOUR_UTC/);
+    expect(crons).toMatch(/minuteUTC:\s*PRUNE_MINUTE_UTC/);
+  });
+});
+
 describe("cafeteria notices", () => {
   it("recognizes posted closed-day text as a notice, not a missing menu", () => {
     expect(looksLikeCafeteriaNotice(["추석 연휴 휴무"])).toBe(true);
@@ -254,7 +295,7 @@ describe("webhook secret", () => {
 
   it("keeps Convex query, mutation, and action functions internal", () => {
     const convexDir = join(dirname(fileURLToPath(import.meta.url)), "../convex");
-    for (const file of ["menus.ts", "appConfig.ts", "telegram.ts", "telegramWebhook.ts"]) {
+    for (const file of ["menus.ts", "appConfig.ts", "telegram.ts", "telegramWebhook.ts", "prune.ts"]) {
       const source = readFileSync(join(convexDir, file), "utf8");
       expect(source).not.toMatch(
         /^\s*export const \w+ = (query|mutation|action)\(/m,
