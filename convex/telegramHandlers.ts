@@ -1,3 +1,5 @@
+import type { TrackEvent } from "./analytics";
+import { EVENT_START, EVENT_TODAY_MENU } from "./analytics";
 import { formatMenuMessage } from "./format";
 import type { Dish } from "./types";
 import type { InlineKeyboardMarkup } from "./telegramClient";
@@ -25,6 +27,7 @@ export type TelegramDeps = {
     callbackQueryId: string,
     text?: string,
   ) => Promise<unknown>;
+  trackEvent?: TrackEvent;
 };
 
 export function todayMenuKeyboard(): InlineKeyboardMarkup {
@@ -47,6 +50,18 @@ type MessageUpdate = {
     from?: { id?: number };
   };
 };
+
+async function safeTrack(
+  trackEvent: TrackEvent | undefined,
+  eventName: Parameters<TrackEvent>[0],
+): Promise<void> {
+  if (!trackEvent) return;
+  try {
+    await trackEvent(eventName);
+  } catch (err) {
+    console.warn(`trackEvent(${eventName}) failed: ${(err as Error).message}`);
+  }
+}
 
 /**
  * Stateless Telegram bot logic:
@@ -75,6 +90,8 @@ export async function processTelegramUpdate(
       return "ok";
     }
 
+    await safeTrack(deps.trackEvent, EVENT_TODAY_MENU);
+
     try {
       const today = await deps.getTodayMenus();
       const text = formatMenuMessage(today.peony, today.azilea);
@@ -97,5 +114,6 @@ export async function processTelegramUpdate(
   await deps.sendMessage(chatId, START_PROMPT, {
     reply_markup: todayMenuKeyboard(),
   });
+  await safeTrack(deps.trackEvent, EVENT_START);
   return "ok";
 }

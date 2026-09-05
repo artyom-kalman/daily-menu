@@ -1,5 +1,6 @@
 import { httpAction, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { trackAptabaseEvent } from "./analytics";
 import {
   answerCallbackQuery,
   sendAdminAlert,
@@ -77,6 +78,7 @@ export const handleWebhook = httpAction(async (ctx, request) => {
     },
     sendMessage,
     answerCallbackQuery,
+    trackEvent: trackAptabaseEvent,
   });
 
   return new Response("ok", { status: 200 });

@@ -1,10 +1,12 @@
 import { v } from "convex/values";
 import {
+  type ActionCtx,
   internalAction,
   internalMutation,
   internalQuery,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { scrapeEventForStatus, trackAptabaseEvent } from "./analytics";
 import { fetchHtml, parseMenuHtml } from "./scraper";
 import { enrichDishes } from "./openrouter";
 import { kstHourMinute, kstNow, kstWeekday, todayKst } from "./dates";
@@ -122,6 +124,25 @@ export const recordAttempt = internalMutation({
   },
 });
 
+type AttemptArgs = {
+  date: string;
+  cafeteria: string;
+  attemptedAt: number;
+  status: "success" | "empty" | "error";
+  error?: string;
+};
+
+async function recordAttemptAndTrack(
+  ctx: ActionCtx,
+  args: AttemptArgs,
+): Promise<void> {
+  await ctx.runMutation(internal.menus.recordAttempt, args);
+  await trackAptabaseEvent(scrapeEventForStatus(args.status), {
+    cafeteria: args.cafeteria,
+    date: args.date,
+  });
+}
+
 /** Seed today's menus for E2E / manual checks without scraping. */
 export const seedToday = internalMutation({
   args: {
@@ -188,7 +209,7 @@ export const scrapeAndEnrich = internalAction({
     if (!url) {
       const err = `Missing appConfig URL for ${cafeteria}`;
       console.error(err);
-      await ctx.runMutation(internal.menus.recordAttempt, {
+      await recordAttemptAndTrack(ctx, {
         date,
         cafeteria,
         attemptedAt: Date.now(),
@@ -211,7 +232,7 @@ export const scrapeAndEnrich = internalAction({
         // Don't clobber a good live menu if a later scrape comes back empty
         // (parse blip / partial HTML). Keep retrying via cron / stale refresh.
         if (existing?.source === "live" && existing.dishes.length > 0) {
-          await ctx.runMutation(internal.menus.recordAttempt, {
+          await recordAttemptAndTrack(ctx, {
             date,
             cafeteria,
             attemptedAt: Date.now(),
@@ -227,7 +248,7 @@ export const scrapeAndEnrich = internalAction({
           fetchedAt: Date.now(),
           source: "no_info",
         });
-        await ctx.runMutation(internal.menus.recordAttempt, {
+        await recordAttemptAndTrack(ctx, {
           date,
           cafeteria,
           attemptedAt: Date.now(),
@@ -251,7 +272,7 @@ export const scrapeAndEnrich = internalAction({
           fetchedAt: Date.now(),
           source: "live",
         });
-        await ctx.runMutation(internal.menus.recordAttempt, {
+        await recordAttemptAndTrack(ctx, {
           date,
           cafeteria,
           attemptedAt: Date.now(),
@@ -270,7 +291,7 @@ export const scrapeAndEnrich = internalAction({
         fetchedAt: Date.now(),
         source: "live",
       });
-      await ctx.runMutation(internal.menus.recordAttempt, {
+      await recordAttemptAndTrack(ctx, {
         date,
         cafeteria,
         attemptedAt: Date.now(),
@@ -280,7 +301,7 @@ export const scrapeAndEnrich = internalAction({
     } catch (err) {
       const message = (err as Error).message;
       console.error(`scrapeAndEnrich(${cafeteria}) failed: ${message}`);
-      await ctx.runMutation(internal.menus.recordAttempt, {
+      await recordAttemptAndTrack(ctx, {
         date,
         cafeteria,
         attemptedAt: Date.now(),

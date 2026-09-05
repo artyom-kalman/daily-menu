@@ -10,6 +10,7 @@ and serves them through a Telegram bot with **one button**: «Сегодняшн
 - **OpenRouter** — LLM enrichment
 - **cheerio** — HTML parsing
 - **Telegram Bot API** — webhook → Convex `httpAction`
+- **Aptabase** — optional product events (button + scrape outcomes)
 
 ## Layout
 
@@ -25,6 +26,7 @@ convex/
   telegramWebhook.ts   CONVEX_SITE_URL → Telegram setWebhook (testable)
   webhookAuth.ts       required TELEGRAM_WEBHOOK_SECRET check
   telegramHandlers.ts  one-button bot logic (testable)
+  analytics.ts         Aptabase events (testable; no-op without key)
   telegramClient.ts    Telegram API client (TELEGRAM_API_BASE overridable)
   menus.ts             scrape / enrich / seed
   scraper.ts           fetch + parse
@@ -51,6 +53,7 @@ npx convex env set OPENROUTER_MODEL meta-llama/llama-3.3-70b-instruct:free
 npx convex env set TELEGRAM_BOT_TOKEN ...          # this deployment's bot only
 npx convex env set TELEGRAM_WEBHOOK_SECRET "$(openssl rand -hex 32)"  # required
 npx convex env set ADMIN_CHAT_ID ...   # optional
+npx convex env set APTABASE_APP_KEY A-EU-...   # optional product analytics
 ```
 
 `TELEGRAM_WEBHOOK_SECRET` is required. The webhook returns 401 if the env var is unset or the `x-telegram-bot-api-secret-token` header does not match.
@@ -80,6 +83,8 @@ Optional for local E2E against a mock Telegram server:
 ```bash
 TELEGRAM_API_BASE=http://127.0.0.1:PORT
 ```
+
+**Aptabase** (optional). If `APTABASE_APP_KEY` is unset, tracking is a no-op. Events: `start` (any message / button shown), `today_menu` (button tap), `scrape_ok` / `scrape_empty` / `scrape_error` (with `cafeteria` + `date` props). No `chatId` or menu text is sent. Host is inferred from the key (`A-EU-…` / `A-US-…`); override with `APTABASE_HOST` for self-host. Set `APTABASE_DEBUG=1` or use a Convex `dev:` deployment to send events to Aptabase’s debug view.
 
 ## Setup
 
@@ -115,6 +120,7 @@ One-time ops for the **dev** bot:
 npx convex env set TELEGRAM_BOT_TOKEN "<dev bot token>"
 npx convex env set TELEGRAM_WEBHOOK_SECRET "$(openssl rand -hex 32)"
 npx convex env set ADMIN_CHAT_ID "<your chat id>"   # optional
+npx convex env set APTABASE_APP_KEY "A-EU-..."      # optional; use a separate Aptabase app from prod
 ```
 
 3. Point the **dev** bot at the **dev** HTTP site:
