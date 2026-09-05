@@ -66,7 +66,7 @@ async function safeTrack(
 /**
  * Stateless Telegram bot logic:
  * - any message → prompt + one inline button
- * - callback "today_menu" → today's Peony + Azilea menus
+ * - callback "today_menu" → today's Peony + Azilea menus (button stays)
  */
 export async function processTelegramUpdate(
   update: unknown,
@@ -95,12 +95,15 @@ export async function processTelegramUpdate(
     try {
       const today = await deps.getTodayMenus();
       const text = formatMenuMessage(today.peony, today.azilea);
-      await deps.sendMessage(chatId, text);
+      await deps.sendMessage(chatId, text, {
+        reply_markup: todayMenuKeyboard(),
+      });
     } catch (err) {
       console.error(`today_menu handler failed: ${(err as Error).message}`);
       await deps.sendMessage(
         chatId,
         "Не удалось получить меню. Попробуйте позже.",
+        { reply_markup: todayMenuKeyboard() },
       );
     }
     return "ok";
