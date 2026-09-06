@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   formatMenuMessage,
   formatSpiciness,
+  inferCourse,
   NO_MENU_INFO,
   shortenDescription,
 } from "../convex/format";
@@ -421,10 +422,11 @@ describe("openrouter model", () => {
     expect(DEFAULT_MODEL).toBe("meta-llama/llama-3.3-70b-instruct:free");
   });
 
-  it("asks for one short clause, not two marketing sentences", () => {
-    expect(SYSTEM_PROMPT).toMatch(/6–10 слов/);
-    expect(SYSTEM_PROMPT).toMatch(/Не пиши второе предложение/);
+  it("asks for a spoken form plus a name translation, not a review", () => {
+    expect(SYSTEM_PROMPT).toMatch(/чимдак, тушёная курица/);
+    expect(SYSTEM_PROMPT).toMatch(/Не перечисляй скрытые ингредиенты/);
     expect(SYSTEM_PROMPT).not.toMatch(/максимум 2 предложения/);
+    expect(SYSTEM_PROMPT).not.toMatch(/6–10 слов/);
   });
 });
 
@@ -457,7 +459,7 @@ describe("formatMenuMessage", () => {
     expect(formatSpiciness(5)).toBe(" 🌶🌶🌶🌶🌶");
   });
 
-  it("formats both cafeterias as a short scannable list", () => {
+  it("groups a soup under Суп and keeps chili after Hangul", () => {
     const text = formatMenuMessage(
       {
         dishes: [
@@ -469,13 +471,13 @@ describe("formatMenuMessage", () => {
     expect(text).toContain("🍽️ Сегодня");
     expect(text).toContain("Peony · верхняя");
     expect(text).toContain("Azilea · нижняя");
-    expect(text).toContain("김치찌개 🌶🌶🌶 — острый суп");
+    expect(text).toContain("Суп\n김치찌개 🌶🌶🌶 — острый суп");
     expect(text).toContain(NO_MENU_INFO);
     expect(text).not.toContain("1)");
     expect(text).not.toContain("выходной");
   });
 
-  it("shortens already-stored long blurbs and hides zero spice", () => {
+  it("groups mains vs staples and shortens leftover review copy", () => {
     const text = formatMenuMessage(
       {
         dishes: [
@@ -485,10 +487,77 @@ describe("formatMenuMessage", () => {
       },
       null,
     );
-    expect(text).toContain("찜닭 🌶🌶 — ");
+    expect(text).toContain("Горячее\n찜닭 🌶🌶 — ");
     expect(text).not.toContain("обязательно");
-    expect(text).toContain("쌀밥 — белый рис");
+    expect(text).toContain("Ещё\n쌀밥");
     expect(text).not.toMatch(/쌀밥 🌶/);
+  });
+
+  it("infers tray slots from Hangul without a schema field", () => {
+    expect(inferCourse("김치찌개")).toBe("soup");
+    expect(inferCourse("미역국")).toBe("soup");
+    expect(inferCourse("잔치국수")).toBe("hot");
+    expect(inferCourse("비빔밥")).toBe("hot");
+    expect(inferCourse("쌀밥")).toBe("side");
+    expect(inferCourse("추가밥")).toBe("side");
+    expect(inferCourse("포기김치")).toBe("side");
+    expect(inferCourse("요구르트")).toBe("side");
+    expect(inferCourse("무생채")).toBe("salad");
+    expect(inferCourse("콩나물맛살냉채")).toBe("salad");
+    expect(inferCourse("찜닭")).toBe("hot");
+  });
+
+  it("renders A2 spoken form + A5 tray groups", () => {
+    const text = formatMenuMessage(
+      {
+        dishes: [
+          { name: "찜닭", description: "чимдак, тушёная курица", spiciness: 2 },
+          { name: "쌀밥", description: "рис", spiciness: 0 },
+          { name: "미역국", description: "миёккук, суп из вакаме", spiciness: 0 },
+          { name: "생선까스", description: "касс, рыбная котлета", spiciness: 0 },
+          { name: "무생채", description: "мусэнчхэ, салат из редьки", spiciness: 2 },
+          { name: "포기김치", description: "кимчи", spiciness: 3 },
+          { name: "요구르트", description: "йогурт", spiciness: 0 },
+        ],
+      },
+      {
+        dishes: [
+          { name: "잔치국수", description: "чанчи-куксу, лапша в бульоне", spiciness: 0 },
+          { name: "추가밥", description: "добавка риса", spiciness: 0 },
+          { name: "돈육간장불고기", description: "пульгоги, свинина в соевом соусе", spiciness: 1 },
+          { name: "갈비만두찜", description: "манду, пельмени на пару", spiciness: 0 },
+          { name: "콩나물맛살냉채", description: "нэнчхэ, холодный салат из проростков", spiciness: 0 },
+          { name: "포기김치", description: "кимчи", spiciness: 3 },
+          { name: "요구르트", description: "йогурт", spiciness: 0 },
+        ],
+      },
+    );
+    expect(text).toBe(
+      [
+        "🍽️ Сегодня",
+        "",
+        "🌸 Peony · верхняя",
+        "Горячее",
+        "찜닭 🌶🌶 — чимдак, тушёная курица",
+        "생선까스 — касс, рыбная котлета",
+        "Суп",
+        "미역국 — миёккук, суп из вакаме",
+        "Салат",
+        "무생채 🌶🌶 — мусэнчхэ, салат из редьки",
+        "Ещё",
+        "쌀밥 · 포기김치 🌶🌶🌶 · 요구르트",
+        "",
+        "🌺 Azilea · нижняя",
+        "Горячее",
+        "잔치국수 — чанчи-куксу, лапша в бульоне",
+        "돈육간장불고기 🌶 — пульгоги, свинина в соевом соусе",
+        "갈비만두찜 — манду, пельмени на пару",
+        "Салат",
+        "콩나물맛살냉채 — нэнчхэ, холодный салат из проростков",
+        "Ещё",
+        "추가밥 · 포기김치 🌶🌶🌶 · 요구르트",
+      ].join("\n"),
+    );
   });
 
   it("shows a posted closed notice instead of no-info, without chili", () => {

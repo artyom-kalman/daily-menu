@@ -41,7 +41,7 @@ tests/
 ## Bot UX
 
 1. User sends any message (e.g. `/start`) → bot replies with one inline button.
-2. User taps **Сегодняшнее меню** → short Peony + Azilea list (`이름 — clause`, chili for heat). The same button stays on the menu so they can tap again.
+2. User taps **Сегодняшнее меню** → Peony + Azilea grouped by tray slot (горячее / суп / салат / ещё). Each main is `이름 🌶 — spoken, gloss`. Staples bunch on one line. The same button stays on the menu.
 
 ## Config
 
