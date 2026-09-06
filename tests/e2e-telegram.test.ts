@@ -8,7 +8,6 @@ import {
   formatSpiciness,
   inferCourse,
   NO_MENU_INFO,
-  shortenDescription,
 } from "../convex/format";
 import { looksLikeCafeteriaNotice } from "../convex/notices";
 import { DEFAULT_MODEL, SYSTEM_PROMPT } from "../convex/openrouter";
@@ -431,28 +430,6 @@ describe("openrouter model", () => {
 });
 
 describe("formatMenuMessage", () => {
-  const longJjidmdak =
-    "Нежная курица, тушённая в ароматном соевом соусе с овощами, стеклянной лапшой и картофелем. Сытное и согревающее блюдо, которое обязательно стоит попробовать.";
-
-  it("keeps the first sentence and drops the marketing tail", () => {
-    const short = shortenDescription(longJjidmdak);
-    expect(short).not.toContain("обязательно");
-    expect(short.length).toBeLessThan(longJjidmdak.length);
-    expect(short.endsWith("…") || short.length <= 56).toBe(true);
-  });
-
-  it("leaves a short clause alone", () => {
-    expect(shortenDescription("острый суп")).toBe("острый суп");
-  });
-
-  it("keeps the clause before an em dash", () => {
-    expect(
-      shortenDescription(
-        "Аппетитный рассыпчатый белый рис — идеальное дополнение к любому блюду. Заряжает энергией на весь день.",
-      ),
-    ).toBe("Аппетитный рассыпчатый белый рис");
-  });
-
   it("omits chili at 0 and repeats it for 1–5", () => {
     expect(formatSpiciness(0)).toBe("");
     expect(formatSpiciness(3)).toBe(" 🌶🌶🌶");
@@ -477,18 +454,17 @@ describe("formatMenuMessage", () => {
     expect(text).not.toContain("выходной");
   });
 
-  it("groups mains vs staples and shortens leftover review copy", () => {
+  it("groups mains vs staples and prints description as stored", () => {
     const text = formatMenuMessage(
       {
         dishes: [
-          { name: "찜닭", description: longJjidmdak, spiciness: 2 },
-          { name: "쌀밥", description: "белый рис", spiciness: 0 },
+          { name: "찜닭", description: "чимдак, тушёная курица", spiciness: 2 },
+          { name: "쌀밥", description: "рис", spiciness: 0 },
         ],
       },
       null,
     );
-    expect(text).toContain("Горячее\n찜닭 🌶🌶 — ");
-    expect(text).not.toContain("обязательно");
+    expect(text).toContain("Горячее\n찜닭 🌶🌶 — чимдак, тушёная курица");
     expect(text).toContain("Ещё\n쌀밥");
     expect(text).not.toMatch(/쌀밥 🌶/);
   });

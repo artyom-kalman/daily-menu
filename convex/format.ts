@@ -3,9 +3,6 @@ import { looksLikeCafeteriaNotice } from "./notices";
 
 export const NO_MENU_INFO = "Нет информации";
 
-/** Soft cap so leftover review copy cannot blow up a line. */
-export const DESCRIPTION_MAX_CHARS = 56;
-
 export type Course = "hot" | "soup" | "salad" | "side";
 
 const COURSE_ORDER: Course[] = ["hot", "soup", "salad", "side"];
@@ -18,33 +15,6 @@ const COURSE_HEADING: Record<Course, string> = {
 };
 
 type MenuLike = { dishes: Dish[] } | null;
-
-/**
- * First sentence, then a word-boundary cap. Already-stored long
- * OpenRouter copy becomes scannable without a refetch.
- */
-export function shortenDescription(raw: string): string {
-  const trimmed = raw.trim();
-  if (!trimmed) return "";
-
-  const sentenceMatch = trimmed.match(/^[^.!?…]+/);
-  let sentence = (sentenceMatch?.[0] ?? trimmed)
-    .replace(/[.!?…]+$/u, "")
-    .trim();
-
-  // Many stored blurbs are "clause — marketing rest". Keep the clause.
-  const dash = sentence.indexOf(" — ");
-  if (dash >= 12) {
-    sentence = sentence.slice(0, dash).trim();
-  }
-
-  if (sentence.length <= DESCRIPTION_MAX_CHARS) return sentence;
-
-  const slice = sentence.slice(0, DESCRIPTION_MAX_CHARS);
-  const breakAt = slice.lastIndexOf(" ");
-  const cut = breakAt >= 20 ? slice.slice(0, breakAt) : slice;
-  return cut.replace(/[,;:–—\-\s]+$/u, "") + "…";
-}
 
 /** Chili marks for 1–5. 0 is omitted. */
 export function formatSpiciness(n: number): string {
@@ -69,7 +39,7 @@ export function inferCourse(name: string): Course {
 
 function formatMainLine(dish: Dish): string {
   const spice = formatSpiciness(dish.spiciness);
-  const desc = shortenDescription(dish.description);
+  const desc = dish.description.trim();
   return desc ? `${dish.name}${spice} — ${desc}` : `${dish.name}${spice}`;
 }
 
