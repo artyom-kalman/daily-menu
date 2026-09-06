@@ -71,6 +71,8 @@ export type TelegramDeps = {
   aptabaseDashboardUrl?: string;
   getAdminStatus?: () => Promise<AdminStatus>;
   refetchToday?: () => Promise<AdminRefetchResult>;
+  /** Atomically claim a Telegram update_id. Return false if already claimed. */
+  claimUpdateId?: (updateId: number) => Promise<boolean>;
 };
 
 export function todayMenuKeyboard(): InlineKeyboardMarkup {
@@ -82,6 +84,7 @@ export function todayMenuKeyboard(): InlineKeyboardMarkup {
 }
 
 type MessageUpdate = {
+  update_id?: number;
   message?: {
     chat?: { id?: number };
     text?: string;
@@ -212,10 +215,17 @@ export function formatRefetchSummary(
   return `Refetch ${date}\n${lines.join("\n")}`;
 }
 
+function telegramUpdateId(update: MessageUpdate): number | undefined {
+  return typeof update.update_id === "number" && Number.isFinite(update.update_id)
+    ? update.update_id
+    : undefined;
+}
+
 async function handleAdminCommand(
   command: AdminCommand,
   chatId: number,
   deps: TelegramDeps,
+  updateId: number | undefined,
 ): Promise<void> {
   if (command === "status") {
     if (!deps.getAdminStatus) {
@@ -239,6 +249,11 @@ async function handleAdminCommand(
       url ? `Analytics: ${url}` : STATS_UNSET_MESSAGE,
     );
     return;
+  }
+
+  if (deps.claimUpdateId && updateId != null) {
+    const claimed = await deps.claimUpdateId(updateId);
+    if (!claimed) return;
   }
 
   await deps.sendMessage(chatId, REFETCHING_MESSAGE);
@@ -310,7 +325,7 @@ export async function processTelegramUpdate(
 
   const command = parseAdminCommand(u.message?.text);
   if (command && isAdminChat(chatId, deps.adminChatId)) {
-    await handleAdminCommand(command, chatId, deps);
+    await handleAdminCommand(command, chatId, deps, telegramUpdateId(u));
     return "ok";
   }
 

@@ -13,6 +13,7 @@ import {
   sameDishNames,
 } from "../convex/refreshPolicy";
 import { addCalendarDays, formatKstClock } from "../convex/dates";
+import { scrapeCafeteriasSafely } from "../convex/scrapeAll";
 import {
   PRUNE_HOUR_UTC,
   PRUNE_MINUTE_UTC,
@@ -672,6 +673,24 @@ describe("telegram webhook registration", () => {
   });
 });
 
+describe("scrapeCafeteriasSafely", () => {
+  it("records a thrown cafeteria scrape and still runs the other", async () => {
+    const seen: string[] = [];
+    const results = await scrapeCafeteriasSafely(async (cafeteria) => {
+      seen.push(cafeteria);
+      if (cafeteria === "peony") {
+        throw new Error("HTTP 500 from peony");
+      }
+      return { ok: true, dishCount: 4 };
+    });
+    expect(seen).toEqual(["peony", "azilea"]);
+    expect(results).toEqual({
+      peony: { ok: false, dishCount: 0, error: "HTTP 500 from peony" },
+      azilea: { ok: true, dishCount: 4 },
+    });
+  });
+});
+
 describe("admin command helpers", () => {
   it("parses slash commands and strips a bot mention", () => {
     expect(parseAdminCommand("/status")).toBe("status");
@@ -942,6 +961,46 @@ describe("telegram button e2e", () => {
         },
       );
       expect(calls[0].body.text).toBe(STATS_UNSET_MESSAGE);
+    });
+  });
+
+  it("claims a Telegram update_id so a redelivered /refetch scrapes once", async () => {
+    const claimed = new Set<number>();
+    let refetchCalls = 0;
+    await withMockTelegram(async (calls) => {
+      const deps = {
+        getTodayMenus: async () => ({ peony: null, azilea: null }),
+        sendMessage,
+        answerCallbackQuery,
+        adminChatId: "99",
+        refetchToday: async () => {
+          refetchCalls += 1;
+          return {
+            date: "2026-09-05",
+            results: {
+              peony: { ok: true, dishCount: 1 },
+              azilea: { ok: true, dishCount: 1 },
+            },
+            telegramMessage: "menu",
+          };
+        },
+        claimUpdateId: async (updateId: number) => {
+          if (claimed.has(updateId)) return false;
+          claimed.add(updateId);
+          return true;
+        },
+      };
+      const update = {
+        update_id: 4242,
+        message: { chat: { id: 99 }, text: "/refetch" },
+      };
+      expect(await processTelegramUpdate(update, deps)).toBe("ok");
+      expect(await processTelegramUpdate(update, deps)).toBe("ok");
+      expect(refetchCalls).toBe(1);
+      expect(claimed.size).toBe(1);
+      expect(calls.filter((c) => c.body.text === REFETCHING_MESSAGE)).toHaveLength(
+        1,
+      );
     });
   });
 

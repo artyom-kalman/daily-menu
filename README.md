@@ -16,7 +16,7 @@ and serves them through a Telegram bot with **one button**: «Сегодняшн
 
 ```
 convex/
-  schema.ts            tables: appConfig, menus, fetchAttempts
+  schema.ts            tables: appConfig, menus, fetchAttempts, telegramUpdates
   appConfig.ts         singleton peonyUrl / azileaUrl
   crons.ts             daily 09:00 KST fetch; 00:00 KST prune
   prune.ts             delete menus / fetchAttempts older than 30 days

@@ -1,4 +1,9 @@
-import { httpAction, internalAction } from "./_generated/server";
+import { v } from "convex/values";
+import {
+  httpAction,
+  internalAction,
+  internalMutation,
+} from "./_generated/server";
 import { internal } from "./_generated/api";
 import { trackAptabaseEvent } from "./analytics";
 import {
@@ -14,6 +19,23 @@ import {
 } from "./telegramWebhook";
 
 export { sendAdminAlert, sendMessage };
+
+/** Persist Telegram update_id once. Returns false if this update was already claimed. */
+export const claimUpdate = internalMutation({
+  args: { updateId: v.number() },
+  handler: async (ctx, { updateId }) => {
+    const existing = await ctx.db
+      .query("telegramUpdates")
+      .withIndex("by_updateId", (q) => q.eq("updateId", updateId))
+      .unique();
+    if (existing) return false;
+    await ctx.db.insert("telegramUpdates", {
+      updateId,
+      claimedAt: Date.now(),
+    });
+    return true;
+  },
+});
 
 /**
  * Register Telegram's webhook at this deployment's CONVEX_SITE_URL.
@@ -98,6 +120,8 @@ export const handleWebhook = httpAction(async (ctx, request) => {
         telegramMessage: result.telegramMessage,
       };
     },
+    claimUpdateId: async (updateId) =>
+      ctx.runMutation(internal.telegram.claimUpdate, { updateId }),
   });
 
   return new Response("ok", { status: 200 });

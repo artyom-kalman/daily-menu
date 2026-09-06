@@ -19,6 +19,7 @@ import {
   nextRetryDelayMs,
   sameDishNames,
 } from "./refreshPolicy";
+import { scrapeCafeteriasSafely } from "./scrapeAll";
 import type { Cafeteria, Dish, ScrapeResult } from "./types";
 
 const CAFETERIAS: Cafeteria[] = ["peony", "azilea"];
@@ -408,16 +409,12 @@ export const refetchToday = internalAction({
   args: { force: v.optional(v.boolean()) },
   handler: async (ctx, { force }) => {
     const shouldForce = force ?? true;
-    const results: Record<Cafeteria, ScrapeResult> = {
-      peony: { ok: false, dishCount: 0 },
-      azilea: { ok: false, dishCount: 0 },
-    };
-    for (const cafeteria of CAFETERIAS) {
-      results[cafeteria] = await ctx.runAction(internal.menus.scrapeAndEnrich, {
+    const results = await scrapeCafeteriasSafely(async (cafeteria) =>
+      ctx.runAction(internal.menus.scrapeAndEnrich, {
         cafeteria,
         force: shouldForce,
-      });
-    }
+      }),
+    );
     const today = await ctx.runQuery(internal.menus.getTodayBoth, {});
     return {
       results,
