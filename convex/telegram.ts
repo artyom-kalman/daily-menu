@@ -1,4 +1,9 @@
-import { httpAction, internalAction } from "./_generated/server";
+import { v } from "convex/values";
+import {
+  httpAction,
+  internalAction,
+  internalMutation,
+} from "./_generated/server";
 import { internal } from "./_generated/api";
 import { trackAptabaseEvent } from "./analytics";
 import {
@@ -6,7 +11,7 @@ import {
   sendAdminAlert,
   sendMessage,
 } from "./telegramClient";
-import { processTelegramUpdate } from "./telegramHandlers";
+import { processTelegramUpdate, toAdminStatus } from "./telegramHandlers";
 import { isAuthorizedWebhook } from "./webhookAuth";
 import {
   fetchTelegramWebhookInfo,
@@ -14,6 +19,23 @@ import {
 } from "./telegramWebhook";
 
 export { sendAdminAlert, sendMessage };
+
+/** Persist Telegram update_id once. Returns false if this update was already claimed. */
+export const claimUpdate = internalMutation({
+  args: { updateId: v.number() },
+  handler: async (ctx, { updateId }) => {
+    const existing = await ctx.db
+      .query("telegramUpdates")
+      .withIndex("by_updateId", (q) => q.eq("updateId", updateId))
+      .unique();
+    if (existing) return false;
+    await ctx.db.insert("telegramUpdates", {
+      updateId,
+      claimedAt: Date.now(),
+    });
+    return true;
+  },
+});
 
 /**
  * Register Telegram's webhook at this deployment's CONVEX_SITE_URL.
@@ -79,6 +101,27 @@ export const handleWebhook = httpAction(async (ctx, request) => {
     sendMessage,
     answerCallbackQuery,
     trackEvent: trackAptabaseEvent,
+    adminChatId: process.env.ADMIN_CHAT_ID,
+    aptabaseDashboardUrl: process.env.APTABASE_DASHBOARD_URL,
+    getAdminStatus: async () => {
+      const today = await ctx.runQuery(internal.menus.getTodayBoth, {});
+      const attempts = await ctx.runQuery(internal.menus.listAttemptsForDate, {
+        date: today.date,
+      });
+      return toAdminStatus(today.date, today.peony, today.azilea, attempts);
+    },
+    refetchToday: async () => {
+      const result = await ctx.runAction(internal.menus.refetchToday, {
+        force: true,
+      });
+      return {
+        date: result.date,
+        results: result.results,
+        telegramMessage: result.telegramMessage,
+      };
+    },
+    claimUpdateId: async (updateId) =>
+      ctx.runMutation(internal.telegram.claimUpdate, { updateId }),
   });
 
   return new Response("ok", { status: 200 });

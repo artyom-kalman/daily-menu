@@ -40,4 +40,10 @@ export default defineSchema({
     ),
     error: v.optional(v.string()),
   }).index("by_date", ["date"]),
+
+  // Dedup Telegram webhook retries for expensive admin commands (/refetch).
+  telegramUpdates: defineTable({
+    updateId: v.number(),
+    claimedAt: v.number(),
+  }).index("by_updateId", ["updateId"]),
 });

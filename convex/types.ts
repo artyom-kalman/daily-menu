@@ -16,6 +16,12 @@ export type MenuDoc = {
   source: "live" | "fallback" | "holiday" | "no_info";
 };
 
+export type ScrapeResult = {
+  ok: boolean;
+  dishCount: number;
+  error?: string;
+};
+
 export const enrichedDishesSchema = z.object({
   dishes: z.array(
     z.object({
