@@ -16,6 +16,19 @@ const COURSE_HEADING: Record<Course, string> = {
 
 type MenuLike = { dishes: Dish[] } | null;
 
+/** Escape dish names for Telegram `parse_mode: HTML`. */
+export function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function bold(s: string): string {
+  return `<b>${escapeHtml(s)}</b>`;
+}
+
+function italic(s: string): string {
+  return `<i>${escapeHtml(s)}</i>`;
+}
+
 /**
  * Compact chili for 1–5 (` 🌶3`). 0 is omitted.
  * One pepper + a digit keeps the same visual weight at every level,
@@ -43,22 +56,23 @@ export function inferCourse(name: string): Course {
 
 function formatMainLine(dish: Dish): string {
   const spice = formatSpiciness(dish.spiciness);
+  const name = bold(dish.name);
   const desc = dish.description.trim();
-  if (desc) return `${dish.name} — ${desc}${spice}`;
-  return `${dish.name}${spice}`;
+  if (desc) return `${name} — ${italic(desc)}${spice}`;
+  return `${name}${spice}`;
 }
 
 function formatSideItem(dish: Dish): string {
-  return `${dish.name}${formatSpiciness(dish.spiciness)}`;
+  return `${bold(dish.name)}${formatSpiciness(dish.spiciness)}`;
 }
 
 function formatBlock(menu: MenuLike): string {
   if (!menu || menu.dishes.length === 0) {
-    return NO_MENU_INFO;
+    return italic(NO_MENU_INFO);
   }
   const names = menu.dishes.map((d) => d.name);
   if (looksLikeCafeteriaNotice(names)) {
-    return names.join("\n");
+    return names.map(escapeHtml).join("\n");
   }
 
   const groups: Record<Course, Dish[]> = {
@@ -75,7 +89,7 @@ function formatBlock(menu: MenuLike): string {
   for (const course of COURSE_ORDER) {
     const dishes = groups[course];
     if (dishes.length === 0) continue;
-    parts.push(COURSE_HEADING[course]);
+    parts.push(italic(COURSE_HEADING[course]));
     if (course === "side") {
       parts.push(dishes.map(formatSideItem).join(" · "));
     } else {
@@ -89,11 +103,11 @@ function formatBlock(menu: MenuLike): string {
 
 export function formatMenuMessage(peony: MenuLike, azilea: MenuLike): string {
   return (
-    "🍽️ Сегодня\n\n" +
-    "🌸 Peony · верхняя\n" +
+    `${bold("🍽️ Сегодня")}\n\n` +
+    `${bold("🌸 Peony · верхняя")}\n` +
     formatBlock(peony) +
     "\n\n" +
-    "🌺 Azilea · нижняя\n" +
+    `${bold("🌺 Azilea · нижняя")}\n` +
     formatBlock(azilea)
   );
 }
