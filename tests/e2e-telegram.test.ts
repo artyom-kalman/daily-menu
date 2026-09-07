@@ -421,9 +421,11 @@ describe("openrouter model", () => {
     expect(DEFAULT_MODEL).toBe("meta-llama/llama-3.3-70b-instruct:free");
   });
 
-  it("asks for a spoken form plus a name translation, not a review", () => {
-    expect(SYSTEM_PROMPT).toMatch(/чимдак, тушёная курица/);
+  it("asks for a name translation only, not a spoken prefix or a review", () => {
+    expect(SYSTEM_PROMPT).toMatch(/тушёная курица/);
+    expect(SYSTEM_PROMPT).toMatch(/Не транслитерируй хангыль/);
     expect(SYSTEM_PROMPT).toMatch(/Не перечисляй скрытые ингредиенты/);
+    expect(SYSTEM_PROMPT).not.toMatch(/сначала как это говорят/);
     expect(SYSTEM_PROMPT).not.toMatch(/максимум 2 предложения/);
     expect(SYSTEM_PROMPT).not.toMatch(/6–10 слов/);
   });
@@ -458,13 +460,13 @@ describe("formatMenuMessage", () => {
     const text = formatMenuMessage(
       {
         dishes: [
-          { name: "찜닭", description: "чимдак, тушёная курица", spiciness: 2 },
+          { name: "찜닭", description: "тушёная курица", spiciness: 2 },
           { name: "쌀밥", description: "рис", spiciness: 0 },
         ],
       },
       null,
     );
-    expect(text).toContain("Горячее\n찜닭 — чимдак, тушёная курица 🌶2");
+    expect(text).toContain("Горячее\n찜닭 — тушёная курица 🌶2");
     expect(text).toContain("Ещё\n쌀밥");
     expect(text).not.toMatch(/쌀밥 🌶/);
   });
@@ -483,26 +485,26 @@ describe("formatMenuMessage", () => {
     expect(inferCourse("찜닭")).toBe("hot");
   });
 
-  it("renders A2 spoken form + A5 tray groups", () => {
+  it("renders A dictionary gloss + A5 tray groups", () => {
     const text = formatMenuMessage(
       {
         dishes: [
-          { name: "찜닭", description: "чимдак, тушёная курица", spiciness: 2 },
+          { name: "찜닭", description: "тушёная курица", spiciness: 2 },
           { name: "쌀밥", description: "рис", spiciness: 0 },
-          { name: "미역국", description: "миёккук, суп из вакаме", spiciness: 0 },
-          { name: "생선까스", description: "касс, рыбная котлета", spiciness: 0 },
-          { name: "무생채", description: "мусэнчхэ, салат из редьки", spiciness: 2 },
+          { name: "미역국", description: "суп из вакаме", spiciness: 0 },
+          { name: "생선까스", description: "рыбная котлета", spiciness: 0 },
+          { name: "무생채", description: "салат из редьки", spiciness: 2 },
           { name: "포기김치", description: "кимчи", spiciness: 3 },
           { name: "요구르트", description: "йогурт", spiciness: 0 },
         ],
       },
       {
         dishes: [
-          { name: "잔치국수", description: "чанчи-куксу, лапша в бульоне", spiciness: 0 },
+          { name: "잔치국수", description: "лапша в бульоне", spiciness: 0 },
           { name: "추가밥", description: "добавка риса", spiciness: 0 },
-          { name: "돈육간장불고기", description: "пульгоги, свинина в соевом соусе", spiciness: 1 },
-          { name: "갈비만두찜", description: "манду, пельмени на пару", spiciness: 0 },
-          { name: "콩나물맛살냉채", description: "нэнчхэ, холодный салат из проростков", spiciness: 0 },
+          { name: "돈육간장불고기", description: "свинина в соевом соусе", spiciness: 1 },
+          { name: "갈비만두찜", description: "пельмени на пару", spiciness: 0 },
+          { name: "콩나물맛살냉채", description: "холодный салат из проростков", spiciness: 0 },
           { name: "포기김치", description: "кимчи", spiciness: 3 },
           { name: "요구르트", description: "йогурт", spiciness: 0 },
         ],
@@ -514,22 +516,22 @@ describe("formatMenuMessage", () => {
         "",
         "🌸 Peony · верхняя",
         "Горячее",
-        "찜닭 — чимдак, тушёная курица 🌶2",
-        "생선까스 — касс, рыбная котлета",
+        "찜닭 — тушёная курица 🌶2",
+        "생선까스 — рыбная котлета",
         "Суп",
-        "미역국 — миёккук, суп из вакаме",
+        "미역국 — суп из вакаме",
         "Салат",
-        "무생채 — мусэнчхэ, салат из редьки 🌶2",
+        "무생채 — салат из редьки 🌶2",
         "Ещё",
         "쌀밥 · 포기김치 🌶3 · 요구르트",
         "",
         "🌺 Azilea · нижняя",
         "Горячее",
-        "잔치국수 — чанчи-куксу, лапша в бульоне",
-        "돈육간장불고기 — пульгоги, свинина в соевом соусе 🌶1",
-        "갈비만두찜 — манду, пельмени на пару",
+        "잔치국수 — лапша в бульоне",
+        "돈육간장불고기 — свинина в соевом соусе 🌶1",
+        "갈비만두찜 — пельмени на пару",
         "Салат",
-        "콩나물맛살냉채 — нэнчхэ, холодный салат из проростков",
+        "콩나물맛살냉채 — холодный салат из проростков",
         "Ещё",
         "추가밥 · 포기김치 🌶3 · 요구르트",
       ].join("\n"),
