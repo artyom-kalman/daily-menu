@@ -16,11 +16,15 @@ const COURSE_HEADING: Record<Course, string> = {
 
 type MenuLike = { dishes: Dish[] } | null;
 
-/** Chili marks for 1–5. 0 is omitted. */
+/**
+ * Compact chili for 1–5 (` 🌶3`). 0 is omitted.
+ * One pepper + a digit keeps the same visual weight at every level,
+ * so repeated 🌶🌶🌶🌶 doesn't split Hangul from Russian.
+ */
 export function formatSpiciness(n: number): string {
   const level = Math.max(0, Math.min(5, Math.round(n)));
   if (level === 0) return "";
-  return " " + "🌶".repeat(level);
+  return ` 🌶${level}`;
 }
 
 /**
@@ -40,7 +44,8 @@ export function inferCourse(name: string): Course {
 function formatMainLine(dish: Dish): string {
   const spice = formatSpiciness(dish.spiciness);
   const desc = dish.description.trim();
-  return desc ? `${dish.name}${spice} — ${desc}` : `${dish.name}${spice}`;
+  if (desc) return `${dish.name} — ${desc}${spice}`;
+  return `${dish.name}${spice}`;
 }
 
 function formatSideItem(dish: Dish): string {

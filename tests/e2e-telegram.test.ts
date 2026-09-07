@@ -430,13 +430,13 @@ describe("openrouter model", () => {
 });
 
 describe("formatMenuMessage", () => {
-  it("omits chili at 0 and repeats it for 1–5", () => {
+  it("omits chili at 0 and prints one pepper plus the level", () => {
     expect(formatSpiciness(0)).toBe("");
-    expect(formatSpiciness(3)).toBe(" 🌶🌶🌶");
-    expect(formatSpiciness(5)).toBe(" 🌶🌶🌶🌶🌶");
+    expect(formatSpiciness(3)).toBe(" 🌶3");
+    expect(formatSpiciness(5)).toBe(" 🌶5");
   });
 
-  it("groups a soup under Суп and keeps chili after Hangul", () => {
+  it("groups a soup under Суп and keeps chili at the end of the line", () => {
     const text = formatMenuMessage(
       {
         dishes: [
@@ -448,7 +448,7 @@ describe("formatMenuMessage", () => {
     expect(text).toContain("🍽️ Сегодня");
     expect(text).toContain("Peony · верхняя");
     expect(text).toContain("Azilea · нижняя");
-    expect(text).toContain("Суп\n김치찌개 🌶🌶🌶 — острый суп");
+    expect(text).toContain("Суп\n김치찌개 — острый суп 🌶3");
     expect(text).toContain(NO_MENU_INFO);
     expect(text).not.toContain("1)");
     expect(text).not.toContain("выходной");
@@ -464,7 +464,7 @@ describe("formatMenuMessage", () => {
       },
       null,
     );
-    expect(text).toContain("Горячее\n찜닭 🌶🌶 — чимдак, тушёная курица");
+    expect(text).toContain("Горячее\n찜닭 — чимдак, тушёная курица 🌶2");
     expect(text).toContain("Ещё\n쌀밥");
     expect(text).not.toMatch(/쌀밥 🌶/);
   });
@@ -514,24 +514,24 @@ describe("formatMenuMessage", () => {
         "",
         "🌸 Peony · верхняя",
         "Горячее",
-        "찜닭 🌶🌶 — чимдак, тушёная курица",
+        "찜닭 — чимдак, тушёная курица 🌶2",
         "생선까스 — касс, рыбная котлета",
         "Суп",
         "미역국 — миёккук, суп из вакаме",
         "Салат",
-        "무생채 🌶🌶 — мусэнчхэ, салат из редьки",
+        "무생채 — мусэнчхэ, салат из редьки 🌶2",
         "Ещё",
-        "쌀밥 · 포기김치 🌶🌶🌶 · 요구르트",
+        "쌀밥 · 포기김치 🌶3 · 요구르트",
         "",
         "🌺 Azilea · нижняя",
         "Горячее",
         "잔치국수 — чанчи-куксу, лапша в бульоне",
-        "돈육간장불고기 🌶 — пульгоги, свинина в соевом соусе",
+        "돈육간장불고기 — пульгоги, свинина в соевом соусе 🌶1",
         "갈비만두찜 — манду, пельмени на пару",
         "Салат",
         "콩나물맛살냉채 — нэнчхэ, холодный салат из проростков",
         "Ещё",
-        "추가밥 · 포기김치 🌶🌶🌶 · 요구르트",
+        "추가밥 · 포기김치 🌶3 · 요구르트",
       ].join("\n"),
     );
   });
@@ -830,7 +830,7 @@ describe("telegram button e2e", () => {
       expect(calls[0].body.callback_query_id).toBe("cb-1");
       const menuText = String(calls[1].body.text);
       expect(menuText).toBe(formatMenuMessage(menus.peony, menus.azilea));
-      expect(menuText).toContain("비빔밥 🌶 — рис с овощами");
+      expect(menuText).toContain("비빔밥 — рис с овощами 🌶1");
       expect(menuText).toContain("된장찌개 — соевый суп");
       expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard());
       expect(tracked).toEqual([EVENT_START, EVENT_TODAY_MENU]);
