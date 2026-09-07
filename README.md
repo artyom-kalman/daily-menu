@@ -41,7 +41,7 @@ tests/
 ## Bot UX
 
 1. User sends any message (e.g. `/start`) → bot replies with one inline button.
-2. User taps **Сегодняшнее меню** → Peony + Azilea grouped by tray slot (горячее / суп / салат / ещё). Telegram HTML: bold names, italic gloss and section labels, compact chili. Staples bunch on one line. The same button stays on the menu.
+2. User taps **Сегодняшнее меню** → Peony + Azilea grouped by tray slot (горячее / суп / салат / ещё). No extra «Сегодня» line. Telegram HTML: bold names, italic gloss and section labels, compact chili. Staples bunch on one line. The same button stays on the menu.
 
 ## Config
 

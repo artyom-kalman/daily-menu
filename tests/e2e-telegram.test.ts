@@ -448,7 +448,7 @@ describe("formatMenuMessage", () => {
       },
       { dishes: [] },
     );
-    expect(text).toContain("🍽️ Сегодня");
+    expect(text).not.toContain("Сегодня");
     expect(text).toContain("Peony · верхняя");
     expect(text).toContain("Azilea · нижняя");
     expect(text).toContain("<i>Суп</i>\n<b>김치찌개</b> — <i>острый суп</i> 🌶3");
@@ -513,8 +513,6 @@ describe("formatMenuMessage", () => {
     );
     expect(text).toBe(
       [
-        "<b>🍽️ Сегодня</b>",
-        "",
         "<b>🌸 Peony · верхняя</b>",
         "<i>Горячее</i>",
         "<b>찜닭</b> — <i>тушёная курица</i> 🌶2",

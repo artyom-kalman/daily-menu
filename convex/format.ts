@@ -103,7 +103,6 @@ function formatBlock(menu: MenuLike): string {
 
 export function formatMenuMessage(peony: MenuLike, azilea: MenuLike): string {
   return (
-    `${bold("🍽️ Сегодня")}\n\n` +
     `${bold("🌸 Peony · верхняя")}\n` +
     formatBlock(peony) +
     "\n\n" +
