@@ -43,11 +43,12 @@ export function formatSpiciness(n: number): string {
 /**
  * Tray slot from the Hangul name. No schema field.
  * 국수 is a main (hot), not soup. 비빔밥 is a main, not a rice side.
+ * 단무지 / 요플레 are tray staples, not mains.
  */
 export function inferCourse(name: string): Course {
   const n = name.replace(/\s/g, "");
-  if (/(요구르트|요거트|후식)$/.test(n)) return "side";
-  if (/(김치|깍두기)$/.test(n)) return "side";
+  if (/(요구르트|요거트|요플레|후식)$/.test(n)) return "side";
+  if (/(김치|깍두기|단무지|피클)$/.test(n)) return "side";
   if (/^(쌀밥|추가밥|공기밥|흰밥|밥)$/.test(n)) return "side";
   if (/(생채|냉채|나물|무침)$/.test(n)) return "salad";
   if (/(찌개|탕)$/.test(n) || /국$/.test(n)) return "soup";

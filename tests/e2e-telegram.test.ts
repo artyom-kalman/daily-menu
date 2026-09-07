@@ -481,9 +481,40 @@ describe("formatMenuMessage", () => {
     expect(inferCourse("추가밥")).toBe("side");
     expect(inferCourse("포기김치")).toBe("side");
     expect(inferCourse("요구르트")).toBe("side");
+    expect(inferCourse("딸기요플레")).toBe("side");
+    expect(inferCourse("단무지")).toBe("side");
+    expect(inferCourse("피클")).toBe("side");
     expect(inferCourse("무생채")).toBe("salad");
     expect(inferCourse("콩나물맛살냉채")).toBe("salad");
     expect(inferCourse("찜닭")).toBe("hot");
+  });
+
+  it("bunches pickles and yoplait with staples, not under Горячее", () => {
+    const text = formatMenuMessage(
+      null,
+      {
+        dishes: [
+          { name: "순살찜닭덮밥", description: "рис с тушёной курицей", spiciness: 2 },
+          { name: "버터갈릭감자튀김", description: "картофель фри с чесноком", spiciness: 0 },
+          { name: "단무지", description: "маринованная редька", spiciness: 0 },
+          { name: "딸기요플레", description: "клубничный йогурт", spiciness: 0 },
+          { name: "경상도식소고기무국", description: "говяжий суп с редькой", spiciness: 0 },
+          { name: "쫄면무침", description: "острая холодная лапша", spiciness: 4 },
+          { name: "포기김치", description: "кимчи", spiciness: 3 },
+        ],
+      },
+    );
+    expect(text).toContain(
+      "<i>Горячее</i>\n<b>순살찜닭덮밥</b> — <i>рис с тушёной курицей</i> 🌶2\n<b>버터갈릭감자튀김</b> — <i>картофель фри с чесноком</i>",
+    );
+    expect(text).toContain("<i>Суп</i>\n<b>경상도식소고기무국</b>");
+    expect(text).toContain("<i>Салат</i>\n<b>쫄면무침</b>");
+    const hot = text.split("<i>Суп</i>")[0];
+    expect(hot).not.toContain("단무지");
+    expect(hot).not.toContain("요플레");
+    expect(text).toContain(
+      "<i>Ещё</i>\n<b>단무지</b> · <b>딸기요플레</b> · <b>포기김치</b> 🌶3",
+    );
   });
 
   it("renders A dictionary gloss + A5 tray groups", () => {
