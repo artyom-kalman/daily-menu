@@ -320,6 +320,14 @@ export const scrapeAndEnrich = internalAction({
   },
 });
 
+async function pushMorningMenu(runPush: () => Promise<unknown>): Promise<void> {
+  try {
+    await runPush();
+  } catch (err) {
+    console.error(`morning push failed: ${(err as Error).message}`);
+  }
+}
+
 export const fetchAllForToday = internalAction({
   args: { retryCount: v.optional(v.number()) },
   handler: async (ctx, { retryCount }): Promise<void> => {
@@ -356,6 +364,9 @@ export const fetchAllForToday = internalAction({
 
     if (missing.length === 0) {
       console.log("All menus already present for today");
+      await pushMorningMenu(() =>
+        ctx.runAction(internal.morningPush.pushIfReady, {}),
+      );
       return;
     }
 
@@ -375,6 +386,10 @@ export const fetchAllForToday = internalAction({
       });
       if (needsCronRetry(existing)) stillIncomplete = true;
     }
+
+    await pushMorningMenu(() =>
+      ctx.runAction(internal.morningPush.pushIfReady, {}),
+    );
 
     if (!anyError && !stillIncomplete) return;
 

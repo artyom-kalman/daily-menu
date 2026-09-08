@@ -8,6 +8,13 @@ export type SendMessageOptions = {
   reply_markup?: InlineKeyboardMarkup;
 };
 
+export type TelegramCallResult = {
+  ok: boolean;
+  status?: number;
+  description?: string;
+  blocked?: boolean;
+};
+
 function telegramApiBase(): string {
   return process.env.TELEGRAM_API_BASE || "https://api.telegram.org";
 }
@@ -16,14 +23,25 @@ function botToken(): string | undefined {
   return process.env.TELEGRAM_BOT_TOKEN;
 }
 
+/** Drop the subscriber: blocked, kicked, deactivated, or chat gone. */
+export function isBlockedTelegramError(
+  status: number,
+  description: string,
+): boolean {
+  if (status === 403) return true;
+  return /blocked by the user|chat not found|user is deactivated|bot was kicked/i.test(
+    description,
+  );
+}
+
 async function callTelegram(
   method: string,
   body: Record<string, unknown>,
-): Promise<boolean> {
+): Promise<TelegramCallResult> {
   const token = botToken();
   if (!token) {
     console.warn(`TELEGRAM_BOT_TOKEN not set; skipping ${method}`);
-    return false;
+    return { ok: false, description: "TELEGRAM_BOT_TOKEN not set" };
   }
   try {
     const res = await fetch(`${telegramApiBase()}/bot${token}/${method}`, {
@@ -31,15 +49,36 @@ async function callTelegram(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      console.warn(`Telegram ${method} HTTP ${res.status}: ${text.slice(0, 500)}`);
-      return false;
+    const text = await res.text().catch(() => "");
+    let parsed: { ok?: boolean; error_code?: number; description?: string } | null =
+      null;
+    try {
+      parsed = text ? (JSON.parse(text) as {
+        ok?: boolean;
+        error_code?: number;
+        description?: string;
+      }) : null;
+    } catch {
+      parsed = null;
     }
-    return true;
+    const description = parsed?.description ?? text.slice(0, 500);
+    const status = parsed?.error_code ?? res.status;
+    const ok = res.ok && parsed?.ok !== false;
+    if (!ok) {
+      console.warn(
+        `Telegram ${method} HTTP ${res.status}: ${description.slice(0, 500)}`,
+      );
+      return {
+        ok: false,
+        status,
+        description,
+        blocked: isBlockedTelegramError(status, description),
+      };
+    }
+    return { ok: true, status: res.status };
   } catch (err) {
     console.warn(`Telegram ${method} failed: ${(err as Error).message}`);
-    return false;
+    return { ok: false, description: (err as Error).message };
   }
 }
 
@@ -48,6 +87,15 @@ export async function sendMessage(
   text: string,
   options: SendMessageOptions = {},
 ): Promise<boolean> {
+  const result = await sendMessageResult(chatId, text, options);
+  return result.ok;
+}
+
+export async function sendMessageResult(
+  chatId: number | string,
+  text: string,
+  options: SendMessageOptions = {},
+): Promise<TelegramCallResult> {
   return callTelegram("sendMessage", {
     chat_id: chatId,
     text,
@@ -63,10 +111,11 @@ export async function answerCallbackQuery(
   callbackQueryId: string,
   text?: string,
 ): Promise<boolean> {
-  return callTelegram("answerCallbackQuery", {
+  const result = await callTelegram("answerCallbackQuery", {
     callback_query_id: callbackQueryId,
     ...(text ? { text } : {}),
   });
+  return result.ok;
 }
 
 export async function sendAdminAlert(text: string): Promise<void> {

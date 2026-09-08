@@ -2,7 +2,7 @@
 
 Convex backend that scrapes two Korean university cafeteria menus (Peony / Azilea),
 enriches each dish with a Russian description and spiciness rating via OpenRouter,
-and serves them through a Telegram bot with **one button**: «Сегодняшнее меню».
+and serves them through a Telegram bot: «Сегодняшнее меню» plus an opt-in morning push.
 
 ## Stack
 
@@ -16,16 +16,19 @@ and serves them through a Telegram bot with **one button**: «Сегодняшн
 
 ```
 convex/
-  schema.ts            tables: appConfig, menus, fetchAttempts, telegramUpdates
+  schema.ts            tables: appConfig, menus, fetchAttempts, telegramUpdates, subscribers
   appConfig.ts         singleton peonyUrl / azileaUrl
   crons.ts             daily 09:00 KST fetch; 00:00 KST prune
   prune.ts             delete menus / fetchAttempts older than 30 days
   prunePolicy.ts       retention cutoff (testable)
+  morningPush.ts       fan-out to opted-in chats after a ready fetch
+  morningPushPolicy.ts weekday / complete-tray gate (testable)
+  subscribers.ts       opt-in rows; delete on unsubscribe
   http.ts              /telegram/webhook
   telegram.ts          webhook httpAction + setWebhook / getWebhookInfo
   telegramWebhook.ts   CONVEX_SITE_URL → Telegram setWebhook (testable)
   webhookAuth.ts       required TELEGRAM_WEBHOOK_SECRET check
-  telegramHandlers.ts  one-button + admin-command bot logic (testable)
+  telegramHandlers.ts  buttons + admin-command bot logic (testable)
   analytics.ts         Aptabase events (testable; no-op without key)
   telegramClient.ts    Telegram API client (TELEGRAM_API_BASE overridable)
   menus.ts             scrape / enrich / seed
@@ -40,8 +43,9 @@ tests/
 
 ## Bot UX
 
-1. User sends any message (e.g. `/start`) → bot replies with one inline button.
-2. User taps **Сегодняшнее меню** → Peony + Azilea grouped by tray slot (горячее / суп / салат / ещё). No extra «Сегодня» line. Telegram HTML: bold names, italic gloss and section labels, compact chili. Staples bunch on one line. The same button stays on the menu.
+1. User sends any message (e.g. `/start`) → bot replies with **Сегодняшнее меню** and **Присылать утром**.
+2. User taps **Сегодняшнее меню** → Peony + Azilea grouped by tray slot (горячее / суп / салат / ещё). No extra «Сегодня» line. Telegram HTML: bold names, italic gloss and section labels, compact chili. Staples bunch on one line. Both buttons stay on the menu.
+3. **Присылать утром** stores that `chatId` in Convex. After a weekday scrape with at least one complete live tray, opted-in chats get the same menu once. **Отписаться** deletes the row (stops the next day). No student commands; no weekly reminder.
 
 `ADMIN_CHAT_ID` can also use English admin commands (anyone else who types them still gets the button):
 
@@ -183,5 +187,6 @@ npx convex run menus:seedToday '{"peonyDishes":[{"name":"Test","description":"x"
 - Retries every **30 minutes** until a **complete** menu is found or **12:30 KST**. Fewer than **5** dishes (e.g. Azilea 오므라이스, or `잔치국수` + `추가밥`) is shown but not treated as ready — fetching continues. A closed/holiday notice is still final as one line. If the page is still empty at 12:30, the bot shows «Нет информации» (not a holiday).
 - If the cafeteria posts a closed/holiday notice as a menu item, that text is shown as-is and fetching stops.
 - Tapping **Сегодняшнее меню** re-fetches when there is still no complete live menu (empty, stub, or `no_info`).
-- **00:00 KST (15:00 UTC)** — prune `menus` and `fetchAttempts` older than **30 days**. Today’s rows are never deleted. Run `npx convex run prune:pruneOldData` to drain a backlog manually.
+- After a weekday fetch with at least one complete live tray, opted-in chats get that menu once (`subscribers.lastPushedDate`). Weekends, both-closed / `no_info` days, and stub trays are skipped. A failed send does not stop the rest of the batch; a blocked chat is dropped.
+- **00:00 KST (15:00 UTC)** — prune `menus` and `fetchAttempts` older than **30 days**. Today’s rows are never deleted. Subscriber rows are not pruned; they are deleted on unsubscribe. Run `npx convex run prune:pruneOldData` to drain a backlog manually.
 - Fetch errors retry until **12:30 KST**, then alert `ADMIN_CHAT_ID`.

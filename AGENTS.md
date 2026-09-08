@@ -17,8 +17,9 @@ Read open issues and the [project page](https://app.notion.com/p/3d1252aaf7ec812
 - `TELEGRAM_WEBHOOK_SECRET` is required; the webhook 401s if it is missing or wrong
 - Separate Telegram bots for Convex **dev** and **prod** (one bot = one webhook). Register with `npx convex run telegram:setWebhook` (uses `CONVEX_SITE_URL`; do not paste URLs). `npx convex dev` does not change Telegram webhooks.
 - Secrets in Convex env; cafeteria URLs in `appConfig` singleton (`key: "default"`)
-- Telegram UX: one inline button (`today_menu`) for today's menu
-- Admin commands (`/status`, `/refetch`, `/stats`) only for `ADMIN_CHAT_ID`; everyone else gets the button. `/stats` sends `APTABASE_DASHBOARD_URL`
+- Telegram UX: two inline buttons — `today_menu` and morning `Присылать утром` / `Отписаться`. No student commands.
+- Admin commands (`/status`, `/refetch`, `/stats`) only for `ADMIN_CHAT_ID`; everyone else gets the buttons. `/stats` sends `APTABASE_DASHBOARD_URL`
 - Keep bot logic in `telegramHandlers.ts` so E2E can run without a live deploy
-- Prune `menus` and `fetchAttempts` older than 30 days at 00:00 KST; never delete today's rows
+- Prune `menus` and `fetchAttempts` older than 30 days at 00:00 KST; never delete today's rows. `subscribers` are dropped only on unsubscribe.
+- Morning push: after a weekday cron fetch with at least one complete live tray (not a stub or closed notice). One message per opted-in chat. Store `chatId` in Convex only; never send it to Aptabase.
 - Product events go to Aptabase (`start`, `today_menu`, `scrape_ok` / `scrape_empty` / `scrape_error`). Optional `APTABASE_APP_KEY`; no-op if unset. Do not send `chatId` or menu text. Convex **dev** (`enchanted-goshawk-667`) uses Aptabase Debug; prod uses Release.

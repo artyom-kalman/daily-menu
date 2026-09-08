@@ -122,6 +122,14 @@ export const handleWebhook = httpAction(async (ctx, request) => {
     },
     claimUpdateId: async (updateId) =>
       ctx.runMutation(internal.telegram.claimUpdate, { updateId }),
+    isSubscribed: async (chatId) =>
+      ctx.runQuery(internal.subscribers.isSubscribed, { chatId }),
+    subscribe: async (chatId) => {
+      await ctx.runMutation(internal.subscribers.subscribe, { chatId });
+    },
+    unsubscribe: async (chatId) => {
+      await ctx.runMutation(internal.subscribers.unsubscribe, { chatId });
+    },
   });
 
   return new Response("ok", { status: 200 });

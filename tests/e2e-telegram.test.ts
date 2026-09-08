@@ -12,15 +12,8 @@ import {
 } from "../convex/format";
 import { looksLikeCafeteriaNotice } from "../convex/notices";
 import { DEFAULT_MODEL, SYSTEM_PROMPT } from "../convex/openrouter";
-import {
-  isCompleteLiveMenu,
-  isFreshForServing,
-  MIN_READY_DISH_COUNT,
-  needsCronRetry,
-  nextRetryDelayMs,
-  sameDishNames,
-} from "../convex/refreshPolicy";
-import { addCalendarDays, formatKstClock } from "../convex/dates";
+import { shouldSendMorningPush, isPushableFoodMenu } from "../convex/morningPushPolicy";
+import { addCalendarDays, formatKstClock, isKstWeekend, weekdayFromYmd } from "../convex/dates";
 import { scrapeCafeteriasSafely } from "../convex/scrapeAll";
 import {
   PRUNE_HOUR_UTC,
@@ -47,14 +40,29 @@ import {
   scrapeEventForStatus,
   trackAptabaseEvent,
 } from "../convex/analytics";
+import {
+  isCompleteLiveMenu,
+  isFreshForServing,
+  MIN_READY_DISH_COUNT,
+  needsCronRetry,
+  nextRetryDelayMs,
+  sameDishNames,
+} from "../convex/refreshPolicy";
 import { parseMenuHtml, targetWeekdayIndex } from "../convex/scraper";
 import { isAuthorizedWebhook } from "../convex/webhookAuth";
 import {
   REFETCHING_MESSAGE,
   START_PROMPT,
   STATS_UNSET_MESSAGE,
+  SUBSCRIBE_BUTTON_LABEL,
+  SUBSCRIBE_CALLBACK,
+  SUBSCRIBED_MESSAGE,
+  UNSUBSCRIBE_BUTTON_LABEL,
+  UNSUBSCRIBE_CALLBACK,
+  UNSUBSCRIBED_MESSAGE,
   TODAY_MENU_BUTTON_LABEL,
   TODAY_MENU_CALLBACK,
+  deliverMorningPushes,
   formatAdminStatus,
   formatRefetchSummary,
   isAdminChat,
@@ -65,7 +73,9 @@ import {
 } from "../convex/telegramHandlers";
 import {
   answerCallbackQuery,
+  isBlockedTelegramError,
   sendMessage,
+  sendMessageResult,
 } from "../convex/telegramClient";
 import {
   fetchTelegramWebhookInfo,
@@ -944,7 +954,7 @@ describe("admin command helpers", () => {
 });
 
 describe("telegram button e2e", () => {
-  it("message shows one button; callback returns today's menu via Telegram API", async () => {
+  it("message shows today + subscribe buttons; callback returns today's menu via Telegram API", async () => {
     await withMockTelegram(async (calls) => {
       const menus = {
         peony: {
@@ -985,6 +995,12 @@ describe("telegram button e2e", () => {
       );
       expect(JSON.stringify(calls[0].body.reply_markup)).toContain(
         TODAY_MENU_BUTTON_LABEL,
+      );
+      expect(JSON.stringify(calls[0].body.reply_markup)).toContain(
+        SUBSCRIBE_BUTTON_LABEL,
+      );
+      expect(JSON.stringify(calls[0].body.reply_markup)).toContain(
+        SUBSCRIBE_CALLBACK,
       );
 
       calls.length = 0;
@@ -1273,5 +1289,219 @@ describe("telegram button e2e", () => {
       expect(calls).toHaveLength(1);
       expect(calls[0].method).toBe("sendMessage");
     });
+  });
+
+  it("opts in and out via the morning buttons; unsubscribe removes the next-day push", async () => {
+    const chats = new Set<number>();
+    const deps = {
+      getTodayMenus: async () => ({ peony: null, azilea: null }),
+      sendMessage,
+      answerCallbackQuery,
+      isSubscribed: async (chatId: number) => chats.has(chatId),
+      subscribe: async (chatId: number) => {
+        chats.add(chatId);
+      },
+      unsubscribe: async (chatId: number) => {
+        chats.delete(chatId);
+      },
+    };
+
+    await withMockTelegram(async (calls) => {
+      await processTelegramUpdate(
+        {
+          callback_query: {
+            id: "cb-sub",
+            data: SUBSCRIBE_CALLBACK,
+            message: { chat: { id: 42 } },
+          },
+        },
+        deps,
+      );
+      expect(chats.has(42)).toBe(true);
+      expect(calls[1].body.text).toBe(SUBSCRIBED_MESSAGE);
+      expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard(true));
+      expect(JSON.stringify(calls[1].body.reply_markup)).toContain(
+        UNSUBSCRIBE_BUTTON_LABEL,
+      );
+      expect(JSON.stringify(calls[1].body.reply_markup)).toContain(
+        UNSUBSCRIBE_CALLBACK,
+      );
+
+      calls.length = 0;
+      await processTelegramUpdate(
+        { message: { chat: { id: 42 }, text: "hi" } },
+        deps,
+      );
+      expect(calls[0].body.reply_markup).toEqual(todayMenuKeyboard(true));
+
+      calls.length = 0;
+      await processTelegramUpdate(
+        {
+          callback_query: {
+            id: "cb-unsub",
+            data: UNSUBSCRIBE_CALLBACK,
+            message: { chat: { id: 42 } },
+          },
+        },
+        deps,
+      );
+      expect(chats.has(42)).toBe(false);
+      expect(calls[1].body.text).toBe(UNSUBSCRIBED_MESSAGE);
+      expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard(false));
+    });
+  });
+});
+
+describe("morning push", () => {
+  const tray = {
+    source: "live" as const,
+    dishes: [
+      { name: "눈꽃치즈닭갈비덮밥" },
+      { name: "미역국" },
+      { name: "피자고로케&케찹" },
+      { name: "어묵채볶음" },
+      { name: "숙주나물" },
+    ],
+    fetchedAt: 1,
+  };
+  const stub = {
+    source: "live" as const,
+    dishes: [{ name: "오므라이스" }],
+    fetchedAt: 1,
+  };
+  const notice = {
+    source: "live" as const,
+    dishes: [{ name: "추석 연휴 휴무" }],
+    fetchedAt: 1,
+  };
+  const noInfo = {
+    source: "no_info" as const,
+    dishes: [],
+    fetchedAt: 1,
+  };
+  const monday = "2026-09-07";
+  const saturday = "2026-09-05";
+
+  it("maps KST calendar dates to weekdays", () => {
+    expect(weekdayFromYmd(saturday)).toBe(6);
+    expect(weekdayFromYmd("2026-09-06")).toBe(0);
+    expect(weekdayFromYmd(monday)).toBe(1);
+    expect(isKstWeekend(saturday)).toBe(true);
+    expect(isKstWeekend(monday)).toBe(false);
+  });
+
+  it("pushes only a complete live tray on weekdays", () => {
+    expect(isPushableFoodMenu(tray)).toBe(true);
+    expect(isPushableFoodMenu(stub)).toBe(false);
+    expect(isPushableFoodMenu(notice)).toBe(false);
+    expect(isPushableFoodMenu(noInfo)).toBe(false);
+    expect(
+      shouldSendMorningPush({ today: monday, peony: tray, azilea: stub }),
+    ).toBe(true);
+    expect(
+      shouldSendMorningPush({ today: monday, peony: tray, azilea: notice }),
+    ).toBe(true);
+    expect(
+      shouldSendMorningPush({ today: monday, peony: notice, azilea: noInfo }),
+    ).toBe(false);
+    expect(
+      shouldSendMorningPush({ today: monday, peony: stub, azilea: stub }),
+    ).toBe(false);
+    expect(
+      shouldSendMorningPush({ today: saturday, peony: tray, azilea: tray }),
+    ).toBe(false);
+  });
+
+  it("sends one menu per opted-in chat and keeps going after a failed send", async () => {
+    const sent: number[] = [];
+    const dropped: number[] = [];
+    const marked: number[] = [];
+    const summary = await deliverMorningPushes({
+      today: monday,
+      peony: tray,
+      azilea: noInfo,
+      menuText: "menu",
+      subscribers: [
+        { chatId: 1 },
+        { chatId: 2, lastPushedDate: monday },
+        { chatId: 3 },
+        { chatId: 4 },
+      ],
+      send: async (chatId) => {
+        sent.push(chatId);
+        if (chatId === 1) return { ok: false, blocked: true };
+        if (chatId === 3) return { ok: false };
+        return { ok: true };
+      },
+      markPushed: async (chatId) => {
+        marked.push(chatId);
+      },
+      dropSubscriber: async (chatId) => {
+        dropped.push(chatId);
+      },
+    });
+    expect(sent).toEqual([1, 3, 4]);
+    expect(dropped).toEqual([1]);
+    expect(marked).toEqual([4]);
+    expect(summary).toEqual({ sent: 1, failed: 1, skipped: 1, dropped: 1 });
+  });
+
+  it("does not send on a closed day even if chats are opted in", async () => {
+    const send = vi.fn(async () => ({ ok: true }));
+    const summary = await deliverMorningPushes({
+      today: monday,
+      peony: notice,
+      azilea: noInfo,
+      menuText: "closed",
+      subscribers: [{ chatId: 1 }],
+      send,
+      markPushed: async () => undefined,
+      dropSubscriber: async () => undefined,
+    });
+    expect(send).not.toHaveBeenCalled();
+    expect(summary.sent).toBe(0);
+  });
+
+  it("treats Telegram 403 / blocked copy as a dropped chat", () => {
+    expect(isBlockedTelegramError(403, "Forbidden: bot was blocked by the user")).toBe(
+      true,
+    );
+    expect(isBlockedTelegramError(400, "Bad Request: chat not found")).toBe(true);
+    expect(isBlockedTelegramError(400, "Bad Request: message is too long")).toBe(
+      false,
+    );
+  });
+
+  it("parses Telegram ok:false 403 from a 200 HTTP body", async () => {
+    await withMockTelegram(
+      async () => {
+        const result = await sendMessageResult(99, "menu");
+        expect(result.ok).toBe(false);
+        expect(result.blocked).toBe(true);
+        expect(result.status).toBe(403);
+      },
+      {
+        respond: () => ({
+          status: 200,
+          body: {
+            ok: false,
+            error_code: 403,
+            description: "Forbidden: bot was blocked by the user",
+          },
+        }),
+      },
+    );
+  });
+
+  it("hooks morning push from the fetch cron action", () => {
+    const menus = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "../convex/menus.ts"),
+      "utf8",
+    );
+    expect(menus).toMatch(/internal\.morningPush\.pushIfReady/);
+    expect(todayMenuKeyboard(false).inline_keyboard).toHaveLength(2);
+    expect(todayMenuKeyboard(true).inline_keyboard[1][0].text).toBe(
+      UNSUBSCRIBE_BUTTON_LABEL,
+    );
   });
 });
