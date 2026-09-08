@@ -433,7 +433,7 @@ export const refetchToday = internalAction({
   },
 });
 
-/** Re-scrape when the live row is still empty or only a one-dish stub. */
+/** Re-scrape when the live row is still empty or under MIN_READY_DISH_COUNT dishes. */
 export const refreshStaleForToday = internalAction({
   args: {},
   handler: async (ctx): Promise<void> => {

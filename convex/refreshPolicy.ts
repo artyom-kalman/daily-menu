@@ -6,8 +6,8 @@ export const CUTOFF_HOUR = 12;
 export const CUTOFF_MINUTE = 30;
 export const RETRY_DELAY_MS = 30 * 60 * 1000;
 
-/** A single food item is a stub (Azilea 오므라이스). Two is a real short tray. */
-export const MIN_READY_DISH_COUNT = 2;
+/** Typical tray is 6–8 items. Fewer than 5 is still a stub (오므라이스, or 잔치국수+추가밥). */
+export const MIN_READY_DISH_COUNT = 5;
 
 export type MenuSource = "live" | "fallback" | "holiday" | "no_info";
 
@@ -60,7 +60,7 @@ export function nextRetryDelayMs(hour: number, minute: number): number | null {
 }
 
 /**
- * A posted closed notice is final even as one line. One real dish is not —
+ * A posted closed notice is final even as one line. A short food list is not —
  * KBU often stubs a main first and fills the tray later.
  */
 export function isCompleteLiveMenu(existing: StoredMenuLike): boolean {

@@ -209,22 +209,47 @@ describe("refreshPolicy", () => {
     dishes: [{ name: "잔치국수" }, { name: "추가밥" }],
     fetchedAt: 1_000,
   };
+  const fourDishes = {
+    source: "live" as const,
+    dishes: [
+      { name: "오므라이스" },
+      { name: "쌀밥" },
+      { name: "포기김치" },
+      { name: "요구르트" },
+    ],
+    fetchedAt: 1_000,
+  };
+  const tray = {
+    source: "live" as const,
+    dishes: [
+      { name: "눈꽃치즈닭갈비덮밥" },
+      { name: "미역국" },
+      { name: "피자고로케&케찹" },
+      { name: "어묵채볶음" },
+      { name: "숙주나물" },
+    ],
+    fetchedAt: 1_000,
+  };
 
   it("retries empty/no_info until a complete live menu exists", () => {
-    expect(MIN_READY_DISH_COUNT).toBe(2);
+    expect(MIN_READY_DISH_COUNT).toBe(5);
     expect(needsCronRetry(noInfo)).toBe(true);
     expect(needsCronRetry(null)).toBe(true);
     expect(needsCronRetry(stub)).toBe(true);
+    expect(needsCronRetry(shortTray)).toBe(true);
+    expect(needsCronRetry(fourDishes)).toBe(true);
     expect(needsCronRetry(notice)).toBe(false);
-    expect(needsCronRetry(shortTray)).toBe(false);
+    expect(needsCronRetry(tray)).toBe(false);
   });
 
-  it("treats a one-dish stub as not ready and a notice or tray as fresh", () => {
+  it("treats a short stub as not ready and a notice or 5-dish tray as fresh", () => {
     expect(isCompleteLiveMenu(stub)).toBe(false);
+    expect(isCompleteLiveMenu(fourDishes)).toBe(false);
     expect(isFreshForServing(noInfo)).toBe(false);
     expect(isFreshForServing(stub)).toBe(false);
+    expect(isFreshForServing(shortTray)).toBe(false);
     expect(isFreshForServing(notice)).toBe(true);
-    expect(isFreshForServing(shortTray)).toBe(true);
+    expect(isFreshForServing(tray)).toBe(true);
   });
 
   it("schedules 30 min retries from 09:00 through 12:30 KST", () => {
