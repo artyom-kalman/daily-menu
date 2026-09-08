@@ -433,7 +433,7 @@ export const refetchToday = internalAction({
   },
 });
 
-/** Re-scrape when the live row is still empty or under MIN_READY_DISH_COUNT dishes. */
+/** Re-scrape when no complete live menu exists; closed or holiday notices are final. */
 export const refreshStaleForToday = internalAction({
   args: {},
   handler: async (ctx): Promise<void> => {
