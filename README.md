@@ -180,8 +180,8 @@ npx convex run menus:seedToday '{"peonyDishes":[{"name":"Test","description":"x"
 ## Schedule
 
 - **09:00 KST (00:00 UTC)** — cron starts fetching both menus from `appConfig` URLs.
-- Retries every **30 minutes** until a menu is found or **12:30 KST**. If the page is still empty at 12:30, the bot shows «Нет информации» (not a holiday).
+- Retries every **30 minutes** until a **complete** menu is found or **12:30 KST**. One real dish (e.g. Azilea 오므라이스) is shown but not treated as ready — fetching continues. Two or more dishes count as a tray (including Azilea’s short `잔치국수` + `추가밥`). If the page is still empty at 12:30, the bot shows «Нет информации» (not a holiday).
 - If the cafeteria posts a closed/holiday notice as a menu item, that text is shown as-is and fetching stops.
-- Tapping **Сегодняшнее меню** re-fetches only when there is still no live menu.
+- Tapping **Сегодняшнее меню** re-fetches when there is still no complete live menu (empty, stub, or `no_info`).
 - **00:00 KST (15:00 UTC)** — prune `menus` and `fetchAttempts` older than **30 days**. Today’s rows are never deleted. Run `npx convex run prune:pruneOldData` to drain a backlog manually.
 - Fetch errors retry until **12:30 KST**, then alert `ADMIN_CHAT_ID`.

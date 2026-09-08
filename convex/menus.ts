@@ -360,16 +360,23 @@ export const fetchAllForToday = internalAction({
     }
 
     let anyError = false;
-    let stillEmpty = false;
     for (const cafeteria of missing) {
       const result = await ctx.runAction(internal.menus.scrapeAndEnrich, {
         cafeteria,
       });
       if (!result.ok) anyError = true;
-      if (result.dishCount === 0) stillEmpty = true;
     }
 
-    if (!anyError && !stillEmpty) return;
+    let stillIncomplete = false;
+    for (const cafeteria of CAFETERIAS) {
+      const existing = await ctx.runQuery(internal.menus.getMenuForDate, {
+        date,
+        cafeteria,
+      });
+      if (needsCronRetry(existing)) stillIncomplete = true;
+    }
+
+    if (!anyError && !stillIncomplete) return;
 
     const delay = nextRetryDelayMs(
       kstHourMinute().hour,
@@ -377,7 +384,7 @@ export const fetchAllForToday = internalAction({
     );
     if (delay != null) {
       console.log(
-        `Some cafeterias still have no menu; scheduling retry in ${Math.round(delay / 60000)} min`,
+        `Some cafeterias still have an incomplete menu; scheduling retry in ${Math.round(delay / 60000)} min`,
       );
       await ctx.scheduler.runAfter(
         delay,
@@ -426,7 +433,7 @@ export const refetchToday = internalAction({
   },
 });
 
-/** Re-scrape only when we still have no live menu (posted dishes or a closed notice). */
+/** Re-scrape when the live row is still empty or only a one-dish stub. */
 export const refreshStaleForToday = internalAction({
   args: {},
   handler: async (ctx): Promise<void> => {

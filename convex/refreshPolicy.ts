@@ -1,8 +1,13 @@
+import { looksLikeCafeteriaNotice } from "./notices";
+
 export const FETCH_START_HOUR = 9;
 export const FETCH_START_MINUTE = 0;
 export const CUTOFF_HOUR = 12;
 export const CUTOFF_MINUTE = 30;
 export const RETRY_DELAY_MS = 30 * 60 * 1000;
+
+/** A single food item is a stub (Azilea 오므라이스). Two is a real short tray. */
+export const MIN_READY_DISH_COUNT = 2;
 
 export type MenuSource = "live" | "fallback" | "holiday" | "no_info";
 
@@ -55,23 +60,32 @@ export function nextRetryDelayMs(hour: number, minute: number): number | null {
 }
 
 /**
- * Keep fetching until we have a live menu (dishes or a posted closed notice).
+ * A posted closed notice is final even as one line. One real dish is not —
+ * KBU often stubs a main first and fills the tray later.
+ */
+export function isCompleteLiveMenu(existing: StoredMenuLike): boolean {
+  if (!existing || existing.source !== "live") return false;
+  const names = existing.dishes.map((d) => d.name);
+  if (names.length === 0) return false;
+  if (looksLikeCafeteriaNotice(names)) return true;
+  return names.length >= MIN_READY_DISH_COUNT;
+}
+
+/**
+ * Keep fetching until we have a complete live menu (tray or closed notice).
  * An empty page is "not posted yet", not a holiday. Cutoff only stops
  * scheduling the next retry after 12:30 KST.
  */
 export function needsCronRetry(existing: StoredMenuLike): boolean {
   if (!existing) return true;
   if (existing.source === "fallback") return true;
-  if (existing.source === "live" && existing.dishes.length > 0) return false;
-  return true;
+  return !isCompleteLiveMenu(existing);
 }
 
 /**
- * Once a live menu exists, stop. Empty / no_info rows are not fresh so a
- * later button tap can still hit the cafeteria page (release time varies).
+ * Once a complete live menu exists, stop. Empty / stub / no_info rows are
+ * not fresh so a later button tap can still hit the cafeteria page.
  */
 export function isFreshForServing(existing: StoredMenuLike): boolean {
-  if (!existing) return false;
-  if (existing.source !== "live") return false;
-  return existing.dishes.length > 0;
+  return isCompleteLiveMenu(existing);
 }
