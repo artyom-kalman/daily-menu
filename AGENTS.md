@@ -6,10 +6,20 @@ Read open issues and the [project page](https://app.notion.com/p/3d1252aaf7ec812
 
 ## Build & Test Commands
 - Install: `npm install`
-- Dev (codegen + sync): `npx convex dev`
-- Deploy: `npx convex deploy`
+- Dev (codegen + watch): `npx convex dev`
+- Deploy to Convex **dev** (`enchanted-goshawk-667`): `npx convex deploy --yes` with the **dev** `CONVEX_DEPLOY_KEY` (prefix `dev:enchanted-goshawk-667`). Never pass `--prod` from a feature branch.
+- Production deploy is CI only (push to `master`). Do not `npx convex deploy --prod` from an agent.
 - Test: `npm test` (Vitest; includes mock-Telegram button E2E)
 - Typecheck: `npx tsc --noEmit` (after `npx convex codegen`)
+
+## Real-env testing (required)
+Vitest is not enough for Telegram UX. After the code is ready, **deploy to Convex dev and exercise the real dev bot** before calling the work done.
+
+- Cloud agents have `CONVEX_DEPLOY_KEY` for **dev** (`enchanted-goshawk-667`). Use that. It is not the production key.
+- Prefer `npx convex deploy --yes`. `npx convex dev --once` often fails on this key (`deployment:logs:view` is missing).
+- `npx convex deploy` / `npx convex dev` do **not** change Telegram webhooks. Do not run `telegram:setWebhook` unless asked.
+- Confirm on the **dev** bot (not prod): new buttons, copy, opt-in/out, admin commands if they changed.
+- If the deploy key is missing or is a prod key, stop and say so. Do not guess.
 
 ## Code Style
 - TypeScript, Convex query/mutation/action patterns
