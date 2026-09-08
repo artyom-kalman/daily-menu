@@ -3,9 +3,15 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
-import { formatMenuMessage, NO_MENU_INFO } from "../convex/format";
+import {
+  escapeHtml,
+  formatMenuMessage,
+  formatSpiciness,
+  inferCourse,
+  NO_MENU_INFO,
+} from "../convex/format";
 import { looksLikeCafeteriaNotice } from "../convex/notices";
-import { DEFAULT_MODEL } from "../convex/openrouter";
+import { DEFAULT_MODEL, SYSTEM_PROMPT } from "../convex/openrouter";
 import {
   isFreshForServing,
   needsCronRetry,
@@ -424,10 +430,25 @@ describe("openrouter model", () => {
   it("defaults to Llama 3.3 70B instruct via OpenRouter", () => {
     expect(DEFAULT_MODEL).toBe("meta-llama/llama-3.3-70b-instruct:free");
   });
+
+  it("asks for a name translation only, not a spoken prefix or a review", () => {
+    expect(SYSTEM_PROMPT).toMatch(/тушёная курица/);
+    expect(SYSTEM_PROMPT).toMatch(/Не транслитерируй хангыль/);
+    expect(SYSTEM_PROMPT).toMatch(/Не перечисляй скрытые ингредиенты/);
+    expect(SYSTEM_PROMPT).not.toMatch(/сначала как это говорят/);
+    expect(SYSTEM_PROMPT).not.toMatch(/максимум 2 предложения/);
+    expect(SYSTEM_PROMPT).not.toMatch(/6–10 слов/);
+  });
 });
 
 describe("formatMenuMessage", () => {
-  it("formats both cafeterias", () => {
+  it("omits chili at 0 and prints one pepper plus the level", () => {
+    expect(formatSpiciness(0)).toBe("");
+    expect(formatSpiciness(3)).toBe(" 🌶3");
+    expect(formatSpiciness(5)).toBe(" 🌶5");
+  });
+
+  it("groups a soup under Суп and keeps chili at the end of the line", () => {
     const text = formatMenuMessage(
       {
         dishes: [
@@ -436,19 +457,153 @@ describe("formatMenuMessage", () => {
       },
       { dishes: [] },
     );
-    expect(text).toContain("Peony");
-    expect(text).toContain("Azilea");
-    expect(text).toContain("김치찌개");
+    expect(text).not.toContain("Сегодня");
+    expect(text).toContain("Peony · верхняя");
+    expect(text).toContain("Azilea · нижняя");
+    expect(text).toContain("<i>Суп</i>\n<b>김치찌개</b> — <i>острый суп</i> 🌶3");
     expect(text).toContain(NO_MENU_INFO);
+    expect(text).not.toContain("1)");
     expect(text).not.toContain("выходной");
   });
 
-  it("shows a posted closed notice instead of no-info", () => {
+  it("groups mains vs staples and prints description as stored", () => {
+    const text = formatMenuMessage(
+      {
+        dishes: [
+          { name: "찜닭", description: "тушёная курица", spiciness: 2 },
+          { name: "쌀밥", description: "рис", spiciness: 0 },
+        ],
+      },
+      null,
+    );
+    expect(text).toContain("<i>Горячее</i>\n<b>찜닭</b> — <i>тушёная курица</i> 🌶2");
+    expect(text).toContain("<i>Ещё</i>\n<b>쌀밥</b>");
+    expect(text).not.toMatch(/쌀밥 🌶/);
+  });
+
+  it("infers tray slots from Hangul without a schema field", () => {
+    expect(inferCourse("김치찌개")).toBe("soup");
+    expect(inferCourse("미역국")).toBe("soup");
+    expect(inferCourse("잔치국수")).toBe("hot");
+    expect(inferCourse("비빔밥")).toBe("hot");
+    expect(inferCourse("쌀밥")).toBe("side");
+    expect(inferCourse("추가밥")).toBe("side");
+    expect(inferCourse("포기김치")).toBe("side");
+    expect(inferCourse("요구르트")).toBe("side");
+    expect(inferCourse("딸기요플레")).toBe("side");
+    expect(inferCourse("단무지")).toBe("side");
+    expect(inferCourse("피클")).toBe("side");
+    expect(inferCourse("무생채")).toBe("salad");
+    expect(inferCourse("콩나물맛살냉채")).toBe("salad");
+    expect(inferCourse("찜닭")).toBe("hot");
+  });
+
+  it("bunches pickles and yoplait with staples, not under Горячее", () => {
+    const text = formatMenuMessage(
+      null,
+      {
+        dishes: [
+          { name: "순살찜닭덮밥", description: "рис с тушёной курицей", spiciness: 2 },
+          { name: "버터갈릭감자튀김", description: "картофель фри с чесноком", spiciness: 0 },
+          { name: "단무지", description: "маринованная редька", spiciness: 0 },
+          { name: "딸기요플레", description: "клубничный йогурт", spiciness: 0 },
+          { name: "경상도식소고기무국", description: "говяжий суп с редькой", spiciness: 0 },
+          { name: "쫄면무침", description: "острая холодная лапша", spiciness: 4 },
+          { name: "포기김치", description: "кимчи", spiciness: 3 },
+        ],
+      },
+    );
+    expect(text).toContain(
+      "<i>Горячее</i>\n<b>순살찜닭덮밥</b> — <i>рис с тушёной курицей</i> 🌶2\n<b>버터갈릭감자튀김</b> — <i>картофель фри с чесноком</i>",
+    );
+    expect(text).toContain("<i>Суп</i>\n<b>경상도식소고기무국</b>");
+    expect(text).toContain("<i>Салат</i>\n<b>쫄면무침</b>");
+    const hot = text.split("<i>Суп</i>")[0];
+    expect(hot).not.toContain("단무지");
+    expect(hot).not.toContain("요플레");
+    expect(text).toContain(
+      "<i>Ещё</i>\n<b>단무지</b> · <b>딸기요플레</b> · <b>포기김치</b> 🌶3",
+    );
+  });
+
+  it("renders A dictionary gloss + A5 tray groups", () => {
+    const text = formatMenuMessage(
+      {
+        dishes: [
+          { name: "찜닭", description: "тушёная курица", spiciness: 2 },
+          { name: "쌀밥", description: "рис", spiciness: 0 },
+          { name: "미역국", description: "суп из вакаме", spiciness: 0 },
+          { name: "생선까스", description: "рыбная котлета", spiciness: 0 },
+          { name: "무생채", description: "салат из редьки", spiciness: 2 },
+          { name: "포기김치", description: "кимчи", spiciness: 3 },
+          { name: "요구르트", description: "йогурт", spiciness: 0 },
+        ],
+      },
+      {
+        dishes: [
+          { name: "잔치국수", description: "лапша в бульоне", spiciness: 0 },
+          { name: "추가밥", description: "добавка риса", spiciness: 0 },
+          { name: "돈육간장불고기", description: "свинина в соевом соусе", spiciness: 1 },
+          { name: "갈비만두찜", description: "пельмени на пару", spiciness: 0 },
+          { name: "콩나물맛살냉채", description: "холодный салат из проростков", spiciness: 0 },
+          { name: "포기김치", description: "кимчи", spiciness: 3 },
+          { name: "요구르트", description: "йогурт", spiciness: 0 },
+        ],
+      },
+    );
+    expect(text).toBe(
+      [
+        "<b>🌸 Peony · верхняя</b>",
+        "<i>Горячее</i>",
+        "<b>찜닭</b> — <i>тушёная курица</i> 🌶2",
+        "<b>생선까스</b> — <i>рыбная котлета</i>",
+        "<i>Суп</i>",
+        "<b>미역국</b> — <i>суп из вакаме</i>",
+        "<i>Салат</i>",
+        "<b>무생채</b> — <i>салат из редьки</i> 🌶2",
+        "<i>Ещё</i>",
+        "<b>쌀밥</b> · <b>포기김치</b> 🌶3 · <b>요구르트</b>",
+        "",
+        "<b>🌺 Azilea · нижняя</b>",
+        "<i>Горячее</i>",
+        "<b>잔치국수</b> — <i>лапша в бульоне</i>",
+        "<b>돈육간장불고기</b> — <i>свинина в соевом соусе</i> 🌶1",
+        "<b>갈비만두찜</b> — <i>пельмени на пару</i>",
+        "<i>Салат</i>",
+        "<b>콩나물맛살냉채</b> — <i>холодный салат из проростков</i>",
+        "<i>Ещё</i>",
+        "<b>추가밥</b> · <b>포기김치</b> 🌶3 · <b>요구르트</b>",
+      ].join("\n"),
+    );
+  });
+
+  it("escapes HTML in dish names and leaves asterisks alone", () => {
+    expect(escapeHtml("A & B <C>")).toBe("A &amp; B &lt;C&gt;");
+    const text = formatMenuMessage(
+      {
+        dishes: [
+          {
+            name: "치킨까스*치폴레S",
+            description: "котлета A & B",
+            spiciness: 2,
+          },
+        ],
+      },
+      null,
+    );
+    expect(text).toContain(
+      "<b>치킨까스*치폴레S</b> — <i>котлета A &amp; B</i> 🌶2",
+    );
+    expect(text).not.toContain("<b>치킨까스</b>");
+  });
+
+  it("shows a posted closed notice instead of no-info, without chili", () => {
     const text = formatMenuMessage(
       { dishes: [{ name: "추석 연휴 휴무", description: "", spiciness: 0 }] },
       null,
     );
     expect(text).toContain("추석 연휴 휴무");
+    expect(text).not.toContain("🌶");
     expect(text).toMatch(/Peony[\s\S]*추석 연휴 휴무[\s\S]*Azilea[\s\S]*Нет информации/);
   });
 });
@@ -777,6 +932,7 @@ describe("telegram button e2e", () => {
       expect(calls).toHaveLength(1);
       expect(calls[0].method).toBe("sendMessage");
       expect(calls[0].body.chat_id).toBe(42);
+      expect(calls[0].body.parse_mode).toBe("HTML");
       expect(calls[0].body.reply_markup).toEqual(todayMenuKeyboard());
       expect(JSON.stringify(calls[0].body.reply_markup)).toContain(
         TODAY_MENU_CALLBACK,
@@ -805,9 +961,38 @@ describe("telegram button e2e", () => {
       expect(calls[0].body.callback_query_id).toBe("cb-1");
       const menuText = String(calls[1].body.text);
       expect(menuText).toBe(formatMenuMessage(menus.peony, menus.azilea));
-      expect(menuText).toContain("비빔밥");
-      expect(menuText).toContain("된장찌개");
+      expect(menuText).toContain("<b>비빔밥</b> — <i>рис с овощами</i> 🌶1");
+      expect(menuText).toContain("<b>된장찌개</b> — <i>соевый суп</i>");
+      expect(calls[1].body.parse_mode).toBe("HTML");
+      expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard());
       expect(tracked).toEqual([EVENT_START, EVENT_TODAY_MENU]);
+    });
+  });
+
+  it("keeps the button on the error fallback", async () => {
+    await withMockTelegram(async (calls) => {
+      await processTelegramUpdate(
+        {
+          callback_query: {
+            id: "cb-err",
+            data: TODAY_MENU_CALLBACK,
+            message: { chat: { id: 42 } },
+          },
+        },
+        {
+          getTodayMenus: async () => {
+            throw new Error("db down");
+          },
+          sendMessage,
+          answerCallbackQuery,
+        },
+      );
+      expect(calls.map((c) => c.method)).toEqual([
+        "answerCallbackQuery",
+        "sendMessage",
+      ]);
+      expect(String(calls[1].body.text)).toContain("Не удалось получить меню");
+      expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard());
     });
   });
 

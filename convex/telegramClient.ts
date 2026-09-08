@@ -51,6 +51,7 @@ export async function sendMessage(
   return callTelegram("sendMessage", {
     chat_id: chatId,
     text,
+    parse_mode: "HTML",
     disable_web_page_preview: true,
     ...(options.reply_markup
       ? { reply_markup: options.reply_markup }
