@@ -13,7 +13,9 @@ import {
 import { looksLikeCafeteriaNotice } from "../convex/notices";
 import { DEFAULT_MODEL, SYSTEM_PROMPT } from "../convex/openrouter";
 import {
+  isCompleteLiveMenu,
   isFreshForServing,
+  MIN_READY_DISH_COUNT,
   needsCronRetry,
   nextRetryDelayMs,
   sameDishNames,
@@ -198,21 +200,62 @@ describe("refreshPolicy", () => {
     dishes: [],
     fetchedAt: 1,
   };
-  const live = {
+  const stub = {
     source: "live" as const,
-    dishes: [{ name: "미역국" }],
+    dishes: [{ name: "오므라이스" }],
+    fetchedAt: 1_000,
+  };
+  const notice = {
+    source: "live" as const,
+    dishes: [{ name: "추석 연휴 휴무" }],
+    fetchedAt: 1_000,
+  };
+  const shortTray = {
+    source: "live" as const,
+    dishes: [{ name: "잔치국수" }, { name: "추가밥" }],
+    fetchedAt: 1_000,
+  };
+  const fourDishes = {
+    source: "live" as const,
+    dishes: [
+      { name: "오므라이스" },
+      { name: "쌀밥" },
+      { name: "포기김치" },
+      { name: "요구르트" },
+    ],
+    fetchedAt: 1_000,
+  };
+  const tray = {
+    source: "live" as const,
+    dishes: [
+      { name: "눈꽃치즈닭갈비덮밥" },
+      { name: "미역국" },
+      { name: "피자고로케&케찹" },
+      { name: "어묵채볶음" },
+      { name: "숙주나물" },
+    ],
     fetchedAt: 1_000,
   };
 
-  it("retries empty/no_info until a live menu exists", () => {
+  it("retries empty/no_info until a complete live menu exists", () => {
+    expect(MIN_READY_DISH_COUNT).toBe(5);
     expect(needsCronRetry(noInfo)).toBe(true);
     expect(needsCronRetry(null)).toBe(true);
-    expect(needsCronRetry(live)).toBe(false);
+    expect(needsCronRetry(stub)).toBe(true);
+    expect(needsCronRetry(shortTray)).toBe(true);
+    expect(needsCronRetry(fourDishes)).toBe(true);
+    expect(needsCronRetry(notice)).toBe(false);
+    expect(needsCronRetry(tray)).toBe(false);
   });
 
-  it("treats a live menu as final and no_info as not fresh", () => {
+  it("treats a short stub as not ready and a notice or 5-dish tray as fresh", () => {
+    expect(isCompleteLiveMenu(stub)).toBe(false);
+    expect(isCompleteLiveMenu(fourDishes)).toBe(false);
     expect(isFreshForServing(noInfo)).toBe(false);
-    expect(isFreshForServing(live)).toBe(true);
+    expect(isFreshForServing(stub)).toBe(false);
+    expect(isFreshForServing(shortTray)).toBe(false);
+    expect(isFreshForServing(notice)).toBe(true);
+    expect(isFreshForServing(tray)).toBe(true);
   });
 
   it("schedules 30 min retries from 09:00 through 12:30 KST", () => {
@@ -233,6 +276,9 @@ describe("refreshPolicy", () => {
         ["눈꽃치즈닭갈비덮밥", "미역국"],
         ["눈꽃치즈닭갈비덮밥", "미역국", "피자고로케&케찹"],
       ),
+    ).toBe(false);
+    expect(
+      sameDishNames(["오므라이스"], ["오므라이스", "쌀밥", "포기김치"]),
     ).toBe(false);
   });
 });
