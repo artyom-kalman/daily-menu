@@ -1498,7 +1498,15 @@ describe("morning push", () => {
       join(dirname(fileURLToPath(import.meta.url)), "../convex/menus.ts"),
       "utf8",
     );
-    expect(menus).toMatch(/internal\.morningPush\.pushIfReady/);
+    const fetchAll = menus.slice(
+      menus.indexOf("export const fetchAllForToday"),
+      menus.indexOf("export const refetchToday"),
+    );
+    expect(fetchAll).toContain("export const fetchAllForToday");
+    expect(fetchAll.match(/await pushMorningMenu\(/g)).toHaveLength(2);
+    expect(fetchAll.match(/internal\.morningPush\.pushIfReady/g)).toHaveLength(
+      2,
+    );
     expect(todayMenuKeyboard(false).inline_keyboard).toHaveLength(2);
     expect(todayMenuKeyboard(true).inline_keyboard[1][0].text).toBe(
       UNSUBSCRIBE_BUTTON_LABEL,

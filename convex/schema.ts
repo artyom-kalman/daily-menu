@@ -53,5 +53,8 @@ export default defineSchema({
     chatId: v.number(),
     createdAt: v.number(),
     lastPushedDate: v.optional(v.string()), // YYYY-MM-DD KST; one push per day
+    // Epoch ms of an in-flight morning-push claim. Cleared on complete;
+    // stale claims can be reclaimed so a crashed send does not block the day.
+    pushClaimedAt: v.optional(v.number()),
   }).index("by_chatId", ["chatId"]),
 });

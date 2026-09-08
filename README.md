@@ -23,7 +23,7 @@ convex/
   prunePolicy.ts       retention cutoff (testable)
   morningPush.ts       fan-out to opted-in chats after a ready fetch
   morningPushPolicy.ts weekday / complete-tray gate (testable)
-  subscribers.ts       opt-in rows; delete on unsubscribe
+  subscribers.ts       opt-in rows; delete on unsubscribe or blocked chat
   http.ts              /telegram/webhook
   telegram.ts          webhook httpAction + setWebhook / getWebhookInfo
   telegramWebhook.ts   CONVEX_SITE_URL → Telegram setWebhook (testable)
@@ -188,5 +188,5 @@ npx convex run menus:seedToday '{"peonyDishes":[{"name":"Test","description":"x"
 - If the cafeteria posts a closed/holiday notice as a menu item, that text is shown as-is and fetching stops.
 - Tapping **Сегодняшнее меню** re-fetches when there is still no complete live menu (empty, stub, or `no_info`).
 - After a weekday fetch with at least one complete live tray, opted-in chats get that menu once (`subscribers.lastPushedDate`). Weekends, both-closed / `no_info` days, and stub trays are skipped. A failed send does not stop the rest of the batch; a blocked chat is dropped.
-- **00:00 KST (15:00 UTC)** — prune `menus` and `fetchAttempts` older than **30 days**. Today’s rows are never deleted. Subscriber rows are not pruned; they are deleted on unsubscribe. Run `npx convex run prune:pruneOldData` to drain a backlog manually.
+- **00:00 KST (15:00 UTC)** — prune `menus` and `fetchAttempts` older than **30 days**. Today’s rows are never deleted. Subscriber rows are not pruned; they are deleted on unsubscribe or blocked-chat delivery. Run `npx convex run prune:pruneOldData` to drain a backlog manually.
 - Fetch errors retry until **12:30 KST**, then alert `ADMIN_CHAT_ID`.

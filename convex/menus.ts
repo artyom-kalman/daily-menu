@@ -10,6 +10,7 @@ import { fetchHtml, parseMenuHtml } from "./scraper";
 import { enrichDishes } from "./openrouter";
 import { kstHourMinute, kstNow, kstWeekday, todayKst } from "./dates";
 import { sendAdminAlert } from "./telegramClient";
+import { runMorningPush } from "./morningPushRun";
 import { looksLikeCafeteriaNotice } from "./notices";
 import { formatMenuMessage } from "./format";
 import {
@@ -321,11 +322,7 @@ export const scrapeAndEnrich = internalAction({
 });
 
 async function pushMorningMenu(runPush: () => Promise<unknown>): Promise<void> {
-  try {
-    await runPush();
-  } catch (err) {
-    console.error(`morning push failed: ${(err as Error).message}`);
-  }
+  await runMorningPush(runPush, sendAdminAlert);
 }
 
 export const fetchAllForToday = internalAction({
@@ -387,11 +384,19 @@ export const fetchAllForToday = internalAction({
       if (needsCronRetry(existing)) stillIncomplete = true;
     }
 
-    await pushMorningMenu(() =>
-      ctx.runAction(internal.morningPush.pushIfReady, {}),
-    );
+    let morningPushError: unknown;
+    try {
+      await pushMorningMenu(() =>
+        ctx.runAction(internal.morningPush.pushIfReady, {}),
+      );
+    } catch (err) {
+      morningPushError = err;
+    }
 
-    if (!anyError && !stillIncomplete) return;
+    if (!anyError && !stillIncomplete) {
+      if (morningPushError) throw morningPushError;
+      return;
+    }
 
     const delay = nextRetryDelayMs(
       kstHourMinute().hour,
@@ -409,7 +414,10 @@ export const fetchAllForToday = internalAction({
       return;
     }
 
-    if (!anyError) return;
+    if (!anyError) {
+      if (morningPushError) throw morningPushError;
+      return;
+    }
 
     const attempts = await ctx.runQuery(internal.menus.listAttemptsForDate, {
       date,
@@ -423,6 +431,7 @@ export const fetchAllForToday = internalAction({
     await sendAdminAlert(
       `⚠️ daily-menu: failed to fetch all menus for ${date} by 12:30 KST after ${attempt + 1} attempts.\n\n${summary}`,
     );
+    if (morningPushError) throw morningPushError;
   },
 });
 

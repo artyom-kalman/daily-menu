@@ -5,7 +5,8 @@ import { formatMenuMessage } from "./format";
 import { shouldSendMorningPush } from "./morningPushPolicy";
 import type { StoredMenuLike } from "./refreshPolicy";
 import type { Cafeteria, Dish, ScrapeResult } from "./types";
-import type { InlineKeyboardMarkup } from "./telegramClient";
+import { TELEGRAM_SEND_TIMEOUT_MS, type InlineKeyboardMarkup } from "./telegramClient";
+import { withTimeout } from "./asyncTimeout";
 
 export const TODAY_MENU_CALLBACK = "today_menu";
 export const TODAY_MENU_BUTTON_LABEL = "Сегодняшнее меню";
@@ -281,6 +282,13 @@ export async function deliverMorningPushes(args: {
   markPushed: (chatId: number) => Promise<void>;
   dropSubscriber: (chatId: number) => Promise<void>;
   menuText: string;
+  sendTimeoutMs?: number;
+  /** Atomically claim this chat for today. When set, replaces lastPushedDate skip. */
+  claimDelivery?: (chatId: number) => Promise<boolean>;
+  /** Undo a claim after a failed / thrown send so a later retry can deliver. */
+  releaseClaim?: (chatId: number) => Promise<void>;
+  /** Clear the in-flight marker after a successful send. */
+  completeDelivery?: (chatId: number) => Promise<void>;
 }): Promise<MorningPushSummary> {
   const summary: MorningPushSummary = {
     sent: 0,
@@ -300,31 +308,70 @@ export async function deliverMorningPushes(args: {
 
   const text = args.menuText;
   const keyboard = todayMenuKeyboard(true);
+  const sendTimeoutMs = args.sendTimeoutMs ?? TELEGRAM_SEND_TIMEOUT_MS;
+
+  const releaseIfNeeded = async (chatId: number) => {
+    if (!args.releaseClaim) return;
+    try {
+      await args.releaseClaim(chatId);
+    } catch (err) {
+      console.error(
+        `morning push release ${chatId} failed: ${(err as Error).message}`,
+      );
+    }
+  };
 
   for (const subscriber of args.subscribers) {
-    if (subscriber.lastPushedDate === args.today) {
+    // claimDelivery is the atomic skip path; lastPushedDate remains for tests
+    // that do not pass claim callbacks.
+    if (args.claimDelivery) {
+      let claimed = false;
+      try {
+        claimed = await args.claimDelivery(subscriber.chatId);
+      } catch (err) {
+        console.error(
+          `morning push claim ${subscriber.chatId} failed: ${(err as Error).message}`,
+        );
+        summary.failed += 1;
+        continue;
+      }
+      if (!claimed) {
+        summary.skipped += 1;
+        continue;
+      }
+    } else if (subscriber.lastPushedDate === args.today) {
       summary.skipped += 1;
       continue;
     }
     try {
-      const result = await args.send(subscriber.chatId, text, {
-        reply_markup: keyboard,
-      });
+      const result = await withTimeout(
+        args.send(subscriber.chatId, text, {
+          reply_markup: keyboard,
+        }),
+        sendTimeoutMs,
+        `morning push to ${subscriber.chatId} timed out after ${sendTimeoutMs}ms`,
+      );
       if (result.blocked) {
         await args.dropSubscriber(subscriber.chatId);
         summary.dropped += 1;
         continue;
       }
       if (!result.ok) {
+        await releaseIfNeeded(subscriber.chatId);
         summary.failed += 1;
         continue;
       }
-      await args.markPushed(subscriber.chatId);
+      if (args.completeDelivery) {
+        await args.completeDelivery(subscriber.chatId);
+      } else {
+        await args.markPushed(subscriber.chatId);
+      }
       summary.sent += 1;
     } catch (err) {
       console.error(
         `morning push to ${subscriber.chatId} failed: ${(err as Error).message}`,
       );
+      await releaseIfNeeded(subscriber.chatId);
       summary.failed += 1;
     }
   }
