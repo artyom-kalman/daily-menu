@@ -4,8 +4,9 @@ import { kstHourMinute } from "./dates";
 import { formatMenuMessage } from "./format";
 import { shouldSendMorningPush } from "./morningPushPolicy";
 import { inMorningPushWindow } from "./refreshPolicy";
-import { sendMessageResult } from "./telegramClient";
-import { deliverMorningPushes } from "./telegramHandlers";
+import { sendAdminAlert, sendMessageResult } from "./telegramClient";
+import { deliverChannelPost, deliverMorningPushes } from "./telegramHandlers";
+import { trackAptabaseEvent } from "./analytics";
 
 export const pushIfReady = internalAction({
   args: {},
@@ -77,9 +78,42 @@ export const pushIfReady = internalAction({
         await ctx.runMutation(internal.subscribers.unsubscribe, { chatId });
       },
     });
+
+    const channel = await deliverChannelPost({
+      today: today.date,
+      peony,
+      azilea,
+      channelChatId: process.env.TELEGRAM_CHANNEL_CHAT_ID,
+      menuText,
+      send: async (chatId, text) => sendMessageResult(chatId, text),
+      trackEvent: trackAptabaseEvent,
+      claimDelivery: async () => {
+        const result = await ctx.runMutation(internal.channelPush.claim, {
+          date: today.date,
+          nowMs: Date.now(),
+          staleAfterMs: 60_000,
+        });
+        return result.claimed;
+      },
+      completeDelivery: async () => {
+        await ctx.runMutation(internal.channelPush.complete, {
+          date: today.date,
+        });
+      },
+      releaseClaim: async () => {
+        await ctx.runMutation(internal.channelPush.release, {
+          date: today.date,
+        });
+      },
+    });
+    if (channel.outcome === "blocked") {
+      await sendAdminAlert(
+        "⚠️ daily-menu: cannot post today's menu to the Telegram channel (bot kicked or not admin).",
+      );
+    }
     console.log(
-      `morningPush: date=${today.date} sent=${summary.sent} failed=${summary.failed} skipped=${summary.skipped} dropped=${summary.dropped}`,
+      `morningPush: date=${today.date} sent=${summary.sent} failed=${summary.failed} skipped=${summary.skipped} dropped=${summary.dropped} channel=${channel.outcome}`,
     );
-    return summary;
+    return { ...summary, channel: channel.outcome };
   },
 });

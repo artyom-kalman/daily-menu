@@ -5,6 +5,7 @@
 
 export const EVENT_START = "start";
 export const EVENT_TODAY_MENU = "today_menu";
+export const EVENT_CHANNEL_POST = "channel_post";
 export const EVENT_SCRAPE_OK = "scrape_ok";
 export const EVENT_SCRAPE_EMPTY = "scrape_empty";
 export const EVENT_SCRAPE_ERROR = "scrape_error";
@@ -12,6 +13,7 @@ export const EVENT_SCRAPE_ERROR = "scrape_error";
 export type AnalyticsEventName =
   | typeof EVENT_START
   | typeof EVENT_TODAY_MENU
+  | typeof EVENT_CHANNEL_POST
   | typeof EVENT_SCRAPE_OK
   | typeof EVENT_SCRAPE_EMPTY
   | typeof EVENT_SCRAPE_ERROR;
