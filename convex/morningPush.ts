@@ -34,7 +34,14 @@ export const pushIfReady = internalAction({
     }
 
     const subscribers = await ctx.runQuery(internal.subscribers.listAll, {});
+    const porkWatchers = await ctx.runQuery(internal.porkWatchers.listAll, {});
+    const watchingPork = new Set(
+      porkWatchers.map((row: { chatId: number }) => row.chatId),
+    );
     const menuText = formatMenuMessage(today.peony, today.azilea);
+    const porkMenuText = formatMenuMessage(today.peony, today.azilea, {
+      markPork: true,
+    });
     const summary = await deliverMorningPushes({
       today: today.date,
       peony,
@@ -44,6 +51,8 @@ export const pushIfReady = internalAction({
         lastPushedDate: row.lastPushedDate,
       })),
       menuText,
+      porkMenuText,
+      isWatchingPork: async (chatId) => watchingPork.has(chatId),
       send: async (chatId, text, options) =>
         sendMessageResult(chatId, text, options),
       markPushed: async (chatId) => {

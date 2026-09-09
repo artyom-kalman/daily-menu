@@ -130,6 +130,14 @@ export const handleWebhook = httpAction(async (ctx, request) => {
     unsubscribe: async (chatId) => {
       await ctx.runMutation(internal.subscribers.unsubscribe, { chatId });
     },
+    isWatchingPork: async (chatId) =>
+      ctx.runQuery(internal.porkWatchers.isWatching, { chatId }),
+    watchPork: async (chatId) => {
+      await ctx.runMutation(internal.porkWatchers.watch, { chatId });
+    },
+    unwatchPork: async (chatId) => {
+      await ctx.runMutation(internal.porkWatchers.unwatch, { chatId });
+    },
   });
 
   return new Response("ok", { status: 200 });
