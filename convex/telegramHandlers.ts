@@ -1,8 +1,14 @@
 import type { TrackEvent } from "./analytics";
-import { EVENT_START, EVENT_TODAY_MENU } from "./analytics";
+import {
+  EVENT_PORK_UNWATCH,
+  EVENT_PORK_WATCH,
+  EVENT_START,
+  EVENT_TODAY_MENU,
+} from "./analytics";
 import { formatKstClock } from "./dates";
 import { formatMenuMessage } from "./format";
 import { shouldSendMorningPush } from "./morningPushPolicy";
+import { formatPorkNote } from "./pork";
 import type { StoredMenuLike } from "./refreshPolicy";
 import type { Cafeteria, Dish, ScrapeResult } from "./types";
 import { TELEGRAM_SEND_TIMEOUT_MS, type InlineKeyboardMarkup } from "./telegramClient";
@@ -16,6 +22,12 @@ export const SUBSCRIBE_BUTTON_LABEL = "Присылать утром";
 export const UNSUBSCRIBE_BUTTON_LABEL = "Отписаться";
 export const SUBSCRIBED_MESSAGE = "Буду присылать меню по утрам.";
 export const UNSUBSCRIBED_MESSAGE = "Больше не буду присылать утром.";
+export const PORK_WATCH_CALLBACK = "pork_watch";
+export const PORK_UNWATCH_CALLBACK = "pork_unwatch";
+export const PORK_WATCH_BUTTON_LABEL = "Не ем свинину";
+export const PORK_UNWATCH_BUTTON_LABEL = "Не следить";
+export const PORK_WATCH_MESSAGE = "Буду писать про свинину после меню.";
+export const PORK_UNWATCH_MESSAGE = "Больше не буду писать про свинину.";
 export const START_PROMPT =
   "Нажмите кнопку, чтобы увидеть меню на сегодня.";
 
@@ -85,9 +97,15 @@ export type TelegramDeps = {
   isSubscribed?: (chatId: number) => Promise<boolean>;
   subscribe?: (chatId: number) => Promise<void>;
   unsubscribe?: (chatId: number) => Promise<void>;
+  isWatchingPork?: (chatId: number) => Promise<boolean>;
+  watchPork?: (chatId: number) => Promise<void>;
+  unwatchPork?: (chatId: number) => Promise<void>;
 };
 
-export function todayMenuKeyboard(subscribed = false): InlineKeyboardMarkup {
+export function todayMenuKeyboard(
+  subscribed = false,
+  watchingPork = false,
+): InlineKeyboardMarkup {
   return {
     inline_keyboard: [
       [{ text: TODAY_MENU_BUTTON_LABEL, callback_data: TODAY_MENU_CALLBACK }],
@@ -102,6 +120,17 @@ export function todayMenuKeyboard(subscribed = false): InlineKeyboardMarkup {
               callback_data: SUBSCRIBE_CALLBACK,
             },
       ],
+      [
+        watchingPork
+          ? {
+              text: PORK_UNWATCH_BUTTON_LABEL,
+              callback_data: PORK_UNWATCH_CALLBACK,
+            }
+          : {
+              text: PORK_WATCH_BUTTON_LABEL,
+              callback_data: PORK_WATCH_CALLBACK,
+            },
+      ],
     ],
   };
 }
@@ -110,10 +139,24 @@ async function keyboardFor(
   chatId: number,
   deps: TelegramDeps,
 ): Promise<InlineKeyboardMarkup> {
-  const subscribed = deps.isSubscribed
-    ? await deps.isSubscribed(chatId)
-    : false;
-  return todayMenuKeyboard(subscribed);
+  const [subscribed, watchingPork] = await Promise.all([
+    deps.isSubscribed ? deps.isSubscribed(chatId) : Promise.resolve(false),
+    deps.isWatchingPork
+      ? deps.isWatchingPork(chatId)
+      : Promise.resolve(false),
+  ]);
+  return todayMenuKeyboard(subscribed, watchingPork);
+}
+
+async function sendPorkNote(
+  chatId: number,
+  deps: TelegramDeps,
+  menus: TodayMenus,
+  keyboard: InlineKeyboardMarkup,
+): Promise<void> {
+  await deps.sendMessage(chatId, formatPorkNote(menus.peony, menus.azilea), {
+    reply_markup: keyboard,
+  });
 }
 
 type MessageUpdate = {
@@ -289,6 +332,8 @@ export async function deliverMorningPushes(args: {
   releaseClaim?: (chatId: number) => Promise<void>;
   /** Clear the in-flight marker after a successful send. */
   completeDelivery?: (chatId: number) => Promise<void>;
+  isWatchingPork?: (chatId: number) => Promise<boolean>;
+  porkNoteText?: string;
 }): Promise<MorningPushSummary> {
   const summary: MorningPushSummary = {
     sent: 0,
@@ -307,7 +352,6 @@ export async function deliverMorningPushes(args: {
   }
 
   const text = args.menuText;
-  const keyboard = todayMenuKeyboard(true);
   const sendTimeoutMs = args.sendTimeoutMs ?? TELEGRAM_SEND_TIMEOUT_MS;
 
   const releaseIfNeeded = async (chatId: number) => {
@@ -344,6 +388,10 @@ export async function deliverMorningPushes(args: {
       continue;
     }
     try {
+      const watchingPork = args.isWatchingPork
+        ? await args.isWatchingPork(subscriber.chatId)
+        : false;
+      const keyboard = todayMenuKeyboard(true, watchingPork);
       const result = await withTimeout(
         args.send(subscriber.chatId, text, {
           reply_markup: keyboard,
@@ -360,6 +408,21 @@ export async function deliverMorningPushes(args: {
         await releaseIfNeeded(subscriber.chatId);
         summary.failed += 1;
         continue;
+      }
+      if (watchingPork && args.porkNoteText) {
+        try {
+          await withTimeout(
+            args.send(subscriber.chatId, args.porkNoteText, {
+              reply_markup: keyboard,
+            }),
+            sendTimeoutMs,
+            `morning pork note to ${subscriber.chatId} timed out after ${sendTimeoutMs}ms`,
+          );
+        } catch (err) {
+          console.error(
+            `morning pork note to ${subscriber.chatId} failed: ${(err as Error).message}`,
+          );
+        }
       }
       if (args.completeDelivery) {
         await args.completeDelivery(subscriber.chatId);
@@ -431,6 +494,10 @@ async function handleAdminCommand(
       formatRefetchSummary(result.date, result.results),
     );
     await deps.sendMessage(chatId, result.telegramMessage);
+    if (deps.isWatchingPork && (await deps.isWatchingPork(chatId))) {
+      const today = await deps.getTodayMenus();
+      await sendPorkNote(chatId, deps, today, await keyboardFor(chatId, deps));
+    }
   } catch (err) {
     console.error(`/refetch failed: ${(err as Error).message}`);
     await deps.sendMessage(chatId, `Refetch failed: ${(err as Error).message}`);
@@ -439,10 +506,11 @@ async function handleAdminCommand(
 
 /**
  * Stateless Telegram bot logic:
- * - any message → prompt + today + subscribe/unsubscribe buttons
+ * - any message → prompt + today + morning + pork buttons
  * - ADMIN_CHAT_ID only: /status, /refetch, /stats
  * - callback "today_menu" → today's Peony + Azilea menus
  * - callback morning_subscribe / morning_unsubscribe → opt-in table
+ * - callback pork_watch / pork_unwatch → second-message pork note
  */
 export async function processTelegramUpdate(
   update: unknown,
@@ -466,7 +534,7 @@ export async function processTelegramUpdate(
       try {
         if (deps.subscribe) await deps.subscribe(chatId);
         await deps.sendMessage(chatId, SUBSCRIBED_MESSAGE, {
-          reply_markup: todayMenuKeyboard(true),
+          reply_markup: await keyboardFor(chatId, deps),
         });
       } catch (err) {
         console.error(`morning_subscribe failed: ${(err as Error).message}`);
@@ -483,13 +551,58 @@ export async function processTelegramUpdate(
       try {
         if (deps.unsubscribe) await deps.unsubscribe(chatId);
         await deps.sendMessage(chatId, UNSUBSCRIBED_MESSAGE, {
-          reply_markup: todayMenuKeyboard(false),
+          reply_markup: await keyboardFor(chatId, deps),
         });
       } catch (err) {
         console.error(`morning_unsubscribe failed: ${(err as Error).message}`);
         await deps.sendMessage(
           chatId,
           "Не удалось отписаться. Попробуйте позже.",
+          { reply_markup: await keyboardFor(chatId, deps) },
+        );
+      }
+      return "ok";
+    }
+
+    if (callback.data === PORK_WATCH_CALLBACK) {
+      try {
+        if (deps.watchPork) await deps.watchPork(chatId);
+        await safeTrack(deps.trackEvent, EVENT_PORK_WATCH);
+        const keyboard = await keyboardFor(chatId, deps);
+        await deps.sendMessage(chatId, PORK_WATCH_MESSAGE, {
+          reply_markup: keyboard,
+        });
+        try {
+          const today = await deps.getTodayMenus();
+          await sendPorkNote(chatId, deps, today, keyboard);
+        } catch (err) {
+          console.error(
+            `pork note after watch failed: ${(err as Error).message}`,
+          );
+        }
+      } catch (err) {
+        console.error(`pork_watch failed: ${(err as Error).message}`);
+        await deps.sendMessage(
+          chatId,
+          "Не удалось включить заметку про свинину. Попробуйте позже.",
+          { reply_markup: await keyboardFor(chatId, deps) },
+        );
+      }
+      return "ok";
+    }
+
+    if (callback.data === PORK_UNWATCH_CALLBACK) {
+      try {
+        if (deps.unwatchPork) await deps.unwatchPork(chatId);
+        await safeTrack(deps.trackEvent, EVENT_PORK_UNWATCH);
+        await deps.sendMessage(chatId, PORK_UNWATCH_MESSAGE, {
+          reply_markup: await keyboardFor(chatId, deps),
+        });
+      } catch (err) {
+        console.error(`pork_unwatch failed: ${(err as Error).message}`);
+        await deps.sendMessage(
+          chatId,
+          "Не удалось выключить заметку про свинину. Попробуйте позже.",
           { reply_markup: await keyboardFor(chatId, deps) },
         );
       }
@@ -504,10 +617,20 @@ export async function processTelegramUpdate(
 
     try {
       const today = await deps.getTodayMenus();
-      const text = formatMenuMessage(today.peony, today.azilea);
-      await deps.sendMessage(chatId, text, {
-        reply_markup: await keyboardFor(chatId, deps),
+      const keyboard = await keyboardFor(chatId, deps);
+      await deps.sendMessage(chatId, formatMenuMessage(today.peony, today.azilea), {
+        reply_markup: keyboard,
       });
+      try {
+        const watchingPork = deps.isWatchingPork
+          ? await deps.isWatchingPork(chatId)
+          : false;
+        if (watchingPork) {
+          await sendPorkNote(chatId, deps, today, keyboard);
+        }
+      } catch (err) {
+        console.error(`pork note after today_menu failed: ${(err as Error).message}`);
+      }
     } catch (err) {
       console.error(`today_menu handler failed: ${(err as Error).message}`);
       await deps.sendMessage(

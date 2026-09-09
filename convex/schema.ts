@@ -57,4 +57,10 @@ export default defineSchema({
     // stale claims can be reclaimed so a crashed send does not block the day.
     pushClaimedAt: v.optional(v.number()),
   }).index("by_chatId", ["chatId"]),
+
+  // Opt-in pork note (second message). Independent of morning subscribers.
+  porkWatchers: defineTable({
+    chatId: v.number(),
+    createdAt: v.number(),
+  }).index("by_chatId", ["chatId"]),
 });

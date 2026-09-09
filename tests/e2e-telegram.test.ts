@@ -10,6 +10,7 @@ import {
   inferCourse,
   NO_MENU_INFO,
 } from "../convex/format";
+import { formatPorkNote } from "../convex/pork";
 import { looksLikeCafeteriaNotice } from "../convex/notices";
 import { DEFAULT_MODEL, SYSTEM_PROMPT } from "../convex/openrouter";
 import { shouldSendMorningPush, isPushableFoodMenu } from "../convex/morningPushPolicy";
@@ -26,6 +27,8 @@ import {
   APP_VERSION,
   APTABASE_FETCH_TIMEOUT_MS,
   CONVEX_DEV_DEPLOYMENT_HOST,
+  EVENT_PORK_UNWATCH,
+  EVENT_PORK_WATCH,
   EVENT_SCRAPE_EMPTY,
   EVENT_SCRAPE_ERROR,
   EVENT_SCRAPE_OK,
@@ -60,6 +63,12 @@ import {
   UNSUBSCRIBE_BUTTON_LABEL,
   UNSUBSCRIBE_CALLBACK,
   UNSUBSCRIBED_MESSAGE,
+  PORK_UNWATCH_BUTTON_LABEL,
+  PORK_UNWATCH_CALLBACK,
+  PORK_UNWATCH_MESSAGE,
+  PORK_WATCH_BUTTON_LABEL,
+  PORK_WATCH_CALLBACK,
+  PORK_WATCH_MESSAGE,
   TODAY_MENU_BUTTON_LABEL,
   TODAY_MENU_CALLBACK,
   deliverMorningPushes,
@@ -1002,6 +1011,12 @@ describe("telegram button e2e", () => {
       expect(JSON.stringify(calls[0].body.reply_markup)).toContain(
         SUBSCRIBE_CALLBACK,
       );
+      expect(JSON.stringify(calls[0].body.reply_markup)).toContain(
+        PORK_WATCH_BUTTON_LABEL,
+      );
+      expect(JSON.stringify(calls[0].body.reply_markup)).toContain(
+        PORK_WATCH_CALLBACK,
+      );
 
       calls.length = 0;
 
@@ -1025,6 +1040,7 @@ describe("telegram button e2e", () => {
       expect(menuText).toBe(formatMenuMessage(menus.peony, menus.azilea));
       expect(menuText).toContain("<b>비빔밥</b> — <i>рис с овощами</i> 🌶1");
       expect(menuText).toContain("<b>된장찌개</b> — <i>соевый суп</i>");
+      expect(menuText).not.toContain("Свинина сегодня");
       expect(calls[1].body.parse_mode).toBe("HTML");
       expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard());
       expect(tracked).toEqual([EVENT_START, EVENT_TODAY_MENU]);
@@ -1350,6 +1366,109 @@ describe("telegram button e2e", () => {
       expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard(false));
     });
   });
+
+  it("opts in to the pork note, then sends it after the unchanged menu", async () => {
+    const morning = new Set<number>();
+    const pork = new Set<number>();
+    const menus = {
+      peony: {
+        dishes: [
+          { name: "제육볶음", description: "свинина", spiciness: 1 },
+          { name: "된장찌개", description: "соевый суп", spiciness: 0 },
+        ],
+      },
+      azilea: {
+        dishes: [{ name: "눈꽃치즈닭갈비덮밥", description: "курица", spiciness: 2 }],
+      },
+    };
+    const tracked: string[] = [];
+    const deps = {
+      getTodayMenus: async () => menus,
+      sendMessage,
+      answerCallbackQuery,
+      isSubscribed: async (chatId: number) => morning.has(chatId),
+      subscribe: async (chatId: number) => {
+        morning.add(chatId);
+      },
+      unsubscribe: async (chatId: number) => {
+        morning.delete(chatId);
+      },
+      isWatchingPork: async (chatId: number) => pork.has(chatId),
+      watchPork: async (chatId: number) => {
+        pork.add(chatId);
+      },
+      unwatchPork: async (chatId: number) => {
+        pork.delete(chatId);
+      },
+      trackEvent: async (eventName: string) => {
+        tracked.push(eventName);
+      },
+    };
+
+    await withMockTelegram(async (calls) => {
+      await processTelegramUpdate(
+        {
+          callback_query: {
+            id: "cb-pork",
+            data: PORK_WATCH_CALLBACK,
+            message: { chat: { id: 42 } },
+          },
+        },
+        deps,
+      );
+      expect(pork.has(42)).toBe(true);
+      expect(tracked).toEqual([EVENT_PORK_WATCH]);
+      expect(calls[1].body.text).toBe(PORK_WATCH_MESSAGE);
+      expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard(false, true));
+      expect(calls[2].body.text).toBe(formatPorkNote(menus.peony, menus.azilea));
+      expect(String(calls[2].body.text)).toContain("제육볶음");
+      expect(String(calls[2].body.text)).toContain("된장찌개");
+      expect(String(calls[2].body.text)).not.toContain("눈꽃치즈닭갈비덮밥");
+
+      calls.length = 0;
+      await processTelegramUpdate(
+        {
+          callback_query: {
+            id: "cb-menu",
+            data: TODAY_MENU_CALLBACK,
+            message: { chat: { id: 42 } },
+          },
+        },
+        deps,
+      );
+      expect(calls.map((c) => c.method)).toEqual([
+        "answerCallbackQuery",
+        "sendMessage",
+        "sendMessage",
+      ]);
+      expect(calls[1].body.text).toBe(formatMenuMessage(menus.peony, menus.azilea));
+      expect(String(calls[1].body.text)).not.toContain("Точно:");
+      expect(calls[2].body.text).toBe(formatPorkNote(menus.peony, menus.azilea));
+
+      calls.length = 0;
+      tracked.length = 0;
+      await processTelegramUpdate(
+        {
+          callback_query: {
+            id: "cb-unpork",
+            data: PORK_UNWATCH_CALLBACK,
+            message: { chat: { id: 42 } },
+          },
+        },
+        deps,
+      );
+      expect(pork.has(42)).toBe(false);
+      expect(tracked).toEqual([EVENT_PORK_UNWATCH]);
+      expect(calls[1].body.text).toBe(PORK_UNWATCH_MESSAGE);
+      expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard(false, false));
+      expect(JSON.stringify(calls[1].body.reply_markup)).toContain(
+        PORK_WATCH_BUTTON_LABEL,
+      );
+      expect(JSON.stringify(calls[1].body.reply_markup)).not.toContain(
+        PORK_UNWATCH_CALLBACK,
+      );
+    });
+  });
 });
 
 describe("morning push", () => {
@@ -1446,6 +1565,31 @@ describe("morning push", () => {
     expect(summary).toEqual({ sent: 1, failed: 1, skipped: 1, dropped: 1 });
   });
 
+  it("sends the pork note after the morning menu for watchers only", async () => {
+    const sent: Array<{ chatId: number; text: string }> = [];
+    const summary = await deliverMorningPushes({
+      today: monday,
+      peony: tray,
+      azilea: noInfo,
+      menuText: "menu",
+      porkNoteText: "pork-note",
+      subscribers: [{ chatId: 10 }, { chatId: 11 }],
+      isWatchingPork: async (chatId) => chatId === 11,
+      send: async (chatId, text) => {
+        sent.push({ chatId, text });
+        return { ok: true };
+      },
+      markPushed: async () => undefined,
+      dropSubscriber: async () => undefined,
+    });
+    expect(sent).toEqual([
+      { chatId: 10, text: "menu" },
+      { chatId: 11, text: "menu" },
+      { chatId: 11, text: "pork-note" },
+    ]);
+    expect(summary.sent).toBe(2);
+  });
+
   it("does not send on a closed day even if chats are opted in", async () => {
     const send = vi.fn(async () => ({ ok: true }));
     const summary = await deliverMorningPushes({
@@ -1507,9 +1651,12 @@ describe("morning push", () => {
     expect(fetchAll.match(/internal\.morningPush\.pushIfReady/g)).toHaveLength(
       2,
     );
-    expect(todayMenuKeyboard(false).inline_keyboard).toHaveLength(2);
+    expect(todayMenuKeyboard(false).inline_keyboard).toHaveLength(3);
     expect(todayMenuKeyboard(true).inline_keyboard[1][0].text).toBe(
       UNSUBSCRIBE_BUTTON_LABEL,
+    );
+    expect(todayMenuKeyboard(false, true).inline_keyboard[2][0].text).toBe(
+      PORK_UNWATCH_BUTTON_LABEL,
     );
   });
 });

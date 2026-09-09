@@ -2,7 +2,8 @@
 
 Convex backend that scrapes two Korean university cafeteria menus (Peony / Azilea),
 enriches each dish with a Russian description and spiciness rating via OpenRouter,
-and serves them through a Telegram bot: «Сегодняшнее меню» plus an opt-in morning push.
+and serves them through a Telegram bot: «Сегодняшнее меню», an opt-in morning push,
+and an opt-in pork note.
 
 ## Stack
 
@@ -16,7 +17,7 @@ and serves them through a Telegram bot: «Сегодняшнее меню» plus
 
 ```
 convex/
-  schema.ts            tables: appConfig, menus, fetchAttempts, telegramUpdates, subscribers
+  schema.ts            tables: appConfig, menus, fetchAttempts, telegramUpdates, subscribers, porkWatchers
   appConfig.ts         singleton peonyUrl / azileaUrl
   crons.ts             daily 09:00 KST fetch; 00:00 KST prune
   prune.ts             delete menus / fetchAttempts older than 30 days
@@ -24,6 +25,8 @@ convex/
   morningPush.ts       fan-out to opted-in chats after a ready fetch
   morningPushPolicy.ts weekday / complete-tray gate (testable)
   subscribers.ts       opt-in rows; delete on unsubscribe or blocked chat
+  porkWatchers.ts      opt-in pork note; delete on unwatch
+  pork.ts              Hangul pork certain/maybe + second-message formatter
   http.ts              /telegram/webhook
   telegram.ts          webhook httpAction + setWebhook / getWebhookInfo
   telegramWebhook.ts   CONVEX_SITE_URL → Telegram setWebhook (testable)
@@ -43,9 +46,10 @@ tests/
 
 ## Bot UX
 
-1. User sends any message (e.g. `/start`) → bot replies with **Сегодняшнее меню** and **Присылать утром**.
-2. User taps **Сегодняшнее меню** → Peony + Azilea grouped by tray slot (горячее / суп / салат / ещё). No extra «Сегодня» line. Telegram HTML: bold names, italic gloss and section labels, compact chili. Staples bunch on one line. Both buttons stay on the menu.
+1. User sends any message (e.g. `/start`) → bot replies with **Сегодняшнее меню**, **Присылать утром**, and **Не ем свинину**.
+2. User taps **Сегодняшнее меню** → Peony + Azilea grouped by tray slot (горячее / суп / салат / ещё). No extra «Сегодня» line. Telegram HTML: bold names, italic gloss and section labels, compact chili. Staples bunch on one line. All three buttons stay on the menu.
 3. **Присылать утром** stores that `chatId` in Convex. After a weekday scrape with at least one complete live tray, opted-in chats get the same menu once. **Отписаться** deletes the row (stops the next day). No student commands; no weekly reminder.
+4. **Не ем свинину** stores a separate `porkWatchers` row. The main menu does not hide dishes. After the menu (button tap, morning push, or opt-in), the bot sends a second message: certain pork vs maybe, plus a line that staff can swap a dish. **Не следить** deletes the row. Fish is out of scope.
 
 `ADMIN_CHAT_ID` can also use English admin commands (anyone else who types them still gets the button):
 
