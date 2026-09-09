@@ -1384,6 +1384,61 @@ describe("telegram button e2e", () => {
       expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard(false));
     });
   });
+
+  it("subscribe/unsubscribe errors keep a static keyboard without looking up prefs", async () => {
+    await withMockTelegram(async (calls) => {
+      await processTelegramUpdate(
+        {
+          callback_query: {
+            id: "cb-sub-fail",
+            data: SUBSCRIBE_CALLBACK,
+            message: { chat: { id: 7 } },
+          },
+        },
+        {
+          getTodayMenus: async () => ({ peony: null, azilea: null }),
+          sendMessage,
+          answerCallbackQuery,
+          isSubscribed: async () => {
+            throw new Error("prefs lookup should not run");
+          },
+          subscribe: async () => {
+            throw new Error("db down");
+          },
+        },
+      );
+      expect(calls.map((c) => c.method)).toEqual([
+        "answerCallbackQuery",
+        "sendMessage",
+      ]);
+      expect(String(calls[1].body.text)).toContain("Не удалось подписаться");
+      expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard(false));
+
+      calls.length = 0;
+      await processTelegramUpdate(
+        {
+          callback_query: {
+            id: "cb-unsub-fail",
+            data: UNSUBSCRIBE_CALLBACK,
+            message: { chat: { id: 7 } },
+          },
+        },
+        {
+          getTodayMenus: async () => ({ peony: null, azilea: null }),
+          sendMessage,
+          answerCallbackQuery,
+          isSubscribed: async () => {
+            throw new Error("prefs lookup should not run");
+          },
+          unsubscribe: async () => {
+            throw new Error("db down");
+          },
+        },
+      );
+      expect(String(calls[1].body.text)).toContain("Не удалось отписаться");
+      expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard(true));
+    });
+  });
 });
 
 describe("morning push", () => {

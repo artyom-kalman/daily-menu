@@ -492,7 +492,7 @@ export async function processTelegramUpdate(
         await deps.sendMessage(
           chatId,
           "Не удалось подписаться. Попробуйте позже.",
-          { reply_markup: await keyboardFor(chatId, deps) },
+          { reply_markup: todayMenuKeyboard(false) },
         );
       }
       return "ok";
@@ -509,7 +509,7 @@ export async function processTelegramUpdate(
         await deps.sendMessage(
           chatId,
           "Не удалось отписаться. Попробуйте позже.",
-          { reply_markup: await keyboardFor(chatId, deps) },
+          { reply_markup: todayMenuKeyboard(true) },
         );
       }
       return "ok";
