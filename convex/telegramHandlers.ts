@@ -16,8 +16,8 @@ export const SUBSCRIBE_BUTTON_LABEL = "Присылать утром";
 export const UNSUBSCRIBE_BUTTON_LABEL = "Отписаться";
 export const SUBSCRIBED_MESSAGE = "Буду присылать меню по утрам.";
 export const UNSUBSCRIBED_MESSAGE = "Больше не буду присылать утром.";
-export const START_PROMPT =
-  "Нажмите кнопку, чтобы увидеть меню на сегодня.";
+export const MENU_UNAVAILABLE_MESSAGE =
+  "Не удалось получить меню. Попробуйте позже.";
 
 export const REFETCHING_MESSAGE = "Refetching…";
 export const STATS_UNSET_MESSAGE = "APTABASE_DASHBOARD_URL is not set";
@@ -114,6 +114,25 @@ async function keyboardFor(
     ? await deps.isSubscribed(chatId)
     : false;
   return todayMenuKeyboard(subscribed);
+}
+
+async function sendTodayMenu(
+  chatId: number,
+  deps: TelegramDeps,
+  logLabel: string,
+): Promise<void> {
+  try {
+    const today = await deps.getTodayMenus();
+    const text = formatMenuMessage(today.peony, today.azilea);
+    await deps.sendMessage(chatId, text, {
+      reply_markup: await keyboardFor(chatId, deps),
+    });
+  } catch (err) {
+    console.error(`${logLabel} failed: ${(err as Error).message}`);
+    await deps.sendMessage(chatId, MENU_UNAVAILABLE_MESSAGE, {
+      reply_markup: await keyboardFor(chatId, deps),
+    });
+  }
 }
 
 type MessageUpdate = {
@@ -439,9 +458,9 @@ async function handleAdminCommand(
 
 /**
  * Stateless Telegram bot logic:
- * - any message → prompt + today + subscribe/unsubscribe buttons
+ * - any student message → today's Peony + Azilea menus + keyboard
  * - ADMIN_CHAT_ID only: /status, /refetch, /stats
- * - callback "today_menu" → today's Peony + Azilea menus
+ * - callback "today_menu" → same menu (refresh, including stub trays)
  * - callback morning_subscribe / morning_unsubscribe → opt-in table
  */
 export async function processTelegramUpdate(
@@ -473,7 +492,7 @@ export async function processTelegramUpdate(
         await deps.sendMessage(
           chatId,
           "Не удалось подписаться. Попробуйте позже.",
-          { reply_markup: await keyboardFor(chatId, deps) },
+          { reply_markup: todayMenuKeyboard(false) },
         );
       }
       return "ok";
@@ -490,7 +509,7 @@ export async function processTelegramUpdate(
         await deps.sendMessage(
           chatId,
           "Не удалось отписаться. Попробуйте позже.",
-          { reply_markup: await keyboardFor(chatId, deps) },
+          { reply_markup: todayMenuKeyboard(true) },
         );
       }
       return "ok";
@@ -501,21 +520,7 @@ export async function processTelegramUpdate(
     }
 
     await safeTrack(deps.trackEvent, EVENT_TODAY_MENU);
-
-    try {
-      const today = await deps.getTodayMenus();
-      const text = formatMenuMessage(today.peony, today.azilea);
-      await deps.sendMessage(chatId, text, {
-        reply_markup: await keyboardFor(chatId, deps),
-      });
-    } catch (err) {
-      console.error(`today_menu handler failed: ${(err as Error).message}`);
-      await deps.sendMessage(
-        chatId,
-        "Не удалось получить меню. Попробуйте позже.",
-        { reply_markup: await keyboardFor(chatId, deps) },
-      );
-    }
+    await sendTodayMenu(chatId, deps, "today_menu handler");
     return "ok";
   }
 
@@ -530,9 +535,7 @@ export async function processTelegramUpdate(
     return "ok";
   }
 
-  await deps.sendMessage(chatId, START_PROMPT, {
-    reply_markup: await keyboardFor(chatId, deps),
-  });
+  await sendTodayMenu(chatId, deps, "start menu");
   await safeTrack(deps.trackEvent, EVENT_START);
   return "ok";
 }

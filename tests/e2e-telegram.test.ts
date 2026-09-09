@@ -52,7 +52,7 @@ import { parseMenuHtml, targetWeekdayIndex } from "../convex/scraper";
 import { isAuthorizedWebhook } from "../convex/webhookAuth";
 import {
   REFETCHING_MESSAGE,
-  START_PROMPT,
+  MENU_UNAVAILABLE_MESSAGE,
   STATS_UNSET_MESSAGE,
   SUBSCRIBE_BUTTON_LABEL,
   SUBSCRIBE_CALLBACK,
@@ -954,7 +954,7 @@ describe("admin command helpers", () => {
 });
 
 describe("telegram button e2e", () => {
-  it("message shows today + subscribe buttons; callback returns today's menu via Telegram API", async () => {
+  it("message shows today's menu + buttons; callback refreshes the same menu", async () => {
     await withMockTelegram(async (calls) => {
       const menus = {
         peony: {
@@ -989,6 +989,9 @@ describe("telegram button e2e", () => {
       expect(calls[0].method).toBe("sendMessage");
       expect(calls[0].body.chat_id).toBe(42);
       expect(calls[0].body.parse_mode).toBe("HTML");
+      expect(calls[0].body.text).toBe(
+        formatMenuMessage(menus.peony, menus.azilea),
+      );
       expect(calls[0].body.reply_markup).toEqual(todayMenuKeyboard());
       expect(JSON.stringify(calls[0].body.reply_markup)).toContain(
         TODAY_MENU_CALLBACK,
@@ -1053,7 +1056,7 @@ describe("telegram button e2e", () => {
         "answerCallbackQuery",
         "sendMessage",
       ]);
-      expect(String(calls[1].body.text)).toContain("Не удалось получить меню");
+      expect(String(calls[1].body.text)).toBe(MENU_UNAVAILABLE_MESSAGE);
       expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard());
     });
   });
@@ -1082,7 +1085,7 @@ describe("telegram button e2e", () => {
     expect(tracked).toEqual([]);
   });
 
-  it("admin /status /refetch /stats; students still get the button", async () => {
+  it("admin /status /refetch /stats; students still get today's menu", async () => {
     const fetchedAt = Date.parse("2026-09-05T00:12:00.000Z");
     const attemptedAt = Date.parse("2026-09-05T02:30:00.000Z");
     const status = toAdminStatus(
@@ -1182,7 +1185,9 @@ describe("telegram button e2e", () => {
         { message: { chat: { id: 42 }, text: "/status" } },
         deps,
       )).toBe("ok");
-      expect(calls[0].body.text).toBe(START_PROMPT);
+      expect(calls[0].body.text).toBe(
+        formatMenuMessage(menus.peony, menus.azilea),
+      );
       expect(calls[0].body.reply_markup).toEqual(todayMenuKeyboard());
       expect(refetchCalls).toBe(1);
       expect(tracked).toEqual([EVENT_START]);
@@ -1192,6 +1197,9 @@ describe("telegram button e2e", () => {
         { message: { chat: { id: 99 }, text: "hello" } },
         deps,
       )).toBe("ok");
+      expect(calls[0].body.text).toBe(
+        formatMenuMessage(menus.peony, menus.azilea),
+      );
       expect(calls[0].body.reply_markup).toEqual(todayMenuKeyboard());
     });
   });
@@ -1267,12 +1275,12 @@ describe("telegram button e2e", () => {
         },
       );
       expect(refetchCalls).toBe(0);
-      expect(calls[0].body.text).toBe(START_PROMPT);
+      expect(calls[0].body.text).toBe(formatMenuMessage(null, null));
       expect(calls[0].body.reply_markup).toEqual(todayMenuKeyboard());
     });
   });
 
-  it("still sends the start button if trackEvent throws", async () => {
+  it("still sends today's menu if trackEvent throws", async () => {
     await withMockTelegram(async (calls) => {
       const result = await processTelegramUpdate(
         { message: { chat: { id: 9 }, text: "hi" } },
@@ -1288,6 +1296,32 @@ describe("telegram button e2e", () => {
       expect(result).toBe("ok");
       expect(calls).toHaveLength(1);
       expect(calls[0].method).toBe("sendMessage");
+      expect(calls[0].body.text).toBe(formatMenuMessage(null, null));
+      expect(calls[0].body.reply_markup).toEqual(todayMenuKeyboard());
+    });
+  });
+
+  it("student message still tracks start when the menu fetch fails", async () => {
+    const tracked: string[] = [];
+    await withMockTelegram(async (calls) => {
+      const result = await processTelegramUpdate(
+        { message: { chat: { id: 9 }, text: "/start" } },
+        {
+          getTodayMenus: async () => {
+            throw new Error("db down");
+          },
+          sendMessage,
+          answerCallbackQuery,
+          trackEvent: async (eventName) => {
+            tracked.push(eventName);
+          },
+        },
+      );
+      expect(result).toBe("ok");
+      expect(calls).toHaveLength(1);
+      expect(calls[0].body.text).toBe(MENU_UNAVAILABLE_MESSAGE);
+      expect(calls[0].body.reply_markup).toEqual(todayMenuKeyboard());
+      expect(tracked).toEqual([EVENT_START]);
     });
   });
 
@@ -1348,6 +1382,61 @@ describe("telegram button e2e", () => {
       expect(chats.has(42)).toBe(false);
       expect(calls[1].body.text).toBe(UNSUBSCRIBED_MESSAGE);
       expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard(false));
+    });
+  });
+
+  it("subscribe/unsubscribe errors keep a static keyboard without looking up prefs", async () => {
+    await withMockTelegram(async (calls) => {
+      await processTelegramUpdate(
+        {
+          callback_query: {
+            id: "cb-sub-fail",
+            data: SUBSCRIBE_CALLBACK,
+            message: { chat: { id: 7 } },
+          },
+        },
+        {
+          getTodayMenus: async () => ({ peony: null, azilea: null }),
+          sendMessage,
+          answerCallbackQuery,
+          isSubscribed: async () => {
+            throw new Error("prefs lookup should not run");
+          },
+          subscribe: async () => {
+            throw new Error("db down");
+          },
+        },
+      );
+      expect(calls.map((c) => c.method)).toEqual([
+        "answerCallbackQuery",
+        "sendMessage",
+      ]);
+      expect(String(calls[1].body.text)).toContain("Не удалось подписаться");
+      expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard(false));
+
+      calls.length = 0;
+      await processTelegramUpdate(
+        {
+          callback_query: {
+            id: "cb-unsub-fail",
+            data: UNSUBSCRIBE_CALLBACK,
+            message: { chat: { id: 7 } },
+          },
+        },
+        {
+          getTodayMenus: async () => ({ peony: null, azilea: null }),
+          sendMessage,
+          answerCallbackQuery,
+          isSubscribed: async () => {
+            throw new Error("prefs lookup should not run");
+          },
+          unsubscribe: async () => {
+            throw new Error("db down");
+          },
+        },
+      );
+      expect(String(calls[1].body.text)).toContain("Не удалось отписаться");
+      expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard(true));
     });
   });
 });
