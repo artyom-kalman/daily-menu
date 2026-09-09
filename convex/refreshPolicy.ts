@@ -46,6 +46,17 @@ export function beforeFetchWindow(hour: number, minute: number): boolean {
 }
 
 /**
+ * Morning push delivery window: 09:00 through 12:30 KST inclusive.
+ * 12:30 is included because the last fetch attempt runs at cutoff.
+ */
+export function inMorningPushWindow(hour: number, minute: number): boolean {
+  const now = kstMinutesSinceMidnight(hour, minute);
+  const start = kstMinutesSinceMidnight(FETCH_START_HOUR, FETCH_START_MINUTE);
+  const cutoff = kstMinutesSinceMidnight(CUTOFF_HOUR, CUTOFF_MINUTE);
+  return now >= start && now <= cutoff;
+}
+
+/**
  * Delay until the next scrape in the 09:00–12:30 KST window.
  * Returns null once it is 12:30 KST or later (last attempt has run).
  */

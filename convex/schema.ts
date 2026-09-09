@@ -46,4 +46,15 @@ export default defineSchema({
     updateId: v.number(),
     claimedAt: v.number(),
   }).index("by_updateId", ["updateId"]),
+
+  // Opt-in morning push. A row means subscribed; unsubscribe deletes it.
+  // chatId stays in Convex only — never sent to Aptabase.
+  subscribers: defineTable({
+    chatId: v.number(),
+    createdAt: v.number(),
+    lastPushedDate: v.optional(v.string()), // YYYY-MM-DD KST; one push per day
+    // Epoch ms of an in-flight morning-push claim. Cleared on complete;
+    // stale claims can be reclaimed so a crashed send does not block the day.
+    pushClaimedAt: v.optional(v.number()),
+  }).index("by_chatId", ["chatId"]),
 });

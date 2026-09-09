@@ -10,6 +10,7 @@ import { fetchHtml, parseMenuHtml } from "./scraper";
 import { enrichDishes } from "./openrouter";
 import { kstHourMinute, kstNow, kstWeekday, todayKst } from "./dates";
 import { sendAdminAlert } from "./telegramClient";
+import { runMorningPush } from "./morningPushRun";
 import { looksLikeCafeteriaNotice } from "./notices";
 import { formatMenuMessage } from "./format";
 import {
@@ -320,6 +321,10 @@ export const scrapeAndEnrich = internalAction({
   },
 });
 
+async function pushMorningMenu(runPush: () => Promise<unknown>): Promise<void> {
+  await runMorningPush(runPush, sendAdminAlert);
+}
+
 export const fetchAllForToday = internalAction({
   args: { retryCount: v.optional(v.number()) },
   handler: async (ctx, { retryCount }): Promise<void> => {
@@ -356,6 +361,9 @@ export const fetchAllForToday = internalAction({
 
     if (missing.length === 0) {
       console.log("All menus already present for today");
+      await pushMorningMenu(() =>
+        ctx.runAction(internal.morningPush.pushIfReady, {}),
+      );
       return;
     }
 
@@ -376,7 +384,19 @@ export const fetchAllForToday = internalAction({
       if (needsCronRetry(existing)) stillIncomplete = true;
     }
 
-    if (!anyError && !stillIncomplete) return;
+    let morningPushError: unknown;
+    try {
+      await pushMorningMenu(() =>
+        ctx.runAction(internal.morningPush.pushIfReady, {}),
+      );
+    } catch (err) {
+      morningPushError = err;
+    }
+
+    if (!anyError && !stillIncomplete) {
+      if (morningPushError) throw morningPushError;
+      return;
+    }
 
     const delay = nextRetryDelayMs(
       kstHourMinute().hour,
@@ -394,7 +414,10 @@ export const fetchAllForToday = internalAction({
       return;
     }
 
-    if (!anyError) return;
+    if (!anyError) {
+      if (morningPushError) throw morningPushError;
+      return;
+    }
 
     const attempts = await ctx.runQuery(internal.menus.listAttemptsForDate, {
       date,
@@ -408,6 +431,7 @@ export const fetchAllForToday = internalAction({
     await sendAdminAlert(
       `⚠️ daily-menu: failed to fetch all menus for ${date} by 12:30 KST after ${attempt + 1} attempts.\n\n${summary}`,
     );
+    if (morningPushError) throw morningPushError;
   },
 });
 

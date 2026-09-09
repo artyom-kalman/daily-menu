@@ -17,6 +17,23 @@ export function kstWeekday(date: Date): number {
   return date.getUTCDay();
 }
 
+/** Day of week for a KST calendar YYYY-MM-DD. 0=Sun..6=Sat. */
+export function weekdayFromYmd(ymd: string): number {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
+  if (!match) {
+    throw new Error(`Invalid YYYY-MM-DD: ${ymd}`);
+  }
+  return new Date(
+    Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])),
+  ).getUTCDay();
+}
+
+/** Saturday or Sunday on the KST calendar date. */
+export function isKstWeekend(ymd: string): boolean {
+  const day = weekdayFromYmd(ymd);
+  return day === 0 || day === 6;
+}
+
 /** Formats a KST wall-clock Date to YYYY-MM-DD. */
 export function formatKstDate(date: Date): string {
   const y = date.getUTCFullYear();
