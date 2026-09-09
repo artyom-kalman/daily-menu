@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { formatMenuMessage } from "../convex/format";
 import {
-  formatPorkNote,
-  PORK_NONE_CERTAIN,
-  PORK_NOTE_TITLE,
+  formatPorkMark,
+  PORK_LEGEND,
+  PORK_MARK_CERTAIN,
+  PORK_MARK_MAYBE,
   PORK_SWAP_HINT,
   porkSignal,
 } from "../convex/pork";
@@ -14,6 +15,7 @@ describe("porkSignal", () => {
     expect(porkSignal("돼지불백")).toBe("certain");
     expect(porkSignal("등심돈까스")).toBe("certain");
     expect(porkSignal("돈육간장불고기")).toBe("certain");
+    expect(porkSignal("주꾸미돈육볶음")).toBe("certain");
     expect(porkSignal("살코기감자탕")).toBe("certain");
     expect(porkSignal("부대찌개")).toBe("certain");
     expect(porkSignal("순대국")).toBe("certain");
@@ -56,6 +58,7 @@ describe("porkSignal", () => {
     expect(porkSignal("김치찌개")).toBe("maybe");
     expect(porkSignal("된장찌개")).toBe("maybe");
     expect(porkSignal("갈비만두찜")).toBe("maybe");
+    expect(porkSignal("갈비만두(달콤+매콤)")).toBe("maybe");
     expect(porkSignal("마제덮밥")).toBe("maybe");
     expect(porkSignal("피자고로케&케찹")).toBe("maybe");
     expect(porkSignal("오므라이스")).toBe("maybe");
@@ -71,7 +74,15 @@ describe("porkSignal", () => {
   });
 });
 
-describe("formatPorkNote", () => {
+describe("formatPorkMark", () => {
+  it("uses compact certain vs maybe marks", () => {
+    expect(formatPorkMark("제육볶음")).toBe(PORK_MARK_CERTAIN);
+    expect(formatPorkMark("된장찌개")).toBe(PORK_MARK_MAYBE);
+    expect(formatPorkMark("쌀밥")).toBe("");
+  });
+});
+
+describe("formatMenuMessage pork marks", () => {
   const peony = {
     dishes: [
       { name: "제육볶음", description: "свинина", spiciness: 1 },
@@ -88,47 +99,25 @@ describe("formatPorkNote", () => {
     ],
   };
 
-  it("lists certain and maybe by cafeteria and keeps a swap hint", () => {
-    const text = formatPorkNote(peony, azilea);
-    expect(text.startsWith(PORK_NOTE_TITLE)).toBe(true);
-    expect(text).toContain("Точно:");
-    expect(text).toContain("🌸 Peony — 제육볶음");
-    expect(text).toContain("🌺 Azilea — 등심돈까스");
-    expect(text).toContain("Возможно:");
-    expect(text).toContain("된장찌개");
-    expect(text).toContain("피자고로케&amp;케찹");
-    expect(text).toContain(PORK_SWAP_HINT);
-    expect(text).not.toContain("쌀밥");
-    expect(text).not.toContain("포기김치");
-    expect(text).not.toContain("눈꽃치즈닭갈비덮밥");
-  });
-
-  it("says there is no certain pork when only maybes remain", () => {
-    const text = formatPorkNote(
-      { dishes: [{ name: "김치찌개", description: "", spiciness: 0 }] },
-      { dishes: [{ name: "쌀밥", description: "", spiciness: 0 }] },
-    );
-    expect(text).toContain(PORK_NONE_CERTAIN);
-    expect(text).not.toContain("Точно:");
-    expect(text).toContain("Возможно:");
-    expect(text).toContain("김치찌개");
-  });
-
-  it("skips closed-day notices", () => {
-    const text = formatPorkNote(
-      { dishes: [{ name: "추석 연휴 휴무", description: "", spiciness: 0 }] },
-      { dishes: [] },
-    );
-    expect(text).toContain(PORK_NONE_CERTAIN);
-    expect(text).not.toContain("휴무");
-    expect(text).not.toContain("Возможно:");
-  });
-
-  it("does not change the main menu formatter", () => {
+  it("leaves the default menu unmarked", () => {
     const menu = formatMenuMessage(peony, azilea);
-    expect(menu).toContain("<b>제육볶음</b>");
+    expect(menu).toContain("<b>제육볶음</b> — <i>свинина</i> 🌶1");
     expect(menu).toContain("<b>된장찌개</b>");
-    expect(menu).not.toContain("Точно");
-    expect(menu).not.toContain(PORK_NOTE_TITLE);
+    expect(menu).not.toContain("🐖");
+    expect(menu).not.toContain(PORK_LEGEND);
+  });
+
+  it("marks certain and maybe on the same lines when opted in", () => {
+    const menu = formatMenuMessage(peony, azilea, { markPork: true });
+    expect(menu).toContain("<b>제육볶음</b> — <i>свинина</i> 🌶1 🐖");
+    expect(menu).toContain("<b>된장찌개</b> — <i>соевый суп</i> 🐖?");
+    expect(menu).toContain("<b>등심돈까스</b> — <i>шницель</i> 🐖");
+    expect(menu).toContain("<b>피자고로케&amp;케찹</b> — <i>крокет</i> 🐖?");
+    expect(menu).toContain("<b>눈꽃치즈닭갈비덮밥</b> — <i>курица</i> 🌶2");
+    expect(menu).not.toContain("<b>눈꽃치즈닭갈비덮밥</b> — <i>курица</i> 🌶2 🐖");
+    expect(menu).toContain(PORK_LEGEND);
+    expect(menu).toContain(PORK_SWAP_HINT);
+    expect(menu).toContain("쌀밥");
+    expect(menu).toContain("포기김치");
   });
 });

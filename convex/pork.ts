@@ -1,16 +1,10 @@
-import { escapeHtml } from "./format";
-import { looksLikeCafeteriaNotice } from "./notices";
-import type { Dish } from "./types";
-
 export type PorkSignal = "certain" | "maybe";
 
-export const PORK_NOTE_TITLE = "Свинина сегодня";
-export const PORK_NONE_CERTAIN =
-  "Сегодня в названиях явной свинины нет.";
+export const PORK_MARK_CERTAIN = " 🐖";
+export const PORK_MARK_MAYBE = " 🐖?";
+export const PORK_LEGEND = "🐖 свинина · 🐖? возможно";
 export const PORK_SWAP_HINT =
   "Если блюдо не подходит — на стойке можно попросить замену.";
-
-type MenuLike = { dishes: Dish[] } | null;
 
 function compactName(name: string): string {
   return name.replace(/\s+/g, "");
@@ -28,7 +22,7 @@ const HAM_RE = /햄/;
 
 /**
  * Named other protein wins over "maybe". Checked only after certain.
- * 오삼 is certain (삼겹) before this runs.
+ * 오삼 / 주꾸미돈육 are certain (삼겹 / 돈육) before this runs.
  */
 const OTHER_PROTEIN_RE =
   /닭|치킨|오리|소고기|쇠고기|우육|양고기|참치|생선|새우|오징어|낙지|주꾸미|날치|어묵|맛살|고등어|명태|갈치|연어|대구|조기|홍합|바지락|문어|타코야끼/;
@@ -56,77 +50,10 @@ export function porkSignal(name: string): PorkSignal | null {
   return null;
 }
 
-export type PorkHits = {
-  certain: string[];
-  maybe: string[];
-};
-
-export function porkHitsForDishes(dishes: Dish[]): PorkHits {
-  const certain: string[] = [];
-  const maybe: string[] = [];
-  for (const dish of dishes) {
-    const signal = porkSignal(dish.name);
-    if (signal === "certain") certain.push(dish.name);
-    else if (signal === "maybe") maybe.push(dish.name);
-  }
-  return { certain, maybe };
-}
-
-function hitsForMenu(menu: MenuLike): PorkHits {
-  if (!menu || menu.dishes.length === 0) return { certain: [], maybe: [] };
-  if (looksLikeCafeteriaNotice(menu.dishes.map((d) => d.name))) {
-    return { certain: [], maybe: [] };
-  }
-  return porkHitsForDishes(menu.dishes);
-}
-
-function formatCafeLine(
-  label: string,
-  names: string[],
-): string | null {
-  if (names.length === 0) return null;
-  return `${label} — ${names.map(escapeHtml).join(", ")}`;
-}
-
-function formatHitBlock(
-  heading: string,
-  peony: string[],
-  azilea: string[],
-): string[] {
-  const lines = [
-    formatCafeLine("🌸 Peony", peony),
-    formatCafeLine("🌺 Azilea", azilea),
-  ].filter((line): line is string => line != null);
-  if (lines.length === 0) return [];
-  return [heading, ...lines];
-}
-
-/** Opt-in follow-up. Does not change the main menu message. */
-export function formatPorkNote(peony: MenuLike, azilea: MenuLike): string {
-  const peonyHits = hitsForMenu(peony);
-  const azileaHits = hitsForMenu(azilea);
-  const parts: string[] = [PORK_NOTE_TITLE, ""];
-
-  const certainBlock = formatHitBlock(
-    "Точно:",
-    peonyHits.certain,
-    azileaHits.certain,
-  );
-  if (certainBlock.length > 0) {
-    parts.push(...certainBlock);
-  } else {
-    parts.push(PORK_NONE_CERTAIN);
-  }
-
-  const maybeBlock = formatHitBlock(
-    "Возможно:",
-    peonyHits.maybe,
-    azileaHits.maybe,
-  );
-  if (maybeBlock.length > 0) {
-    parts.push("", ...maybeBlock);
-  }
-
-  parts.push("", PORK_SWAP_HINT);
-  return parts.join("\n");
+/** Compact mark at the end of a menu line. Empty when unmarked. */
+export function formatPorkMark(name: string): string {
+  const signal = porkSignal(name);
+  if (signal === "certain") return PORK_MARK_CERTAIN;
+  if (signal === "maybe") return PORK_MARK_MAYBE;
+  return "";
 }

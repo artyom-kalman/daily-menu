@@ -1,5 +1,6 @@
 import type { Dish } from "./types";
 import { looksLikeCafeteriaNotice } from "./notices";
+import { formatPorkMark, PORK_LEGEND, PORK_SWAP_HINT } from "./pork";
 
 export const NO_MENU_INFO = "Нет информации";
 
@@ -55,19 +56,29 @@ export function inferCourse(name: string): Course {
   return "hot";
 }
 
-function formatMainLine(dish: Dish): string {
+export type FormatMenuOptions = {
+  /** Opt-in pork marks on the same lines. Default menu stays unmarked. */
+  markPork?: boolean;
+};
+
+function porkSuffix(name: string, markPork: boolean): string {
+  return markPork ? formatPorkMark(name) : "";
+}
+
+function formatMainLine(dish: Dish, markPork: boolean): string {
   const spice = formatSpiciness(dish.spiciness);
+  const pork = porkSuffix(dish.name, markPork);
   const name = bold(dish.name);
   const desc = dish.description.trim();
-  if (desc) return `${name} — ${italic(desc)}${spice}`;
-  return `${name}${spice}`;
+  if (desc) return `${name} — ${italic(desc)}${spice}${pork}`;
+  return `${name}${spice}${pork}`;
 }
 
-function formatSideItem(dish: Dish): string {
-  return `${bold(dish.name)}${formatSpiciness(dish.spiciness)}`;
+function formatSideItem(dish: Dish, markPork: boolean): string {
+  return `${bold(dish.name)}${formatSpiciness(dish.spiciness)}${porkSuffix(dish.name, markPork)}`;
 }
 
-function formatBlock(menu: MenuLike): string {
+function formatBlock(menu: MenuLike, markPork: boolean): string {
   if (!menu || menu.dishes.length === 0) {
     return italic(NO_MENU_INFO);
   }
@@ -92,22 +103,28 @@ function formatBlock(menu: MenuLike): string {
     if (dishes.length === 0) continue;
     parts.push(italic(COURSE_HEADING[course]));
     if (course === "side") {
-      parts.push(dishes.map(formatSideItem).join(" · "));
+      parts.push(dishes.map((d) => formatSideItem(d, markPork)).join(" · "));
     } else {
       for (const dish of dishes) {
-        parts.push(formatMainLine(dish));
+        parts.push(formatMainLine(dish, markPork));
       }
     }
   }
   return parts.join("\n");
 }
 
-export function formatMenuMessage(peony: MenuLike, azilea: MenuLike): string {
-  return (
+export function formatMenuMessage(
+  peony: MenuLike,
+  azilea: MenuLike,
+  options: FormatMenuOptions = {},
+): string {
+  const markPork = options.markPork === true;
+  const body =
     `${bold("🌸 Peony · верхняя")}\n` +
-    formatBlock(peony) +
+    formatBlock(peony, markPork) +
     "\n\n" +
     `${bold("🌺 Azilea · нижняя")}\n` +
-    formatBlock(azilea)
-  );
+    formatBlock(azilea, markPork);
+  if (!markPork) return body;
+  return body + "\n\n" + italic(PORK_LEGEND) + "\n" + italic(PORK_SWAP_HINT);
 }

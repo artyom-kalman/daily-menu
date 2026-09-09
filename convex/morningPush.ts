@@ -2,7 +2,6 @@ import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { kstHourMinute } from "./dates";
 import { formatMenuMessage } from "./format";
-import { formatPorkNote } from "./pork";
 import { shouldSendMorningPush } from "./morningPushPolicy";
 import { inMorningPushWindow } from "./refreshPolicy";
 import { sendMessageResult } from "./telegramClient";
@@ -40,7 +39,9 @@ export const pushIfReady = internalAction({
       porkWatchers.map((row: { chatId: number }) => row.chatId),
     );
     const menuText = formatMenuMessage(today.peony, today.azilea);
-    const porkNoteText = formatPorkNote(today.peony, today.azilea);
+    const porkMenuText = formatMenuMessage(today.peony, today.azilea, {
+      markPork: true,
+    });
     const summary = await deliverMorningPushes({
       today: today.date,
       peony,
@@ -50,7 +51,7 @@ export const pushIfReady = internalAction({
         lastPushedDate: row.lastPushedDate,
       })),
       menuText,
-      porkNoteText,
+      porkMenuText,
       isWatchingPork: async (chatId) => watchingPork.has(chatId),
       send: async (chatId, text, options) =>
         sendMessageResult(chatId, text, options),

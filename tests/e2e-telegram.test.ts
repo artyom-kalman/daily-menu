@@ -10,7 +10,6 @@ import {
   inferCourse,
   NO_MENU_INFO,
 } from "../convex/format";
-import { formatPorkNote } from "../convex/pork";
 import { looksLikeCafeteriaNotice } from "../convex/notices";
 import { DEFAULT_MODEL, SYSTEM_PROMPT } from "../convex/openrouter";
 import { shouldSendMorningPush, isPushableFoodMenu } from "../convex/morningPushPolicy";
@@ -1418,12 +1417,20 @@ describe("telegram button e2e", () => {
       );
       expect(pork.has(42)).toBe(true);
       expect(tracked).toEqual([EVENT_PORK_WATCH]);
-      expect(calls[1].body.text).toBe(PORK_WATCH_MESSAGE);
+      expect(calls.map((c) => c.method)).toEqual([
+        "answerCallbackQuery",
+        "sendMessage",
+      ]);
+      const optedIn = String(calls[1].body.text);
+      expect(optedIn.startsWith(`${PORK_WATCH_MESSAGE}\n\n`)).toBe(true);
+      expect(optedIn).toBe(
+        `${PORK_WATCH_MESSAGE}\n\n${formatMenuMessage(menus.peony, menus.azilea, { markPork: true })}`,
+      );
+      expect(optedIn).toContain("제육볶음");
+      expect(optedIn).toContain("🐖");
+      expect(optedIn).toContain("된장찌개");
+      expect(optedIn).toContain("눈꽃치즈닭갈비덮밥");
       expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard(false, true));
-      expect(calls[2].body.text).toBe(formatPorkNote(menus.peony, menus.azilea));
-      expect(String(calls[2].body.text)).toContain("제육볶음");
-      expect(String(calls[2].body.text)).toContain("된장찌개");
-      expect(String(calls[2].body.text)).not.toContain("눈꽃치즈닭갈비덮밥");
 
       calls.length = 0;
       await processTelegramUpdate(
@@ -1439,11 +1446,12 @@ describe("telegram button e2e", () => {
       expect(calls.map((c) => c.method)).toEqual([
         "answerCallbackQuery",
         "sendMessage",
-        "sendMessage",
       ]);
-      expect(calls[1].body.text).toBe(formatMenuMessage(menus.peony, menus.azilea));
+      expect(calls[1].body.text).toBe(
+        formatMenuMessage(menus.peony, menus.azilea, { markPork: true }),
+      );
       expect(String(calls[1].body.text)).not.toContain("Точно:");
-      expect(calls[2].body.text).toBe(formatPorkNote(menus.peony, menus.azilea));
+      expect(String(calls[1].body.text)).toContain("🐖");
 
       calls.length = 0;
       tracked.length = 0;
@@ -1565,14 +1573,14 @@ describe("morning push", () => {
     expect(summary).toEqual({ sent: 1, failed: 1, skipped: 1, dropped: 1 });
   });
 
-  it("sends the pork note after the morning menu for watchers only", async () => {
+  it("sends a pork-marked menu to watchers and a plain menu to everyone else", async () => {
     const sent: Array<{ chatId: number; text: string }> = [];
     const summary = await deliverMorningPushes({
       today: monday,
       peony: tray,
       azilea: noInfo,
       menuText: "menu",
-      porkNoteText: "pork-note",
+      porkMenuText: "menu-pork",
       subscribers: [{ chatId: 10 }, { chatId: 11 }],
       isWatchingPork: async (chatId) => chatId === 11,
       send: async (chatId, text) => {
@@ -1584,8 +1592,7 @@ describe("morning push", () => {
     });
     expect(sent).toEqual([
       { chatId: 10, text: "menu" },
-      { chatId: 11, text: "menu" },
-      { chatId: 11, text: "pork-note" },
+      { chatId: 11, text: "menu-pork" },
     ]);
     expect(summary.sent).toBe(2);
   });
