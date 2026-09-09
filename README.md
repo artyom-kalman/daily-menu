@@ -43,11 +43,11 @@ tests/
 
 ## Bot UX
 
-1. User sends any message (e.g. `/start`) → bot replies with **Сегодняшнее меню** and **Присылать утром**.
-2. User taps **Сегодняшнее меню** → Peony + Azilea grouped by tray slot (горячее / суп / салат / ещё). No extra «Сегодня» line. Telegram HTML: bold names, italic gloss and section labels, compact chili. Staples bunch on one line. Both buttons stay on the menu.
+1. User sends any message (e.g. `/start`) → bot replies with today's Peony + Azilea menu. **Сегодняшнее меню** and **Присылать утром** stay on that message.
+2. User taps **Сегодняшнее меню** → the same formatted menu again (refresh, including stub trays). Peony + Azilea grouped by tray slot (горячее / суп / салат / ещё). No extra «Сегодня» line. Telegram HTML: bold names, italic gloss and section labels, compact chili. Staples bunch on one line. Both buttons stay on the menu.
 3. **Присылать утром** stores that `chatId` in Convex. After a weekday scrape with at least one complete live tray, opted-in chats get the same menu once. **Отписаться** deletes the row (stops the next day). No student commands; no weekly reminder.
 
-`ADMIN_CHAT_ID` can also use English admin commands (anyone else who types them still gets the button):
+`ADMIN_CHAT_ID` can also use English admin commands (anyone else who types them still gets today's menu):
 
 - `/status` — today's scrape health (source, dish count, last `fetchAttempts` row). No menu text.
 - `/refetch` — force scrape both cafeterias, then send the outcome and the formatted menu.
@@ -95,7 +95,7 @@ Optional for local E2E against a mock Telegram server:
 TELEGRAM_API_BASE=http://127.0.0.1:PORT
 ```
 
-**Aptabase** (optional). If `APTABASE_APP_KEY` is unset, tracking is a no-op. Events: `start` (any message / button shown), `today_menu` (button tap), `scrape_ok` / `scrape_empty` / `scrape_error` (with `cafeteria` + `date` props). No `chatId` or menu text is sent. Host is inferred from the key (`A-EU-…` / `A-US-…`); override with `APTABASE_HOST` for self-host.
+**Aptabase** (optional). If `APTABASE_APP_KEY` is unset, tracking is a no-op. Events: `start` (any student message), `today_menu` (button tap), `scrape_ok` / `scrape_empty` / `scrape_error` (with `cafeteria` + `date` props). No `chatId` or menu text is sent. Host is inferred from the key (`A-EU-…` / `A-US-…`); override with `APTABASE_HOST` for self-host.
 
 Convex **dev** (`enchanted-goshawk-667`) sends Aptabase **Debug** events. Production sends **Release**. Override with `APTABASE_DEBUG=1` or `=0`. In the Aptabase dashboard, use the bug icon (top right) to view Debug data — it is separate from the Release dashboard.
 
