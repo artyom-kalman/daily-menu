@@ -1,8 +1,9 @@
 export type PorkSignal = "certain" | "maybe";
 
 export const PORK_MARK_CERTAIN = " 🐖";
-export const PORK_MARK_MAYBE = " 🐖?";
-export const PORK_LEGEND = "🐖 свинина · 🐖? возможно";
+/** Word, not `?` — Telegram wraps `🐖?` so the mark sits on its own line. */
+export const PORK_MARK_MAYBE = " возможно";
+export const PORK_LEGEND = "🐖 свинина · возможно — не в названии";
 export const PORK_SWAP_HINT =
   "Если блюдо не подходит — на стойке можно попросить замену.";
 

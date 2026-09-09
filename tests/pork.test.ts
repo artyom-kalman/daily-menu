@@ -104,15 +104,16 @@ describe("formatMenuMessage pork marks", () => {
     expect(menu).toContain("<b>제육볶음</b> — <i>свинина</i> 🌶1");
     expect(menu).toContain("<b>된장찌개</b>");
     expect(menu).not.toContain("🐖");
+    expect(menu).not.toContain("возможно");
     expect(menu).not.toContain(PORK_LEGEND);
   });
 
   it("marks certain and maybe on the same lines when opted in", () => {
     const menu = formatMenuMessage(peony, azilea, { markPork: true });
     expect(menu).toContain("<b>제육볶음</b> — <i>свинина</i> 🌶1 🐖");
-    expect(menu).toContain("<b>된장찌개</b> — <i>соевый суп</i> 🐖?");
+    expect(menu).toContain("<b>된장찌개</b> — <i>соевый суп</i> возможно");
     expect(menu).toContain("<b>등심돈까스</b> — <i>шницель</i> 🐖");
-    expect(menu).toContain("<b>피자고로케&amp;케찹</b> — <i>крокет</i> 🐖?");
+    expect(menu).toContain("<b>피자고로케&amp;케찹</b> — <i>крокет</i> возможно");
     expect(menu).toContain("<b>눈꽃치즈닭갈비덮밥</b> — <i>курица</i> 🌶2");
     expect(menu).not.toContain("<b>눈꽃치즈닭갈비덮밥</b> — <i>курица</i> 🌶2 🐖");
     expect(menu).toContain(PORK_LEGEND);
