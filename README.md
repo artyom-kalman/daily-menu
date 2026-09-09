@@ -2,7 +2,8 @@
 
 Convex backend that scrapes two Korean university cafeteria menus (Peony / Azilea),
 enriches each dish with a Russian description and spiciness rating via OpenRouter,
-and serves them through a Telegram bot: «Сегодняшнее меню» plus an opt-in morning push.
+and serves them through a Telegram bot: «Сегодняшнее меню», an opt-in morning push,
+and an optional daily post to a Telegram channel.
 
 ## Stack
 
@@ -16,14 +17,15 @@ and serves them through a Telegram bot: «Сегодняшнее меню» plus
 
 ```
 convex/
-  schema.ts            tables: appConfig, menus, fetchAttempts, telegramUpdates, subscribers
+  schema.ts            tables: appConfig, menus, fetchAttempts, telegramUpdates, subscribers, channelPush
   appConfig.ts         singleton peonyUrl / azileaUrl
   crons.ts             daily 09:00 KST fetch; 00:00 KST prune
   prune.ts             delete menus / fetchAttempts older than 30 days
   prunePolicy.ts       retention cutoff (testable)
-  morningPush.ts       fan-out to opted-in chats after a ready fetch
+  morningPush.ts       fan-out to opted-in chats + optional channel after a ready fetch
   morningPushPolicy.ts weekday / complete-tray gate (testable)
   subscribers.ts       opt-in rows; delete on unsubscribe or blocked chat
+  channelPush.ts       singleton lastPostedDate for the daily channel post
   http.ts              /telegram/webhook
   telegram.ts          webhook httpAction + setWebhook / getWebhookInfo
   telegramWebhook.ts   CONVEX_SITE_URL → Telegram setWebhook (testable)
@@ -46,6 +48,7 @@ tests/
 1. User sends any message (e.g. `/start`) → bot replies with today's Peony + Azilea menu. **Сегодняшнее меню** and **Присылать утром** stay on that message.
 2. User taps **Сегодняшнее меню** → the same formatted menu again (refresh, including stub trays). Peony + Azilea grouped by tray slot (горячее / суп / салат / ещё). No extra «Сегодня» line. Telegram HTML: bold names, italic gloss and section labels, compact chili. Staples bunch on one line. Both buttons stay on the menu.
 3. **Присылать утром** stores that `chatId` in Convex. After a weekday scrape with at least one complete live tray, opted-in chats get the same menu once. **Отписаться** deletes the row (stops the next day). No student commands; no weekly reminder.
+4. If `TELEGRAM_CHANNEL_CHAT_ID` is set, that same weekday menu is posted once to the channel (no inline keyboard). Comments and photos belong in a Telegram discussion group linked to the channel — the bot does not ingest them. Group / channel inbound updates are ignored so the bot never replies there.
 
 `ADMIN_CHAT_ID` can also use English admin commands (anyone else who types them still gets today's menu):
 
@@ -63,11 +66,14 @@ npx convex env set OPENROUTER_MODEL meta-llama/llama-3.3-70b-instruct:free
 npx convex env set TELEGRAM_BOT_TOKEN ...          # this deployment's bot only
 npx convex env set TELEGRAM_WEBHOOK_SECRET "$(openssl rand -hex 32)"  # required
 npx convex env set ADMIN_CHAT_ID ...   # optional; enables /status /refetch /stats
+npx convex env set TELEGRAM_CHANNEL_CHAT_ID -100...  # optional; daily channel post
 npx convex env set APTABASE_APP_KEY A-EU-...   # optional product analytics
 npx convex env set APTABASE_DASHBOARD_URL ...  # optional; /stats replies with this URL
 ```
 
 `TELEGRAM_WEBHOOK_SECRET` is required. The webhook returns 401 if the env var is unset or the `x-telegram-bot-api-secret-token` header does not match.
+
+`TELEGRAM_CHANNEL_CHAT_ID` is optional. Create a channel, add **this deployment's** bot as admin with Post messages, then set the chat id (`-100…`). Unset means no channel post. Use a private test channel on Convex **dev**; do not point the dev bot at the public prod channel.
 
 **Dev and production must use different bot tokens.** One Telegram bot has one webhook; sharing `TELEGRAM_BOT_TOKEN` between Convex **dev** and **prod** steals updates. See [Dev vs production bots](#dev-vs-production-bots).
 
@@ -95,7 +101,7 @@ Optional for local E2E against a mock Telegram server:
 TELEGRAM_API_BASE=http://127.0.0.1:PORT
 ```
 
-**Aptabase** (optional). If `APTABASE_APP_KEY` is unset, tracking is a no-op. Events: `start` (any student message), `today_menu` (button tap), `scrape_ok` / `scrape_empty` / `scrape_error` (with `cafeteria` + `date` props). No `chatId` or menu text is sent. Host is inferred from the key (`A-EU-…` / `A-US-…`); override with `APTABASE_HOST` for self-host.
+**Aptabase** (optional). If `APTABASE_APP_KEY` is unset, tracking is a no-op. Events: `start` (any student message), `today_menu` (button tap), `channel_post` (`date` only), `scrape_ok` / `scrape_empty` / `scrape_error` (with `cafeteria` + `date` props). No `chatId` or menu text is sent. Host is inferred from the key (`A-EU-…` / `A-US-…`); override with `APTABASE_HOST` for self-host.
 
 Convex **dev** (`enchanted-goshawk-667`) sends Aptabase **Debug** events. Production sends **Release**. Override with `APTABASE_DEBUG=1` or `=0`. In the Aptabase dashboard, use the bug icon (top right) to view Debug data — it is separate from the Release dashboard.
 
@@ -133,6 +139,7 @@ One-time ops for the **dev** bot:
 npx convex env set TELEGRAM_BOT_TOKEN "<dev bot token>"
 npx convex env set TELEGRAM_WEBHOOK_SECRET "$(openssl rand -hex 32)"
 npx convex env set ADMIN_CHAT_ID "<your chat id>"   # optional
+npx convex env set TELEGRAM_CHANNEL_CHAT_ID "-100..."  # optional; private test channel
 npx convex env set APTABASE_APP_KEY "A-EU-..."      # optional; use a separate Aptabase app from prod
 npx convex env set APTABASE_DASHBOARD_URL "https://app.aptabase.com/..."  # optional; /stats link
 ```
@@ -187,6 +194,6 @@ npx convex run menus:seedToday '{"peonyDishes":[{"name":"Test","description":"x"
 - Retries every **30 minutes** until a **complete** menu is found or **12:30 KST**. Fewer than **5** dishes (e.g. Azilea 오므라이스, or `잔치국수` + `추가밥`) is shown but not treated as ready — fetching continues. A closed/holiday notice is still final as one line. If the page is still empty at 12:30, the bot shows «Нет информации» (not a holiday).
 - If the cafeteria posts a closed/holiday notice as a menu item, that text is shown as-is and fetching stops.
 - Tapping **Сегодняшнее меню** re-fetches when there is still no complete live menu (empty, stub, or `no_info`).
-- After a weekday fetch with at least one complete live tray, opted-in chats get that menu once (`subscribers.lastPushedDate`). Weekends, both-closed / `no_info` days, and stub trays are skipped. A failed send does not stop the rest of the batch; a blocked chat is dropped.
+- After a weekday fetch with at least one complete live tray, opted-in chats get that menu once (`subscribers.lastPushedDate`). If `TELEGRAM_CHANNEL_CHAT_ID` is set, the same text is posted once to that channel (`channelPush.lastPostedDate`), with no keyboard. Weekends, both-closed / `no_info` days, and stub trays are skipped. A failed send does not stop the rest of the batch; a blocked DM chat is dropped. A blocked channel does not mark the day posted (cron retries can try again).
 - **00:00 KST (15:00 UTC)** — prune `menus` and `fetchAttempts` older than **30 days**. Today’s rows are never deleted. Subscriber rows are not pruned; they are deleted on unsubscribe or blocked-chat delivery. Run `npx convex run prune:pruneOldData` to drain a backlog manually.
 - Fetch errors retry until **12:30 KST**, then alert `ADMIN_CHAT_ID`.

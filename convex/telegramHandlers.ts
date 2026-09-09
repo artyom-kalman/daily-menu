@@ -1,5 +1,5 @@
 import type { TrackEvent } from "./analytics";
-import { EVENT_START, EVENT_TODAY_MENU } from "./analytics";
+import { EVENT_CHANNEL_POST, EVENT_START, EVENT_TODAY_MENU } from "./analytics";
 import { formatKstClock } from "./dates";
 import { formatMenuMessage } from "./format";
 import { shouldSendMorningPush } from "./morningPushPolicy";
@@ -135,27 +135,53 @@ async function sendTodayMenu(
   }
 }
 
+export type TelegramChatLike = {
+  id?: number;
+  type?: string;
+};
+
 type MessageUpdate = {
   update_id?: number;
   message?: {
-    chat?: { id?: number };
+    chat?: TelegramChatLike;
     text?: string;
   };
   callback_query?: {
     id?: string;
     data?: string;
-    message?: { chat?: { id?: number } };
+    message?: { chat?: TelegramChatLike };
     from?: { id?: number };
   };
 };
 
+/**
+ * Student and admin handlers are DM-only. Missing `type` counts as private so
+ * tests can omit it; Telegram always sends type on live updates.
+ */
+export function isPrivateTelegramChat(
+  chat: TelegramChatLike | undefined,
+): boolean {
+  if (typeof chat?.id !== "number" || !Number.isFinite(chat.id)) return false;
+  if (chat.type == null || chat.type === "") return true;
+  return chat.type === "private";
+}
+
+/** Empty / whitespace `TELEGRAM_CHANNEL_CHAT_ID` means skip the channel post. */
+export function readChannelChatId(
+  envValue: string | undefined,
+): string | undefined {
+  const trimmed = envValue?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
 async function safeTrack(
   trackEvent: TrackEvent | undefined,
   eventName: Parameters<TrackEvent>[0],
+  props?: Parameters<TrackEvent>[1],
 ): Promise<void> {
   if (!trackEvent) return;
   try {
-    await trackEvent(eventName);
+    await trackEvent(eventName, props);
   } catch (err) {
     console.warn(`trackEvent(${eventName}) failed: ${(err as Error).message}`);
   }
@@ -397,6 +423,101 @@ export async function deliverMorningPushes(args: {
   return summary;
 }
 
+export type ChannelPostOutcome =
+  | "unset"
+  | "skipped"
+  | "sent"
+  | "failed"
+  | "blocked";
+
+export type ChannelPostSummary = {
+  outcome: ChannelPostOutcome;
+};
+
+/**
+ * One channel message per weekday when the morning-push gate passes.
+ * No inline keyboard — those callbacks would bind the channel chat id.
+ * Unset TELEGRAM_CHANNEL_CHAT_ID is a no-op.
+ */
+export async function deliverChannelPost(args: {
+  today: string;
+  peony: StoredMenuLike;
+  azilea: StoredMenuLike;
+  channelChatId: string | undefined;
+  menuText: string;
+  send: (chatId: string, text: string) => Promise<MorningSendResult>;
+  sendTimeoutMs?: number;
+  lastPostedDate?: string;
+  claimDelivery?: () => Promise<boolean>;
+  completeDelivery?: () => Promise<void>;
+  releaseClaim?: () => Promise<void>;
+  trackEvent?: TrackEvent;
+}): Promise<ChannelPostSummary> {
+  const channelChatId = readChannelChatId(args.channelChatId);
+  if (!channelChatId) {
+    return { outcome: "unset" };
+  }
+  if (
+    !shouldSendMorningPush({
+      today: args.today,
+      peony: args.peony,
+      azilea: args.azilea,
+    })
+  ) {
+    return { outcome: "skipped" };
+  }
+
+  const releaseIfNeeded = async () => {
+    if (!args.releaseClaim) return;
+    try {
+      await args.releaseClaim();
+    } catch (err) {
+      console.error(
+        `channel post release failed: ${(err as Error).message}`,
+      );
+    }
+  };
+
+  if (args.claimDelivery) {
+    let claimed = false;
+    try {
+      claimed = await args.claimDelivery();
+    } catch (err) {
+      console.error(`channel post claim failed: ${(err as Error).message}`);
+      return { outcome: "failed" };
+    }
+    if (!claimed) return { outcome: "skipped" };
+  } else if (args.lastPostedDate === args.today) {
+    return { outcome: "skipped" };
+  }
+
+  const sendTimeoutMs = args.sendTimeoutMs ?? TELEGRAM_SEND_TIMEOUT_MS;
+  try {
+    const result = await withTimeout(
+      args.send(channelChatId, args.menuText),
+      sendTimeoutMs,
+      `channel post timed out after ${sendTimeoutMs}ms`,
+    );
+    if (result.blocked) {
+      await releaseIfNeeded();
+      return { outcome: "blocked" };
+    }
+    if (!result.ok) {
+      await releaseIfNeeded();
+      return { outcome: "failed" };
+    }
+    if (args.completeDelivery) {
+      await args.completeDelivery();
+    }
+    await safeTrack(args.trackEvent, EVENT_CHANNEL_POST, { date: args.today });
+    return { outcome: "sent" };
+  } catch (err) {
+    console.error(`channel post failed: ${(err as Error).message}`);
+    await releaseIfNeeded();
+    return { outcome: "failed" };
+  }
+}
+
 function telegramUpdateId(update: MessageUpdate): number | undefined {
   return typeof update.update_id === "number" && Number.isFinite(update.update_id)
     ? update.update_id
@@ -458,7 +579,8 @@ async function handleAdminCommand(
 
 /**
  * Stateless Telegram bot logic:
- * - any student message → today's Peony + Azilea menus + keyboard
+ * - any student DM → today's Peony + Azilea menus + keyboard
+ * - group / supergroup / channel inbound updates are ignored
  * - ADMIN_CHAT_ID only: /status, /refetch, /stats
  * - callback "today_menu" → same menu (refresh, including stub trays)
  * - callback morning_subscribe / morning_unsubscribe → opt-in table
@@ -480,6 +602,15 @@ export async function processTelegramUpdate(
     }
 
     await deps.answerCallbackQuery(callbackId);
+
+    if (
+      !isPrivateTelegramChat({
+        id: chatId,
+        type: callback.message?.chat?.type,
+      })
+    ) {
+      return "ignored";
+    }
 
     if (callback.data === SUBSCRIBE_CALLBACK) {
       try {
@@ -526,6 +657,9 @@ export async function processTelegramUpdate(
 
   const chatId = u.message?.chat?.id;
   if (typeof chatId !== "number") {
+    return "ignored";
+  }
+  if (!isPrivateTelegramChat(u.message?.chat)) {
     return "ignored";
   }
 

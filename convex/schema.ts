@@ -57,4 +57,11 @@ export default defineSchema({
     // stale claims can be reclaimed so a crashed send does not block the day.
     pushClaimedAt: v.optional(v.number()),
   }).index("by_chatId", ["chatId"]),
+
+  // One daily channel post. Singleton key: "default".
+  channelPush: defineTable({
+    key: v.string(),
+    lastPostedDate: v.optional(v.string()), // YYYY-MM-DD KST; one post per day
+    claimedAt: v.optional(v.number()),
+  }).index("by_key", ["key"]),
 });
