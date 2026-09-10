@@ -1,3 +1,4 @@
+import { isKstWeekend } from "./dates";
 import { looksLikeCafeteriaNotice } from "./notices";
 
 export const FETCH_START_HOUR = 9;
@@ -99,4 +100,22 @@ export function needsCronRetry(existing: StoredMenuLike): boolean {
  */
 export function isFreshForServing(existing: StoredMenuLike): boolean {
   return isCompleteLiveMenu(existing);
+}
+
+/**
+ * Weekday before 12:30 KST with no rows for either hall — cron still owns
+ * the fetch. Students get an immediate “try later” instead of a scrape.
+ * A stub, no_info, or closed-notice row is not “empty”.
+ */
+export function isWaitingForTodaysMenu(args: {
+  date: string;
+  hour: number;
+  minute: number;
+  peony: StoredMenuLike;
+  azilea: StoredMenuLike;
+}): boolean {
+  if (args.peony != null || args.azilea != null) return false;
+  if (isKstWeekend(args.date)) return false;
+  if (pastCutoff(args.hour, args.minute)) return false;
+  return true;
 }

@@ -43,6 +43,7 @@ import {
 import {
   isCompleteLiveMenu,
   isFreshForServing,
+  isWaitingForTodaysMenu,
   MIN_READY_DISH_COUNT,
   needsCronRetry,
   nextRetryDelayMs,
@@ -52,6 +53,7 @@ import { parseMenuHtml, targetWeekdayIndex } from "../convex/scraper";
 import { isAuthorizedWebhook } from "../convex/webhookAuth";
 import {
   REFETCHING_MESSAGE,
+  MENU_NOT_READY_MESSAGE,
   MENU_UNAVAILABLE_MESSAGE,
   STATS_UNSET_MESSAGE,
   SUBSCRIBE_BUTTON_LABEL,
@@ -275,6 +277,34 @@ describe("refreshPolicy", () => {
     expect(nextRetryDelayMs(12, 20)).toBe(10 * 60 * 1000);
     expect(nextRetryDelayMs(12, 30)).toBeNull();
     expect(nextRetryDelayMs(13, 0)).toBeNull();
+  });
+
+  it("waits for cron only on a weekday before cutoff with both halls missing", () => {
+    const monday = "2026-09-07";
+    const saturday = "2026-09-05";
+    const empty = {
+      date: monday,
+      hour: 10,
+      minute: 0,
+      peony: null,
+      azilea: null,
+    };
+    expect(isWaitingForTodaysMenu(empty)).toBe(true);
+    expect(isWaitingForTodaysMenu({ ...empty, hour: 8, minute: 59 })).toBe(true);
+    expect(isWaitingForTodaysMenu({ ...empty, hour: 12, minute: 29 })).toBe(
+      true,
+    );
+    expect(isWaitingForTodaysMenu({ ...empty, hour: 12, minute: 30 })).toBe(
+      false,
+    );
+    expect(
+      isWaitingForTodaysMenu({ ...empty, date: saturday, hour: 10, minute: 0 }),
+    ).toBe(false);
+    expect(isWaitingForTodaysMenu({ ...empty, peony: noInfo })).toBe(false);
+    expect(isWaitingForTodaysMenu({ ...empty, azilea: stub })).toBe(false);
+    expect(isWaitingForTodaysMenu({ ...empty, peony: tray, azilea: tray })).toBe(
+      false,
+    );
   });
 
   it("detects a later-posted longer menu as a change", () => {
@@ -1031,6 +1061,83 @@ describe("telegram button e2e", () => {
       expect(calls[1].body.parse_mode).toBe("HTML");
       expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard());
       expect(tracked).toEqual([EVENT_START, EVENT_TODAY_MENU]);
+    });
+  });
+
+  it("replies immediately when today's menu is not ready yet; repeats do not scrape", async () => {
+    await withMockTelegram(async (calls) => {
+      let menuReads = 0;
+      const tracked: string[] = [];
+      const deps = {
+        getTodayMenus: async () => {
+          menuReads += 1;
+          return {
+            peony: null,
+            azilea: null,
+            awaitingTodaysMenu: true as const,
+          };
+        },
+        sendMessage,
+        answerCallbackQuery,
+        trackEvent: async (eventName: string) => {
+          tracked.push(eventName);
+        },
+      };
+
+      expect(
+        await processTelegramUpdate(
+          { message: { chat: { id: 42 }, text: "/start" } },
+          deps,
+        ),
+      ).toBe("ok");
+      expect(
+        await processTelegramUpdate(
+          { message: { chat: { id: 42 }, text: "ещё раз" } },
+          deps,
+        ),
+      ).toBe("ok");
+      expect(
+        await processTelegramUpdate(
+          {
+            callback_query: {
+              id: "cb-wait",
+              data: TODAY_MENU_CALLBACK,
+              message: { chat: { id: 42 } },
+            },
+          },
+          deps,
+        ),
+      ).toBe("ok");
+
+      expect(menuReads).toBe(3);
+      const texts = calls
+        .filter((c) => c.method === "sendMessage")
+        .map((c) => c.body.text);
+      expect(texts).toEqual([
+        MENU_NOT_READY_MESSAGE,
+        MENU_NOT_READY_MESSAGE,
+        MENU_NOT_READY_MESSAGE,
+      ]);
+      expect(texts[0]).not.toBe(formatMenuMessage(null, null));
+      expect(calls.find((c) => c.method === "sendMessage")?.body.reply_markup).toEqual(
+        todayMenuKeyboard(),
+      );
+      expect(tracked).toEqual([EVENT_START, EVENT_START, EVENT_TODAY_MENU]);
+    });
+  });
+
+  it("empty stored menus without awaitingTodaysMenu still show Нет информации", async () => {
+    await withMockTelegram(async (calls) => {
+      await processTelegramUpdate(
+        { message: { chat: { id: 7 }, text: "hi" } },
+        {
+          getTodayMenus: async () => ({ peony: null, azilea: null }),
+          sendMessage,
+          answerCallbackQuery,
+        },
+      );
+      expect(calls[0].body.text).toBe(formatMenuMessage(null, null));
+      expect(calls[0].body.text).not.toBe(MENU_NOT_READY_MESSAGE);
     });
   });
 

@@ -18,6 +18,8 @@ export const SUBSCRIBED_MESSAGE = "Буду присылать меню по у�
 export const UNSUBSCRIBED_MESSAGE = "Больше не буду присылать утром.";
 export const MENU_UNAVAILABLE_MESSAGE =
   "Не удалось получить меню. Попробуйте позже.";
+export const MENU_NOT_READY_MESSAGE =
+  "Меню ещё не выложили. Попробуйте позже.";
 
 export const REFETCHING_MESSAGE = "Refetching…";
 export const STATS_UNSET_MESSAGE = "APTABASE_DASHBOARD_URL is not set";
@@ -29,6 +31,8 @@ type MenuLike = { dishes: Dish[] } | null;
 export type TodayMenus = {
   peony: MenuLike;
   azilea: MenuLike;
+  /** Weekday, before cutoff, no today's rows — skip scrape, send try-later. */
+  awaitingTodaysMenu?: boolean;
 };
 
 export type AdminMenuLike = {
@@ -123,7 +127,9 @@ async function sendTodayMenu(
 ): Promise<void> {
   try {
     const today = await deps.getTodayMenus();
-    const text = formatMenuMessage(today.peony, today.azilea);
+    const text = today.awaitingTodaysMenu
+      ? MENU_NOT_READY_MESSAGE
+      : formatMenuMessage(today.peony, today.azilea);
     await deps.sendMessage(chatId, text, {
       reply_markup: await keyboardFor(chatId, deps),
     });
@@ -459,6 +465,7 @@ async function handleAdminCommand(
 /**
  * Stateless Telegram bot logic:
  * - any student message → today's Peony + Azilea menus + keyboard
+ *   (or «меню ещё не выложили» when a weekday fetch is still pending)
  * - ADMIN_CHAT_ID only: /status, /refetch, /stats
  * - callback "today_menu" → same menu (refresh, including stub trays)
  * - callback morning_subscribe / morning_unsubscribe → opt-in table
