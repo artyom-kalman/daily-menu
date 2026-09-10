@@ -45,7 +45,7 @@ tests/
 
 1. User sends any message (e.g. `/start`) → bot replies with today's Peony + Azilea menu. **Сегодняшнее меню** and **Присылать утром** stay on that message.
 2. User taps **Сегодняшнее меню** → the same formatted menu again (refresh, including stub trays). Peony + Azilea grouped by tray slot (горячее / суп / салат / ещё). No extra «Сегодня» line. Telegram HTML: bold names, italic gloss and section labels, compact chili. Staples bunch on one line. Both buttons stay on the menu.
-3. **Присылать утром** stores that `chatId` in Convex. After a weekday scrape when **both** halls are settled (each 5+ live dishes, or a closed notice), opted-in chats get the same menu once. A stub on either side waits until the last 12:30 KST attempt, which sends anyway even if one hall is empty. **Отписаться** deletes the row (stops the next day). No student commands; no weekly reminder.
+3. **Присылать утром** stores that `chatId` in Convex and toasts confirmation on the same message (the button flips to **Отписаться**; no extra chat bubble). After a weekday scrape when **both** halls are settled (each 5+ live dishes, or a closed notice), opted-in chats get the same menu once. A stub on either side waits until the last 12:30 KST attempt, which sends anyway even if one hall is empty. **Отписаться** deletes the row (stops the next day) the same way. No student commands; no weekly reminder.
 
 `ADMIN_CHAT_ID` can also use English admin commands (anyone else who types them still gets today's menu):
 

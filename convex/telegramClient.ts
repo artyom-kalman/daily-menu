@@ -137,6 +137,19 @@ export async function answerCallbackQuery(
   return result.ok;
 }
 
+export async function editMessageReplyMarkup(
+  chatId: number | string,
+  messageId: number,
+  replyMarkup: InlineKeyboardMarkup,
+): Promise<boolean> {
+  const result = await callTelegram("editMessageReplyMarkup", {
+    chat_id: chatId,
+    message_id: messageId,
+    reply_markup: replyMarkup,
+  });
+  return result.ok;
+}
+
 export async function sendAdminAlert(text: string): Promise<void> {
   const chatId = process.env.ADMIN_CHAT_ID;
   if (!chatId) {

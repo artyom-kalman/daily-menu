@@ -8,6 +8,7 @@ import { internal } from "./_generated/api";
 import { trackAptabaseEvent } from "./analytics";
 import {
   answerCallbackQuery,
+  editMessageReplyMarkup,
   sendAdminAlert,
   sendMessage,
 } from "./telegramClient";
@@ -100,6 +101,7 @@ export const handleWebhook = httpAction(async (ctx, request) => {
     },
     sendMessage,
     answerCallbackQuery,
+    editMessageReplyMarkup,
     trackEvent: trackAptabaseEvent,
     adminChatId: process.env.ADMIN_CHAT_ID,
     aptabaseDashboardUrl: process.env.APTABASE_DASHBOARD_URL,

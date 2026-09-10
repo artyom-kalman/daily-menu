@@ -56,9 +56,11 @@ import {
   STATS_UNSET_MESSAGE,
   SUBSCRIBE_BUTTON_LABEL,
   SUBSCRIBE_CALLBACK,
+  SUBSCRIBE_FAILED_MESSAGE,
   SUBSCRIBED_MESSAGE,
   UNSUBSCRIBE_BUTTON_LABEL,
   UNSUBSCRIBE_CALLBACK,
+  UNSUBSCRIBE_FAILED_MESSAGE,
   UNSUBSCRIBED_MESSAGE,
   TODAY_MENU_BUTTON_LABEL,
   TODAY_MENU_CALLBACK,
@@ -73,6 +75,7 @@ import {
 } from "../convex/telegramHandlers";
 import {
   answerCallbackQuery,
+  editMessageReplyMarkup,
   isBlockedTelegramError,
   sendMessage,
   sendMessageResult,
@@ -1331,6 +1334,7 @@ describe("telegram button e2e", () => {
       getTodayMenus: async () => ({ peony: null, azilea: null }),
       sendMessage,
       answerCallbackQuery,
+      editMessageReplyMarkup,
       isSubscribed: async (chatId: number) => chats.has(chatId),
       subscribe: async (chatId: number) => {
         chats.add(chatId);
@@ -1346,13 +1350,20 @@ describe("telegram button e2e", () => {
           callback_query: {
             id: "cb-sub",
             data: SUBSCRIBE_CALLBACK,
-            message: { chat: { id: 42 } },
+            message: { chat: { id: 42 }, message_id: 1001 },
           },
         },
         deps,
       );
       expect(chats.has(42)).toBe(true);
-      expect(calls[1].body.text).toBe(SUBSCRIBED_MESSAGE);
+      expect(calls.map((c) => c.method)).toEqual([
+        "answerCallbackQuery",
+        "editMessageReplyMarkup",
+      ]);
+      expect(calls[0].body.callback_query_id).toBe("cb-sub");
+      expect(calls[0].body.text).toBe(SUBSCRIBED_MESSAGE);
+      expect(calls[1].body.chat_id).toBe(42);
+      expect(calls[1].body.message_id).toBe(1001);
       expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard(true));
       expect(JSON.stringify(calls[1].body.reply_markup)).toContain(
         UNSUBSCRIBE_BUTTON_LABEL,
@@ -1366,6 +1377,7 @@ describe("telegram button e2e", () => {
         { message: { chat: { id: 42 }, text: "hi" } },
         deps,
       );
+      expect(calls[0].method).toBe("sendMessage");
       expect(calls[0].body.reply_markup).toEqual(todayMenuKeyboard(true));
 
       calls.length = 0;
@@ -1374,31 +1386,39 @@ describe("telegram button e2e", () => {
           callback_query: {
             id: "cb-unsub",
             data: UNSUBSCRIBE_CALLBACK,
-            message: { chat: { id: 42 } },
+            message: { chat: { id: 42 }, message_id: 1001 },
           },
         },
         deps,
       );
       expect(chats.has(42)).toBe(false);
-      expect(calls[1].body.text).toBe(UNSUBSCRIBED_MESSAGE);
+      expect(calls.map((c) => c.method)).toEqual([
+        "answerCallbackQuery",
+        "editMessageReplyMarkup",
+      ]);
+      expect(calls[0].body.text).toBe(UNSUBSCRIBED_MESSAGE);
       expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard(false));
+      expect(JSON.stringify(calls[1].body.reply_markup)).toContain(
+        SUBSCRIBE_BUTTON_LABEL,
+      );
     });
   });
 
-  it("subscribe/unsubscribe errors keep a static keyboard without looking up prefs", async () => {
+  it("subscribe/unsubscribe errors toast without a new message or prefs lookup", async () => {
     await withMockTelegram(async (calls) => {
       await processTelegramUpdate(
         {
           callback_query: {
             id: "cb-sub-fail",
             data: SUBSCRIBE_CALLBACK,
-            message: { chat: { id: 7 } },
+            message: { chat: { id: 7 }, message_id: 9 },
           },
         },
         {
           getTodayMenus: async () => ({ peony: null, azilea: null }),
           sendMessage,
           answerCallbackQuery,
+          editMessageReplyMarkup,
           isSubscribed: async () => {
             throw new Error("prefs lookup should not run");
           },
@@ -1407,12 +1427,8 @@ describe("telegram button e2e", () => {
           },
         },
       );
-      expect(calls.map((c) => c.method)).toEqual([
-        "answerCallbackQuery",
-        "sendMessage",
-      ]);
-      expect(String(calls[1].body.text)).toContain("Не удалось подписаться");
-      expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard(false));
+      expect(calls.map((c) => c.method)).toEqual(["answerCallbackQuery"]);
+      expect(String(calls[0].body.text)).toBe(SUBSCRIBE_FAILED_MESSAGE);
 
       calls.length = 0;
       await processTelegramUpdate(
@@ -1420,13 +1436,14 @@ describe("telegram button e2e", () => {
           callback_query: {
             id: "cb-unsub-fail",
             data: UNSUBSCRIBE_CALLBACK,
-            message: { chat: { id: 7 } },
+            message: { chat: { id: 7 }, message_id: 9 },
           },
         },
         {
           getTodayMenus: async () => ({ peony: null, azilea: null }),
           sendMessage,
           answerCallbackQuery,
+          editMessageReplyMarkup,
           isSubscribed: async () => {
             throw new Error("prefs lookup should not run");
           },
@@ -1435,9 +1452,72 @@ describe("telegram button e2e", () => {
           },
         },
       );
-      expect(String(calls[1].body.text)).toContain("Не удалось отписаться");
-      expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard(true));
+      expect(calls.map((c) => c.method)).toEqual(["answerCallbackQuery"]);
+      expect(String(calls[0].body.text)).toBe(UNSUBSCRIBE_FAILED_MESSAGE);
     });
+  });
+
+  it("toasts subscribe without editing when the callback has no message_id", async () => {
+    await withMockTelegram(async (calls) => {
+      await processTelegramUpdate(
+        {
+          callback_query: {
+            id: "cb-sub-no-mid",
+            data: SUBSCRIBE_CALLBACK,
+            message: { chat: { id: 42 } },
+          },
+        },
+        {
+          getTodayMenus: async () => ({ peony: null, azilea: null }),
+          sendMessage,
+          answerCallbackQuery,
+          editMessageReplyMarkup,
+          subscribe: async () => undefined,
+        },
+      );
+      expect(calls.map((c) => c.method)).toEqual(["answerCallbackQuery"]);
+      expect(calls[0].body.text).toBe(SUBSCRIBED_MESSAGE);
+    });
+  });
+
+  it("still toasts and skips extra text when the keyboard cannot be edited", async () => {
+    await withMockTelegram(
+      async (calls) => {
+        await processTelegramUpdate(
+          {
+            callback_query: {
+              id: "cb-sub-stale",
+              data: SUBSCRIBE_CALLBACK,
+              message: { chat: { id: 42 }, message_id: 77 },
+            },
+          },
+          {
+            getTodayMenus: async () => ({ peony: null, azilea: null }),
+            sendMessage,
+            answerCallbackQuery,
+            editMessageReplyMarkup,
+            subscribe: async () => undefined,
+          },
+        );
+        expect(calls.map((c) => c.method)).toEqual([
+          "answerCallbackQuery",
+          "editMessageReplyMarkup",
+        ]);
+        expect(calls[0].body.text).toBe(SUBSCRIBED_MESSAGE);
+        expect(calls.some((c) => c.method === "sendMessage")).toBe(false);
+      },
+      {
+        respond: (call) => {
+          if (call.method === "editMessageReplyMarkup") {
+            return {
+              status: 400,
+              body: { ok: false, description: "message can't be edited" },
+            };
+          }
+          return { status: 200, body: { ok: true } };
+        },
+      },
+    );
   });
 });
 
