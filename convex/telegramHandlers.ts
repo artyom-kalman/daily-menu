@@ -308,6 +308,8 @@ export async function deliverMorningPushes(args: {
   releaseClaim?: (chatId: number) => Promise<void>;
   /** Clear the in-flight marker after a successful send. */
   completeDelivery?: (chatId: number) => Promise<void>;
+  /** 12:30 KST last cron attempt: send even if one hall is still empty. */
+  lastAttempt?: boolean;
 }): Promise<MorningPushSummary> {
   const summary: MorningPushSummary = {
     sent: 0,
@@ -320,6 +322,7 @@ export async function deliverMorningPushes(args: {
       today: args.today,
       peony: args.peony,
       azilea: args.azilea,
+      lastAttempt: args.lastAttempt,
     })
   ) {
     return summary;

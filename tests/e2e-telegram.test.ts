@@ -1524,6 +1524,49 @@ describe("morning push", () => {
     ).toBe(false);
   });
 
+  it("on the last attempt sends even if one hall is empty", () => {
+    expect(
+      shouldSendMorningPush({
+        today: monday,
+        peony: tray,
+        azilea: noInfo,
+        lastAttempt: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldSendMorningPush({
+        today: monday,
+        peony: tray,
+        azilea: stub,
+        lastAttempt: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldSendMorningPush({
+        today: monday,
+        peony: noInfo,
+        azilea: tray,
+        lastAttempt: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldSendMorningPush({
+        today: monday,
+        peony: noInfo,
+        azilea: noInfo,
+        lastAttempt: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldSendMorningPush({
+        today: saturday,
+        peony: tray,
+        azilea: noInfo,
+        lastAttempt: true,
+      }),
+    ).toBe(false);
+  });
+
   it("sends one menu per opted-in chat and keeps going after a failed send", async () => {
     const sent: number[] = [];
     const dropped: number[] = [];
@@ -1572,6 +1615,23 @@ describe("morning push", () => {
     });
     expect(send).not.toHaveBeenCalled();
     expect(summary.sent).toBe(0);
+  });
+
+  it("sends on the last attempt even if one hall is empty", async () => {
+    const send = vi.fn(async () => ({ ok: true }));
+    const summary = await deliverMorningPushes({
+      today: monday,
+      peony: tray,
+      azilea: noInfo,
+      lastAttempt: true,
+      menuText: "last try",
+      subscribers: [{ chatId: 1 }],
+      send,
+      markPushed: async () => undefined,
+      dropSubscriber: async () => undefined,
+    });
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(summary.sent).toBe(1);
   });
 
   it("does not send on a closed day even if chats are opted in", async () => {

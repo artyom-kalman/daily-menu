@@ -45,7 +45,7 @@ tests/
 
 1. User sends any message (e.g. `/start`) → bot replies with today's Peony + Azilea menu. **Сегодняшнее меню** and **Присылать утром** stay on that message.
 2. User taps **Сегодняшнее меню** → the same formatted menu again (refresh, including stub trays). Peony + Azilea grouped by tray slot (горячее / суп / салат / ещё). No extra «Сегодня» line. Telegram HTML: bold names, italic gloss and section labels, compact chili. Staples bunch on one line. Both buttons stay on the menu.
-3. **Присылать утром** stores that `chatId` in Convex. After a weekday scrape when **both** halls are settled (each 5+ live dishes, or a closed notice), opted-in chats get the same menu once. A stub on either side waits. **Отписаться** deletes the row (stops the next day). No student commands; no weekly reminder.
+3. **Присылать утром** stores that `chatId` in Convex. After a weekday scrape when **both** halls are settled (each 5+ live dishes, or a closed notice), opted-in chats get the same menu once. A stub on either side waits until the last 12:30 KST attempt, which sends anyway even if one hall is empty. **Отписаться** deletes the row (stops the next day). No student commands; no weekly reminder.
 
 `ADMIN_CHAT_ID` can also use English admin commands (anyone else who types them still gets today's menu):
 
@@ -187,6 +187,6 @@ npx convex run menus:seedToday '{"peonyDishes":[{"name":"Test","description":"x"
 - Retries every **30 minutes** until a **complete** menu is found or **12:30 KST**. Fewer than **5** dishes (e.g. Azilea 오므라이스, or `잔치국수` + `추가밥`) is shown but not treated as ready — fetching continues. A closed/holiday notice is still final as one line. If the page is still empty at 12:30, the bot shows «Нет информации» (not a holiday).
 - If the cafeteria posts a closed/holiday notice as a menu item, that text is shown as-is and fetching stops.
 - Tapping **Сегодняшнее меню** re-fetches when there is still no complete live menu (empty, stub, or `no_info`).
-- After a weekday fetch when **both** halls are settled (each 5+ live dishes, or a closed notice), opted-in chats get that menu once (`subscribers.lastPushedDate`). Weekends, both-closed / `no_info` days, and any remaining stub are skipped. A failed send does not stop the rest of the batch; a blocked chat is dropped.
+- After a weekday fetch when **both** halls are settled (each 5+ live dishes, or a closed notice), opted-in chats get that menu once (`subscribers.lastPushedDate`). A stub or empty hall waits. On the last 12:30 KST attempt the bot sends anyway even if one side is still empty (`Нет информации`). Weekends and both-empty days are skipped. A failed send does not stop the rest of the batch; a blocked chat is dropped.
 - **00:00 KST (15:00 UTC)** — prune `menus` and `fetchAttempts` older than **30 days**. Today’s rows are never deleted. Subscriber rows are not pruned; they are deleted on unsubscribe or blocked-chat delivery. Run `npx convex run prune:pruneOldData` to drain a backlog manually.
 - Fetch errors retry until **12:30 KST**, then alert `ADMIN_CHAT_ID`.
