@@ -11,6 +11,8 @@ import {
   sendAdminAlert,
   sendMessage,
 } from "./telegramClient";
+import { kstHourMinute } from "./dates";
+import { isWaitingForTodaysMenu } from "./refreshPolicy";
 import { processTelegramUpdate, toAdminStatus } from "./telegramHandlers";
 import { isAuthorizedWebhook } from "./webhookAuth";
 import {
@@ -92,8 +94,21 @@ export const handleWebhook = httpAction(async (ctx, request) => {
 
   await processTelegramUpdate(update, {
     getTodayMenus: async () => {
-      // Re-fetch only when there is still no live menu. If the cafeteria
-      // posted a closed notice, that counts as a menu and we stop.
+      const stored = await ctx.runQuery(internal.menus.getTodayBoth, {});
+      const { hour, minute } = kstHourMinute();
+      if (
+        isWaitingForTodaysMenu({
+          date: stored.date,
+          hour,
+          minute,
+          peony: stored.peony,
+          azilea: stored.azilea,
+        })
+      ) {
+        return { peony: null, azilea: null, awaitingTodaysMenu: true };
+      }
+      // Re-fetch only when there is still no complete live menu. If the
+      // cafeteria posted a closed notice, that counts as a menu and we stop.
       await ctx.runAction(internal.menus.refreshStaleForToday, {});
       const today = await ctx.runQuery(internal.menus.getTodayBoth, {});
       return { peony: today.peony, azilea: today.azilea };
