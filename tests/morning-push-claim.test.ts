@@ -13,12 +13,6 @@ const tray = {
   fetchedAt: 1,
 };
 
-const noInfo = {
-  source: "no_info" as const,
-  dishes: [],
-  fetchedAt: 1,
-};
-
 const monday = "2026-09-07";
 const STALE_AFTER_MS = 60_000;
 
@@ -83,7 +77,7 @@ function baseArgs(store: ReturnType<typeof createPushClaimStore>, nowMs: number)
   return {
     today: monday,
     peony: tray,
-    azilea: noInfo,
+    azilea: tray,
     menuText: "menu",
     sendTimeoutMs: 5_000,
     claimDelivery: (chatId: number) => store.claim(chatId, monday, nowMs),

@@ -1479,16 +1479,25 @@ describe("morning push", () => {
     expect(isKstWeekend(monday)).toBe(false);
   });
 
-  it("pushes only a complete live tray on weekdays", () => {
+  it("pushes only when both halls are settled on weekdays", () => {
     expect(isPushableFoodMenu(tray)).toBe(true);
     expect(isPushableFoodMenu(stub)).toBe(false);
     expect(isPushableFoodMenu(notice)).toBe(false);
     expect(isPushableFoodMenu(noInfo)).toBe(false);
     expect(
-      shouldSendMorningPush({ today: monday, peony: tray, azilea: stub }),
+      shouldSendMorningPush({ today: monday, peony: tray, azilea: tray }),
     ).toBe(true);
     expect(
+      shouldSendMorningPush({ today: monday, peony: tray, azilea: stub }),
+    ).toBe(false);
+    expect(
+      shouldSendMorningPush({ today: monday, peony: stub, azilea: tray }),
+    ).toBe(false);
+    expect(
       shouldSendMorningPush({ today: monday, peony: tray, azilea: notice }),
+    ).toBe(true);
+    expect(
+      shouldSendMorningPush({ today: monday, peony: notice, azilea: tray }),
     ).toBe(true);
     expect(
       shouldSendMorningPush({ today: monday, peony: notice, azilea: noInfo }),
@@ -1497,7 +1506,64 @@ describe("morning push", () => {
       shouldSendMorningPush({ today: monday, peony: stub, azilea: stub }),
     ).toBe(false);
     expect(
+      shouldSendMorningPush({ today: monday, peony: notice, azilea: notice }),
+    ).toBe(false);
+    expect(
       shouldSendMorningPush({ today: saturday, peony: tray, azilea: tray }),
+    ).toBe(false);
+  });
+
+  it("does not treat 5+ as a combined count across halls", () => {
+    const three = {
+      source: "live" as const,
+      dishes: [{ name: "A" }, { name: "B" }, { name: "C" }],
+      fetchedAt: 1,
+    };
+    expect(
+      shouldSendMorningPush({ today: monday, peony: three, azilea: three }),
+    ).toBe(false);
+  });
+
+  it("on the last attempt sends even if one hall is empty", () => {
+    expect(
+      shouldSendMorningPush({
+        today: monday,
+        peony: tray,
+        azilea: noInfo,
+        lastAttempt: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldSendMorningPush({
+        today: monday,
+        peony: tray,
+        azilea: stub,
+        lastAttempt: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldSendMorningPush({
+        today: monday,
+        peony: noInfo,
+        azilea: tray,
+        lastAttempt: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldSendMorningPush({
+        today: monday,
+        peony: noInfo,
+        azilea: noInfo,
+        lastAttempt: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldSendMorningPush({
+        today: saturday,
+        peony: tray,
+        azilea: noInfo,
+        lastAttempt: true,
+      }),
     ).toBe(false);
   });
 
@@ -1508,7 +1574,7 @@ describe("morning push", () => {
     const summary = await deliverMorningPushes({
       today: monday,
       peony: tray,
-      azilea: noInfo,
+      azilea: tray,
       menuText: "menu",
       subscribers: [
         { chatId: 1 },
@@ -1533,6 +1599,39 @@ describe("morning push", () => {
     expect(dropped).toEqual([1]);
     expect(marked).toEqual([4]);
     expect(summary).toEqual({ sent: 1, failed: 1, skipped: 1, dropped: 1 });
+  });
+
+  it("does not send while either hall is still a stub", async () => {
+    const send = vi.fn(async () => ({ ok: true }));
+    const summary = await deliverMorningPushes({
+      today: monday,
+      peony: tray,
+      azilea: stub,
+      menuText: "partial",
+      subscribers: [{ chatId: 1 }],
+      send,
+      markPushed: async () => undefined,
+      dropSubscriber: async () => undefined,
+    });
+    expect(send).not.toHaveBeenCalled();
+    expect(summary.sent).toBe(0);
+  });
+
+  it("sends on the last attempt even if one hall is empty", async () => {
+    const send = vi.fn(async () => ({ ok: true }));
+    const summary = await deliverMorningPushes({
+      today: monday,
+      peony: tray,
+      azilea: noInfo,
+      lastAttempt: true,
+      menuText: "last try",
+      subscribers: [{ chatId: 1 }],
+      send,
+      markPushed: async () => undefined,
+      dropSubscriber: async () => undefined,
+    });
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(summary.sent).toBe(1);
   });
 
   it("does not send on a closed day even if chats are opted in", async () => {
