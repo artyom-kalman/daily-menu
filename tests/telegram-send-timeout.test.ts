@@ -18,12 +18,6 @@ const tray = {
   fetchedAt: 1,
 };
 
-const noInfo = {
-  source: "no_info" as const,
-  dishes: [],
-  fetchedAt: 1,
-};
-
 const monday = "2026-09-07";
 
 describe("telegram send timeout", () => {
@@ -47,7 +41,7 @@ describe("telegram send timeout", () => {
     const summary = await deliverMorningPushes({
       today: monday,
       peony: tray,
-      azilea: noInfo,
+      azilea: tray,
       menuText: "menu",
       sendTimeoutMs,
       subscribers: [{ chatId: 1 }, { chatId: 2 }],

@@ -6,7 +6,7 @@ export const CUTOFF_HOUR = 12;
 export const CUTOFF_MINUTE = 30;
 export const RETRY_DELAY_MS = 30 * 60 * 1000;
 
-/** Typical tray is 6–8 items. Fewer than 5 is still a stub (오므라이스, or 잔치국수+추가밥). */
+/** Typical tray is 6–8 items. Count is per cafeteria, never summed across halls. Fewer than 5 is still a stub (오므라이스, or 잔치국수+추가밥). */
 export const MIN_READY_DISH_COUNT = 5;
 
 export type MenuSource = "live" | "fallback" | "holiday" | "no_info";
