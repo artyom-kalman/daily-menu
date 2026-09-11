@@ -27,7 +27,7 @@ Vitest is not enough for Telegram UX. After the code is ready, **deploy to Conve
 - `TELEGRAM_WEBHOOK_SECRET` is required; the webhook 401s if it is missing or wrong
 - Separate Telegram bots for Convex **dev** and **prod** (one bot = one webhook). Register with `npx convex run telegram:setWebhook` (uses `CONVEX_SITE_URL`; do not paste URLs). `npx convex dev` does not change Telegram webhooks.
 - Secrets in Convex env; cafeteria URLs in `appConfig` singleton (`key: "default"`)
-- Telegram UX: two inline buttons — `today_menu` and morning `Присылать утром` / `Отписаться`. No student commands.
+- Telegram UX: two inline buttons — `today_menu` and morning `Присылать утром` / `Отписаться`. Opt-in/out is a toast + button flip, not a new message. No student commands.
 - Admin commands (`/status`, `/refetch`, `/stats`) only for `ADMIN_CHAT_ID`; everyone else gets today's menu with the two buttons. `/stats` sends `APTABASE_DASHBOARD_URL`
 - Keep bot logic in `telegramHandlers.ts` so E2E can run without a live deploy
 - Prune `menus` and `fetchAttempts` older than 30 days at 00:00 KST; never delete today's rows. `subscribers` are dropped on unsubscribe or blocked-chat delivery.
