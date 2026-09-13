@@ -57,10 +57,23 @@ export function addCalendarDays(ymd: string, days: number): string {
   return formatKstDate(new Date(Date.UTC(year, month - 1, day + days)));
 }
 
+/** KST calendar YYYY-MM-DD for an epoch millisecond instant. */
+export function kstYmdFromMs(ms: number): string {
+  return formatKstDate(new Date(ms + KST_OFFSET_MS));
+}
+
+/** KST hour and minute for an epoch millisecond instant. */
+export function kstHourMinuteFromMs(ms: number): {
+  hour: number;
+  minute: number;
+} {
+  const d = new Date(ms + KST_OFFSET_MS);
+  return { hour: d.getUTCHours(), minute: d.getUTCMinutes() };
+}
+
 /** Current KST hour and minute, as numbers. */
 export function kstHourMinute(): { hour: number; minute: number } {
-  const d = nowAsKstWallClock();
-  return { hour: d.getUTCHours(), minute: d.getUTCMinutes() };
+  return kstHourMinuteFromMs(Date.now());
 }
 
 /** HH:MM in KST for an epoch millisecond instant. */
