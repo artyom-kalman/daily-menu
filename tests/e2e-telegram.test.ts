@@ -1887,6 +1887,16 @@ describe("morning push", () => {
     expect(fetchAll.match(/internal\.morningPush\.pushIfReady/g)).toHaveLength(
       2,
     );
+    const morningPush = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "../convex/morningPush.ts"),
+      "utf8",
+    );
+    expect(morningPush).toContain("deliverChannelPost");
+    expect(morningPush).toContain("internal.channelPush.claim");
+    expect(morningPush).toContain("TELEGRAM_CHANNEL_CHAT_ID");
+    expect(morningPush).toMatch(
+      /deliverChannelPost\(\{[\s\S]*?lastAttempt,/,
+    );
     expect(todayMenuKeyboard(false).inline_keyboard).toHaveLength(2);
     expect(todayMenuKeyboard(true).inline_keyboard[1][0].text).toBe(
       UNSUBSCRIBE_BUTTON_LABEL,
