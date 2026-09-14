@@ -6,6 +6,11 @@ import {
   readChannelChatId,
 } from "../convex/telegramHandlers";
 import { EVENT_CHANNEL_POST } from "../convex/analytics";
+import {
+  decideClaimChannelPush,
+  ownsChannelClaim,
+  type ChannelPushClaimRow,
+} from "../convex/channelPushPolicy";
 
 const tray = {
   source: "live" as const,
@@ -29,25 +34,50 @@ const monday = "2026-09-07";
 const CHANNEL = "-1001234567890";
 
 function createChannelClaimStore() {
-  let row: { lastPostedDate?: string; claimedAt?: number } | undefined;
+  let row: ChannelPushClaimRow | undefined;
+  let tokenSeq = 0;
   return {
-    snapshot() {
+    snapshot(): ChannelPushClaimRow | undefined {
       return row ? { ...row } : undefined;
     },
     async claim(date: string, nowMs: number, staleAfterMs = 60_000) {
-      if (row?.lastPostedDate === date) {
-        if (row.claimedAt == null) return false;
-        if (nowMs - row.claimedAt < staleAfterMs) return false;
+      const decision = decideClaimChannelPush(row ?? {}, {
+        date,
+        nowMs,
+        staleAfterMs,
+      });
+      if (!decision.claimed) return { claimed: false as const };
+      if (decision.resumeComplete) {
+        return {
+          claimed: true as const,
+          claimToken: decision.claimToken,
+          resumeComplete: true as const,
+        };
       }
-      row = { lastPostedDate: date, claimedAt: nowMs };
-      return true;
+      const claimToken = `tok-${++tokenSeq}`;
+      row = {
+        lastPostedDate: decision.lastPostedDate,
+        claimedAt: decision.claimedAt,
+        claimToken,
+      };
+      return { claimed: true as const, claimToken, resumeComplete: false as const };
     },
-    async complete(date: string) {
-      if (!row || row.lastPostedDate !== date) return;
-      delete row.claimedAt;
+    async confirm(date: string, claimToken: string) {
+      if (!ownsChannelClaim(row, { date, claimToken })) return;
+      row = { ...row, sendConfirmed: true };
     },
-    async release(date: string) {
-      if (!row || row.lastPostedDate !== date || row.claimedAt == null) return;
+    async complete(date: string, claimToken: string) {
+      if (!ownsChannelClaim(row, { date, claimToken })) return;
+      row = { lastPostedDate: date, sendConfirmed: true };
+    },
+    async release(date: string, claimToken: string) {
+      if (
+        !ownsChannelClaim(row, { date, claimToken }) ||
+        row.claimedAt == null ||
+        row.sendConfirmed
+      ) {
+        return;
+      }
       row = {};
     },
   };
@@ -62,8 +92,9 @@ function baseArgs(store: ReturnType<typeof createChannelClaimStore>, nowMs: numb
     menuText: "menu",
     sendTimeoutMs: 5_000,
     claimDelivery: () => store.claim(monday, nowMs),
-    completeDelivery: () => store.complete(monday),
-    releaseClaim: () => store.release(monday),
+    confirmDelivery: (token: string) => store.confirm(monday, token),
+    completeDelivery: (token: string) => store.complete(monday, token),
+    releaseClaim: (token: string) => store.release(monday, token),
   };
 }
 
@@ -158,7 +189,10 @@ describe("deliverChannelPost", () => {
     expect(send).toHaveBeenCalledTimes(1);
     expect(send.mock.calls[0]?.length).toBe(2);
     expect(tracked).toEqual([{ name: EVENT_CHANNEL_POST, date: monday }]);
-    expect(store.snapshot()).toEqual({ lastPostedDate: monday });
+    expect(store.snapshot()).toEqual({
+      lastPostedDate: monday,
+      sendConfirmed: true,
+    });
 
     const second = await deliverChannelPost({
       ...baseArgs(store, nowMs),
@@ -231,7 +265,10 @@ describe("deliverChannelPost", () => {
       send: async () => ({ ok: true }),
     });
     expect(retried.outcome).toBe("sent");
-    expect(store.snapshot()).toEqual({ lastPostedDate: monday });
+    expect(store.snapshot()).toEqual({
+      lastPostedDate: monday,
+      sendConfirmed: true,
+    });
   });
 
   it("releases a blocked channel so a later retry can post", async () => {
@@ -243,6 +280,187 @@ describe("deliverChannelPost", () => {
     });
     expect(blocked.outcome).toBe("blocked");
     expect(store.snapshot()).toEqual({});
+  });
+
+  it("does not release an ambiguous send timeout or allow a later resend", async () => {
+    const store = createChannelClaimStore();
+    const nowMs = 1_700_000_000_000;
+    const hung = await deliverChannelPost({
+      ...baseArgs(store, nowMs),
+      sendTimeoutMs: 20,
+      send: async () => new Promise(() => {}),
+    });
+    expect(hung.outcome).toBe("failed");
+    expect(store.snapshot()).toEqual({
+      lastPostedDate: monday,
+      claimedAt: nowMs,
+      claimToken: "tok-1",
+      sendConfirmed: true,
+    });
+
+    const send = vi.fn(async () => ({ ok: true }));
+    const later = await deliverChannelPost({
+      ...baseArgs(store, nowMs + 120_000),
+      send,
+    });
+    expect(send).not.toHaveBeenCalled();
+    expect(later.outcome).toBe("skipped");
+    expect(store.snapshot()).toEqual({
+      lastPostedDate: monday,
+      sendConfirmed: true,
+    });
+  });
+
+  it("does not release a result-object send timeout", async () => {
+    const store = createChannelClaimStore();
+    const nowMs = 1_700_000_000_000;
+    const timedOut = await deliverChannelPost({
+      ...baseArgs(store, nowMs),
+      send: async () => ({
+        ok: false,
+        description: "Telegram sendMessage timed out after 8000ms",
+      }),
+    });
+    expect(timedOut.outcome).toBe("failed");
+    expect(store.snapshot()?.lastPostedDate).toBe(monday);
+    expect(store.snapshot()?.sendConfirmed).toBe(true);
+    expect(store.snapshot()?.claimedAt).toBe(nowMs);
+
+    const send = vi.fn(async () => ({ ok: true }));
+    const later = await deliverChannelPost({
+      ...baseArgs(store, nowMs + 120_000),
+      send,
+    });
+    expect(send).not.toHaveBeenCalled();
+    expect(later.outcome).toBe("skipped");
+  });
+
+  it("retries complete after a confirmed send without sending again", async () => {
+    const store = createChannelClaimStore();
+    const nowMs = 1_700_000_000_000;
+    const send = vi.fn(async () => ({ ok: true }));
+    let completeCalls = 0;
+    const first = await deliverChannelPost({
+      ...baseArgs(store, nowMs),
+      send,
+      completeDelivery: async (token) => {
+        completeCalls += 1;
+        if (completeCalls === 1) throw new Error("complete rejected");
+        await store.complete(monday, token);
+      },
+    });
+    expect(first.outcome).toBe("sent");
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(completeCalls).toBe(1);
+    expect(store.snapshot()).toEqual({
+      lastPostedDate: monday,
+      claimedAt: nowMs,
+      claimToken: "tok-1",
+      sendConfirmed: true,
+    });
+
+    const second = await deliverChannelPost({
+      ...baseArgs(store, nowMs + 120_000),
+      send,
+      completeDelivery: async (token) => {
+        completeCalls += 1;
+        await store.complete(monday, token);
+      },
+    });
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(completeCalls).toBe(2);
+    expect(second.outcome).toBe("skipped");
+    expect(store.snapshot()).toEqual({
+      lastPostedDate: monday,
+      sendConfirmed: true,
+    });
+  });
+
+  it("does not let a stale claim release a newer claim", async () => {
+    const store = createChannelClaimStore();
+    const nowMs = 1_700_000_000_000;
+    let resolveFirstSend!: (value: { ok: boolean }) => void;
+    const firstSend = new Promise<{ ok: boolean }>((resolve) => {
+      resolveFirstSend = resolve;
+    });
+    let firstClaimed!: () => void;
+    const firstHasClaimed = new Promise<void>((resolve) => {
+      firstClaimed = resolve;
+    });
+
+    const first = deliverChannelPost({
+      ...baseArgs(store, nowMs),
+      sendTimeoutMs: 30_000,
+      claimDelivery: async () => {
+        const result = await store.claim(monday, nowMs);
+        firstClaimed();
+        return result;
+      },
+      send: async () => firstSend,
+    });
+    await firstHasClaimed;
+
+    const secondSend = vi.fn(async () => ({ ok: true }));
+    const second = await deliverChannelPost({
+      ...baseArgs(store, nowMs + 120_000),
+      send: secondSend,
+    });
+    expect(second.outcome).toBe("sent");
+    expect(secondSend).toHaveBeenCalledTimes(1);
+    expect(store.snapshot()).toEqual({
+      lastPostedDate: monday,
+      sendConfirmed: true,
+    });
+
+    resolveFirstSend({ ok: false });
+    const firstResult = await first;
+    expect(firstResult.outcome).toBe("failed");
+    expect(store.snapshot()).toEqual({
+      lastPostedDate: monday,
+      sendConfirmed: true,
+    });
+  });
+});
+
+describe("decideClaimChannelPush", () => {
+  const nowMs = 1_700_000_000_000;
+  const staleAfterMs = 60_000;
+
+  it("refuses to reclaim a confirmed post even after the claim is stale", () => {
+    expect(
+      decideClaimChannelPush(
+        {
+          lastPostedDate: monday,
+          claimedAt: nowMs - staleAfterMs - 1,
+          claimToken: "old",
+          sendConfirmed: true,
+        },
+        { date: monday, nowMs, staleAfterMs },
+      ),
+    ).toEqual({
+      claimed: true,
+      resumeComplete: true,
+      lastPostedDate: monday,
+      claimedAt: nowMs - staleAfterMs - 1,
+      claimToken: "old",
+    });
+  });
+
+  it("reclaims a stale unconfirmed claim for a new send", () => {
+    expect(
+      decideClaimChannelPush(
+        {
+          lastPostedDate: monday,
+          claimedAt: nowMs - staleAfterMs - 1,
+          claimToken: "old",
+        },
+        { date: monday, nowMs, staleAfterMs },
+      ),
+    ).toEqual({
+      claimed: true,
+      lastPostedDate: monday,
+      claimedAt: nowMs,
+    });
   });
 });
 

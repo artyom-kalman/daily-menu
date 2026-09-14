@@ -63,5 +63,9 @@ export default defineSchema({
     key: v.string(),
     lastPostedDate: v.optional(v.string()), // YYYY-MM-DD KST; one post per day
     claimedAt: v.optional(v.number()),
+    // Unique per in-flight claim so a stale worker cannot complete/release a newer one.
+    claimToken: v.optional(v.string()),
+    // Telegram ack or ambiguous timeout: never reclaim for another send.
+    sendConfirmed: v.optional(v.boolean()),
   }).index("by_key", ["key"]),
 });
