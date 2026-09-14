@@ -1,10 +1,10 @@
 import type { TrackEvent } from "./analytics";
 import { EVENT_START, EVENT_TODAY_MENU } from "./analytics";
 import { formatKstClock } from "./dates";
-import { formatMenuMessage } from "./format";
+import { formatMenuMessage, type FormatMenuLike } from "./format";
 import { shouldSendMorningPush } from "./morningPushPolicy";
 import type { StoredMenuLike } from "./refreshPolicy";
-import type { Cafeteria, Dish, ScrapeResult } from "./types";
+import type { Cafeteria, ScrapeResult } from "./types";
 import { TELEGRAM_SEND_TIMEOUT_MS, type InlineKeyboardMarkup } from "./telegramClient";
 import { withTimeout } from "./asyncTimeout";
 
@@ -28,11 +28,9 @@ export const STATS_UNSET_MESSAGE = "APTABASE_DASHBOARD_URL is not set";
 
 export type AdminCommand = "status" | "refetch" | "stats";
 
-type MenuLike = { dishes: Dish[] } | null;
-
 export type TodayMenus = {
-  peony: MenuLike;
-  azilea: MenuLike;
+  peony: FormatMenuLike;
+  azilea: FormatMenuLike;
 };
 
 export type AdminMenuLike = {
