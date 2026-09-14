@@ -1,7 +1,34 @@
-import type { Dish } from "./types";
+import {
+  formatKstClock,
+  kstHourMinuteFromMs,
+  kstYmdFromMs,
+  todayKst,
+} from "./dates";
 import { looksLikeCafeteriaNotice } from "./notices";
+import {
+  MIN_READY_DISH_COUNT,
+  pastCutoff,
+  type MenuSource,
+} from "./refreshPolicy";
+import type { Dish } from "./types";
 
 export const NO_MENU_INFO = "Нет информации";
+export const STILL_UPDATING = "ещё обновляется";
+
+const MONTHS_RU = [
+  "янв",
+  "фев",
+  "мар",
+  "апр",
+  "мая",
+  "июн",
+  "июл",
+  "авг",
+  "сен",
+  "окт",
+  "ноя",
+  "дек",
+] as const;
 
 export type Course = "hot" | "soup" | "salad" | "side";
 
@@ -14,7 +41,19 @@ const COURSE_HEADING: Record<Course, string> = {
   side: "Ещё",
 };
 
-type MenuLike = { dishes: Dish[] } | null;
+export type FormatMenuLike = {
+  dishes: Dish[];
+  source?: MenuSource;
+  fetchedAt?: number;
+  date?: string;
+} | null;
+
+export type FormatMenuOptions = {
+  /** KST calendar YYYY-MM-DD. Defaults to the menu row, then today. */
+  date?: string;
+  /** Epoch ms used for the 12:30 KST stub cutoff and a missing date. */
+  nowMs?: number;
+};
 
 /** Escape dish names for Telegram `parse_mode: HTML`. */
 export function escapeHtml(s: string): string {
@@ -67,7 +106,7 @@ function formatSideItem(dish: Dish): string {
   return `${bold(dish.name)}${formatSpiciness(dish.spiciness)}`;
 }
 
-function formatBlock(menu: MenuLike): string {
+function formatBlock(menu: FormatMenuLike): string {
   if (!menu || menu.dishes.length === 0) {
     return italic(NO_MENU_INFO);
   }
@@ -102,12 +141,85 @@ function formatBlock(menu: MenuLike): string {
   return parts.join("\n");
 }
 
-export function formatMenuMessage(peony: MenuLike, azilea: MenuLike): string {
+/** `9 сен` or `9 сен · 09:14` from a KST calendar date and optional fetch instant. */
+export function formatMenuDateLine(
+  ymd: string,
+  fetchedAt?: number | null,
+): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
+  if (!match) {
+    throw new Error(`Invalid YYYY-MM-DD: ${ymd}`);
+  }
+  const day = Number(match[3]);
+  const monthName = MONTHS_RU[Number(match[2]) - 1];
+  if (!monthName) {
+    throw new Error(`Invalid YYYY-MM-DD: ${ymd}`);
+  }
+  const datePart = `${day} ${monthName}`;
+  if (fetchedAt == null || fetchedAt <= 0) return datePart;
+  return `${datePart} · ${formatKstClock(fetchedAt)}`;
+}
+
+function menuCalendarDate(
+  peony: FormatMenuLike,
+  azilea: FormatMenuLike,
+  options: FormatMenuOptions | undefined,
+): string {
+  if (options?.date) return options.date;
+  if (peony?.date) return peony.date;
+  if (azilea?.date) return azilea.date;
+  if (options?.nowMs != null) return kstYmdFromMs(options.nowMs);
+  return todayKst();
+}
+
+function latestFetchedAt(
+  peony: FormatMenuLike,
+  azilea: FormatMenuLike,
+): number | null {
+  const times = [peony?.fetchedAt, azilea?.fetchedAt].filter(
+    (ms): ms is number => typeof ms === "number" && ms > 0,
+  );
+  if (times.length === 0) return null;
+  return Math.max(...times);
+}
+
+/**
+ * Live food list that is on the page but not a full tray yet.
+ * Closed notices, empty/`no_info`, and anything at/after 12:30 KST stay quiet.
+ */
+export function isUpdatingStub(
+  menu: FormatMenuLike,
+  nowMs: number = Date.now(),
+): boolean {
+  const { hour, minute } = kstHourMinuteFromMs(nowMs);
+  if (pastCutoff(hour, minute)) return false;
+  if (!menu || menu.source !== "live") return false;
+  if (menu.dishes.length === 0) return false;
+  const names = menu.dishes.map((d) => d.name);
+  if (looksLikeCafeteriaNotice(names)) return false;
+  return names.length < MIN_READY_DISH_COUNT;
+}
+
+function formatHall(heading: string, menu: FormatMenuLike, nowMs: number): string {
+  const parts = [`${bold(heading)}`, formatBlock(menu)];
+  if (isUpdatingStub(menu, nowMs)) {
+    parts.push(italic(STILL_UPDATING));
+  }
+  return parts.join("\n");
+}
+
+export function formatMenuMessage(
+  peony: FormatMenuLike,
+  azilea: FormatMenuLike,
+  options?: FormatMenuOptions,
+): string {
+  const nowMs = options?.nowMs ?? Date.now();
+  const date = menuCalendarDate(peony, azilea, options);
+  const header = formatMenuDateLine(date, latestFetchedAt(peony, azilea));
   return (
-    `${bold("🌸 Peony · верхняя")}\n` +
-    formatBlock(peony) +
+    `${escapeHtml(header)}\n\n` +
+    formatHall("🌸 Peony · верхняя", peony, nowMs) +
     "\n\n" +
-    `${bold("🌺 Azilea · нижняя")}\n` +
-    formatBlock(azilea)
+    formatHall("🌺 Azilea · нижняя", azilea, nowMs)
   );
 }

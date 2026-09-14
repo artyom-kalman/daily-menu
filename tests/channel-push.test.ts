@@ -57,7 +57,7 @@ function baseArgs(store: ReturnType<typeof createChannelClaimStore>, nowMs: numb
   return {
     today: monday,
     peony: tray,
-    azilea: noInfo,
+    azilea: tray,
     channelChatId: CHANNEL,
     menuText: "menu",
     sendTimeoutMs: 5_000,
@@ -104,7 +104,7 @@ describe("deliverChannelPost", () => {
     const summary = await deliverChannelPost({
       today: monday,
       peony: tray,
-      azilea: noInfo,
+      azilea: tray,
       channelChatId: undefined,
       menuText: "menu",
       send,
@@ -173,7 +173,7 @@ describe("deliverChannelPost", () => {
     const summary = await deliverChannelPost({
       today: monday,
       peony: tray,
-      azilea: noInfo,
+      azilea: tray,
       channelChatId: CHANNEL,
       menuText: "menu",
       lastPostedDate: monday,
@@ -181,6 +181,39 @@ describe("deliverChannelPost", () => {
     });
     expect(summary.outcome).toBe("skipped");
     expect(send).not.toHaveBeenCalled();
+  });
+
+  it("waits while either hall is still a stub", async () => {
+    const send = vi.fn(async () => ({ ok: true }));
+    const summary = await deliverChannelPost({
+      today: monday,
+      peony: tray,
+      azilea: {
+        source: "live",
+        dishes: [{ name: "오므라이스" }],
+        fetchedAt: 1,
+      },
+      channelChatId: CHANNEL,
+      menuText: "partial",
+      send,
+    });
+    expect(summary.outcome).toBe("skipped");
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("posts on the last attempt even if one hall is empty", async () => {
+    const send = vi.fn(async () => ({ ok: true }));
+    const summary = await deliverChannelPost({
+      today: monday,
+      peony: tray,
+      azilea: noInfo,
+      lastAttempt: true,
+      channelChatId: CHANNEL,
+      menuText: "last try",
+      send,
+    });
+    expect(summary.outcome).toBe("sent");
+    expect(send).toHaveBeenCalledTimes(1);
   });
 
   it("releases a failed send so a later retry can post", async () => {
