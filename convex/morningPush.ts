@@ -99,16 +99,29 @@ export const pushIfReady = internalAction({
           nowMs: Date.now(),
           staleAfterMs: 60_000,
         });
-        return result.claimed;
+        if (!result.claimed) return { claimed: false as const };
+        return {
+          claimed: true as const,
+          claimToken: result.claimToken,
+          resumeComplete: result.resumeComplete,
+        };
       },
-      completeDelivery: async () => {
-        await ctx.runMutation(internal.channelPush.complete, {
+      confirmDelivery: async (claimToken) => {
+        await ctx.runMutation(internal.channelPush.confirm, {
           date: today.date,
+          claimToken,
         });
       },
-      releaseClaim: async () => {
+      completeDelivery: async (claimToken) => {
+        await ctx.runMutation(internal.channelPush.complete, {
+          date: today.date,
+          claimToken,
+        });
+      },
+      releaseClaim: async (claimToken) => {
         await ctx.runMutation(internal.channelPush.release, {
           date: today.date,
+          claimToken,
         });
       },
     });

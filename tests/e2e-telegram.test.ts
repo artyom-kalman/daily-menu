@@ -1893,6 +1893,7 @@ describe("morning push", () => {
     );
     expect(morningPush).toContain("deliverChannelPost");
     expect(morningPush).toContain("internal.channelPush.claim");
+    expect(morningPush).toContain("internal.channelPush.confirm");
     expect(morningPush).toContain("TELEGRAM_CHANNEL_CHAT_ID");
     expect(morningPush).toMatch(
       /deliverChannelPost\(\{[\s\S]*?lastAttempt,/,

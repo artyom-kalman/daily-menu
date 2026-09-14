@@ -6,7 +6,7 @@ import { shouldSendMorningPush } from "./morningPushPolicy";
 import type { StoredMenuLike } from "./refreshPolicy";
 import type { Cafeteria, ScrapeResult } from "./types";
 import { TELEGRAM_SEND_TIMEOUT_MS, type InlineKeyboardMarkup } from "./telegramClient";
-import { withTimeout } from "./asyncTimeout";
+import { isTimeoutError, withTimeout } from "./asyncTimeout";
 
 export const TODAY_MENU_CALLBACK = "today_menu";
 export const TODAY_MENU_BUTTON_LABEL = "Сегодняшнее меню";
@@ -351,7 +351,12 @@ export type MorningSubscriber = {
 export type MorningSendResult = {
   ok: boolean;
   blocked?: boolean;
+  description?: string;
 };
+
+export type ChannelClaimResult =
+  | { claimed: false }
+  | { claimed: true; claimToken: string; resumeComplete?: boolean };
 
 export type MorningPushSummary = {
   sent: number;
@@ -492,6 +497,18 @@ export type ChannelPostSummary = {
  * No inline keyboard — those callbacks would bind the channel chat id.
  * Unset TELEGRAM_CHANNEL_CHAT_ID is a no-op.
  */
+function isAmbiguousSendTimeout(errOrResult: unknown): boolean {
+  if (
+    errOrResult != null &&
+    typeof errOrResult === "object" &&
+    "ok" in errOrResult
+  ) {
+    const result = errOrResult as MorningSendResult;
+    return !result.ok && isTimeoutError({ message: result.description ?? "" });
+  }
+  return isTimeoutError(errOrResult);
+}
+
 export async function deliverChannelPost(args: {
   today: string;
   peony: StoredMenuLike;
@@ -501,9 +518,10 @@ export async function deliverChannelPost(args: {
   send: (chatId: string, text: string) => Promise<MorningSendResult>;
   sendTimeoutMs?: number;
   lastPostedDate?: string;
-  claimDelivery?: () => Promise<boolean>;
-  completeDelivery?: () => Promise<void>;
-  releaseClaim?: () => Promise<void>;
+  claimDelivery?: () => Promise<ChannelClaimResult>;
+  confirmDelivery?: (claimToken: string) => Promise<void>;
+  completeDelivery?: (claimToken: string) => Promise<void>;
+  releaseClaim?: (claimToken: string) => Promise<void>;
   trackEvent?: TrackEvent;
   /** 12:30 KST last cron attempt: post even if one hall is still empty. */
   lastAttempt?: boolean;
@@ -523,31 +541,65 @@ export async function deliverChannelPost(args: {
     return { outcome: "skipped" };
   }
 
+  let claimToken: string | undefined;
   const releaseIfNeeded = async () => {
-    if (!args.releaseClaim) return;
+    if (!args.releaseClaim || claimToken == null) return;
     try {
-      await args.releaseClaim();
+      await args.releaseClaim(claimToken);
     } catch (err) {
       console.error(
         `channel post release failed: ${(err as Error).message}`,
       );
     }
   };
+  const confirmBestEffort = async () => {
+    if (!args.confirmDelivery || claimToken == null) return;
+    try {
+      await args.confirmDelivery(claimToken);
+    } catch (err) {
+      console.error(
+        `channel post confirm failed: ${(err as Error).message}`,
+      );
+      try {
+        await args.confirmDelivery(claimToken);
+      } catch (retryErr) {
+        console.error(
+          `channel post confirm retry failed: ${(retryErr as Error).message}`,
+        );
+      }
+    }
+  };
+  const completeBestEffort = async () => {
+    if (!args.completeDelivery || claimToken == null) return;
+    await args.completeDelivery(claimToken);
+  };
 
   if (args.claimDelivery) {
-    let claimed = false;
+    let claim: ChannelClaimResult = { claimed: false };
     try {
-      claimed = await args.claimDelivery();
+      claim = await args.claimDelivery();
     } catch (err) {
       console.error(`channel post claim failed: ${(err as Error).message}`);
       return { outcome: "failed" };
     }
-    if (!claimed) return { outcome: "skipped" };
+    if (!claim.claimed) return { outcome: "skipped" };
+    claimToken = claim.claimToken;
+    if (claim.resumeComplete) {
+      try {
+        await completeBestEffort();
+      } catch (err) {
+        console.error(
+          `channel post complete retry failed: ${(err as Error).message}`,
+        );
+      }
+      return { outcome: "skipped" };
+    }
   } else if (args.lastPostedDate === args.today) {
     return { outcome: "skipped" };
   }
 
   const sendTimeoutMs = args.sendTimeoutMs ?? TELEGRAM_SEND_TIMEOUT_MS;
+  let sendSucceeded = false;
   try {
     const result = await withTimeout(
       args.send(channelChatId, args.menuText),
@@ -559,16 +611,43 @@ export async function deliverChannelPost(args: {
       return { outcome: "blocked" };
     }
     if (!result.ok) {
+      if (isAmbiguousSendTimeout(result)) {
+        await confirmBestEffort();
+        return { outcome: "failed" };
+      }
       await releaseIfNeeded();
       return { outcome: "failed" };
     }
-    if (args.completeDelivery) {
-      await args.completeDelivery();
+    sendSucceeded = true;
+    await confirmBestEffort();
+    try {
+      await completeBestEffort();
+    } catch (err) {
+      console.error(
+        `channel post complete failed: ${(err as Error).message}`,
+      );
     }
     await safeTrack(args.trackEvent, EVENT_CHANNEL_POST, { date: args.today });
     return { outcome: "sent" };
   } catch (err) {
     console.error(`channel post failed: ${(err as Error).message}`);
+    if (sendSucceeded || isAmbiguousSendTimeout(err)) {
+      await confirmBestEffort();
+      if (sendSucceeded) {
+        try {
+          await completeBestEffort();
+        } catch (completeErr) {
+          console.error(
+            `channel post complete failed: ${(completeErr as Error).message}`,
+          );
+        }
+        await safeTrack(args.trackEvent, EVENT_CHANNEL_POST, {
+          date: args.today,
+        });
+        return { outcome: "sent" };
+      }
+      return { outcome: "failed" };
+    }
     await releaseIfNeeded();
     return { outcome: "failed" };
   }
