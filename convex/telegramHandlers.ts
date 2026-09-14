@@ -1,10 +1,10 @@
 import type { TrackEvent } from "./analytics";
 import { EVENT_START, EVENT_TODAY_MENU } from "./analytics";
 import { formatKstClock } from "./dates";
-import { formatMenuMessage } from "./format";
+import { formatMenuMessage, type FormatMenuLike } from "./format";
 import { shouldSendMorningPush } from "./morningPushPolicy";
 import type { StoredMenuLike } from "./refreshPolicy";
-import type { Cafeteria, Dish, ScrapeResult } from "./types";
+import type { Cafeteria, ScrapeResult } from "./types";
 import { TELEGRAM_SEND_TIMEOUT_MS, type InlineKeyboardMarkup } from "./telegramClient";
 import { withTimeout } from "./asyncTimeout";
 
@@ -16,6 +16,10 @@ export const SUBSCRIBE_BUTTON_LABEL = "Присылать утром";
 export const UNSUBSCRIBE_BUTTON_LABEL = "Отписаться";
 export const SUBSCRIBED_MESSAGE = "Буду присылать меню по утрам.";
 export const UNSUBSCRIBED_MESSAGE = "Больше не буду присылать утром.";
+export const SUBSCRIBE_FAILED_MESSAGE =
+  "Не удалось подписаться. Попробуйте позже.";
+export const UNSUBSCRIBE_FAILED_MESSAGE =
+  "Не удалось отписаться. Попробуйте позже.";
 export const MENU_UNAVAILABLE_MESSAGE =
   "Не удалось получить меню. Попробуйте позже.";
 export const MENU_NOT_READY_MESSAGE =
@@ -26,11 +30,9 @@ export const STATS_UNSET_MESSAGE = "APTABASE_DASHBOARD_URL is not set";
 
 export type AdminCommand = "status" | "refetch" | "stats";
 
-type MenuLike = { dishes: Dish[] } | null;
-
 export type TodayMenus = {
-  peony: MenuLike;
-  azilea: MenuLike;
+  peony: FormatMenuLike;
+  azilea: FormatMenuLike;
   /** Weekday, before cutoff, no today's rows — skip scrape, send try-later. */
   awaitingTodaysMenu?: boolean;
 };
@@ -79,6 +81,11 @@ export type TelegramDeps = {
     callbackQueryId: string,
     text?: string,
   ) => Promise<unknown>;
+  editMessageReplyMarkup?: (
+    chatId: number | string,
+    messageId: number,
+    replyMarkup: InlineKeyboardMarkup,
+  ) => Promise<unknown>;
   trackEvent?: TrackEvent;
   adminChatId?: string;
   aptabaseDashboardUrl?: string;
@@ -120,6 +127,49 @@ async function keyboardFor(
   return todayMenuKeyboard(subscribed);
 }
 
+function callbackMessageId(
+  message: { message_id?: number } | undefined,
+): number | undefined {
+  return typeof message?.message_id === "number" &&
+    Number.isFinite(message.message_id)
+    ? message.message_id
+    : undefined;
+}
+
+async function toastMorningToggle(
+  deps: TelegramDeps,
+  callbackId: string,
+  toast: string,
+): Promise<void> {
+  try {
+    await deps.answerCallbackQuery(callbackId, toast);
+  } catch (err) {
+    console.warn(
+      `answerCallbackQuery toast failed: ${(err as Error).message}`,
+    );
+  }
+}
+
+async function flipMorningKeyboard(
+  deps: TelegramDeps,
+  chatId: number,
+  messageId: number | undefined,
+  subscribed: boolean,
+): Promise<void> {
+  if (messageId == null || !deps.editMessageReplyMarkup) return;
+  try {
+    await deps.editMessageReplyMarkup(
+      chatId,
+      messageId,
+      todayMenuKeyboard(subscribed),
+    );
+  } catch (err) {
+    console.warn(
+      `editMessageReplyMarkup failed: ${(err as Error).message}`,
+    );
+  }
+}
+
 async function sendTodayMenu(
   chatId: number,
   deps: TelegramDeps,
@@ -150,7 +200,7 @@ type MessageUpdate = {
   callback_query?: {
     id?: string;
     data?: string;
-    message?: { chat?: { id?: number } };
+    message?: { chat?: { id?: number }; message_id?: number };
     from?: { id?: number };
   };
 };
@@ -314,6 +364,8 @@ export async function deliverMorningPushes(args: {
   releaseClaim?: (chatId: number) => Promise<void>;
   /** Clear the in-flight marker after a successful send. */
   completeDelivery?: (chatId: number) => Promise<void>;
+  /** 12:30 KST last cron attempt: send even if one hall is still empty. */
+  lastAttempt?: boolean;
 }): Promise<MorningPushSummary> {
   const summary: MorningPushSummary = {
     sent: 0,
@@ -326,6 +378,7 @@ export async function deliverMorningPushes(args: {
       today: args.today,
       peony: args.peony,
       azilea: args.azilea,
+      lastAttempt: args.lastAttempt,
     })
   ) {
     return summary;
@@ -467,8 +520,9 @@ async function handleAdminCommand(
  * - any student message → today's Peony + Azilea menus + keyboard
  *   (or «меню ещё не выложили» when a weekday fetch is still pending)
  * - ADMIN_CHAT_ID only: /status, /refetch, /stats
- * - callback "today_menu" → same menu (refresh, including stub trays)
- * - callback morning_subscribe / morning_unsubscribe → opt-in table
+ * - callback "today_menu" → same menu (refresh, including stub trays;
+ *   weekday empty-DB before cutoff sends «меню ещё не выложили» instead)
+ * - callback morning_subscribe / morning_unsubscribe → toast + flip keyboard
  */
 export async function processTelegramUpdate(
   update: unknown,
@@ -486,21 +540,16 @@ export async function processTelegramUpdate(
       return "ignored";
     }
 
-    await deps.answerCallbackQuery(callbackId);
+    const messageId = callbackMessageId(callback.message);
 
     if (callback.data === SUBSCRIBE_CALLBACK) {
       try {
         if (deps.subscribe) await deps.subscribe(chatId);
-        await deps.sendMessage(chatId, SUBSCRIBED_MESSAGE, {
-          reply_markup: todayMenuKeyboard(true),
-        });
+        await toastMorningToggle(deps, callbackId, SUBSCRIBED_MESSAGE);
+        await flipMorningKeyboard(deps, chatId, messageId, true);
       } catch (err) {
         console.error(`morning_subscribe failed: ${(err as Error).message}`);
-        await deps.sendMessage(
-          chatId,
-          "Не удалось подписаться. Попробуйте позже.",
-          { reply_markup: todayMenuKeyboard(false) },
-        );
+        await toastMorningToggle(deps, callbackId, SUBSCRIBE_FAILED_MESSAGE);
       }
       return "ok";
     }
@@ -508,19 +557,16 @@ export async function processTelegramUpdate(
     if (callback.data === UNSUBSCRIBE_CALLBACK) {
       try {
         if (deps.unsubscribe) await deps.unsubscribe(chatId);
-        await deps.sendMessage(chatId, UNSUBSCRIBED_MESSAGE, {
-          reply_markup: todayMenuKeyboard(false),
-        });
+        await toastMorningToggle(deps, callbackId, UNSUBSCRIBED_MESSAGE);
+        await flipMorningKeyboard(deps, chatId, messageId, false);
       } catch (err) {
         console.error(`morning_unsubscribe failed: ${(err as Error).message}`);
-        await deps.sendMessage(
-          chatId,
-          "Не удалось отписаться. Попробуйте позже.",
-          { reply_markup: todayMenuKeyboard(true) },
-        );
+        await toastMorningToggle(deps, callbackId, UNSUBSCRIBE_FAILED_MESSAGE);
       }
       return "ok";
     }
+
+    await deps.answerCallbackQuery(callbackId);
 
     if (callback.data !== TODAY_MENU_CALLBACK) {
       return "ok";

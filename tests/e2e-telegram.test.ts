@@ -5,15 +5,25 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import {
   escapeHtml,
+  formatMenuDateLine,
   formatMenuMessage,
   formatSpiciness,
   inferCourse,
+  isUpdatingStub,
   NO_MENU_INFO,
+  STILL_UPDATING,
 } from "../convex/format";
 import { looksLikeCafeteriaNotice } from "../convex/notices";
 import { DEFAULT_MODEL, SYSTEM_PROMPT } from "../convex/openrouter";
 import { shouldSendMorningPush, isPushableFoodMenu } from "../convex/morningPushPolicy";
-import { addCalendarDays, formatKstClock, isKstWeekend, weekdayFromYmd } from "../convex/dates";
+import {
+  addCalendarDays,
+  formatKstClock,
+  isKstWeekend,
+  kstHourMinuteFromMs,
+  kstYmdFromMs,
+  weekdayFromYmd,
+} from "../convex/dates";
 import { scrapeCafeteriasSafely } from "../convex/scrapeAll";
 import {
   PRUNE_HOUR_UTC,
@@ -58,9 +68,11 @@ import {
   STATS_UNSET_MESSAGE,
   SUBSCRIBE_BUTTON_LABEL,
   SUBSCRIBE_CALLBACK,
+  SUBSCRIBE_FAILED_MESSAGE,
   SUBSCRIBED_MESSAGE,
   UNSUBSCRIBE_BUTTON_LABEL,
   UNSUBSCRIBE_CALLBACK,
+  UNSUBSCRIBE_FAILED_MESSAGE,
   UNSUBSCRIBED_MESSAGE,
   TODAY_MENU_BUTTON_LABEL,
   TODAY_MENU_CALLBACK,
@@ -75,6 +87,7 @@ import {
 } from "../convex/telegramHandlers";
 import {
   answerCallbackQuery,
+  editMessageReplyMarkup,
   isBlockedTelegramError,
   sendMessage,
   sendMessageResult,
@@ -528,10 +541,27 @@ describe("openrouter model", () => {
 });
 
 describe("formatMenuMessage", () => {
+  /** 09:14 KST on 2026-09-05. */
+  const SEP5_0914 = Date.parse("2026-09-05T00:14:00.000Z");
+  /** 12:00 KST — still before the last cron attempt. */
+  const SEP5_NOON = Date.parse("2026-09-05T03:00:00.000Z");
+  /** 12:30 KST cutoff. */
+  const SEP5_CUTOFF = Date.parse("2026-09-05T03:30:00.000Z");
+  const formatOpts = { date: "2026-09-05", nowMs: SEP5_NOON };
+
   it("omits chili at 0 and prints one pepper plus the level", () => {
     expect(formatSpiciness(0)).toBe("");
     expect(formatSpiciness(3)).toBe(" 🌶3");
     expect(formatSpiciness(5)).toBe(" 🌶5");
+  });
+
+  it("prints a Russian KST date, with clock when fetchedAt exists", () => {
+    expect(formatMenuDateLine("2026-09-09")).toBe("9 сен");
+    expect(formatMenuDateLine("2026-09-09", SEP5_0914)).toBe("9 сен · 09:14");
+    expect(formatMenuDateLine("2026-05-08")).toBe("8 мая");
+    expect(formatMenuDateLine("2026-01-01")).toBe("1 янв");
+    expect(kstYmdFromMs(SEP5_0914)).toBe("2026-09-05");
+    expect(kstHourMinuteFromMs(SEP5_CUTOFF)).toEqual({ hour: 12, minute: 30 });
   });
 
   it("groups a soup under Суп and keeps chili at the end of the line", () => {
@@ -542,7 +572,9 @@ describe("formatMenuMessage", () => {
         ],
       },
       { dishes: [] },
+      formatOpts,
     );
+    expect(text.startsWith("5 сен\n\n")).toBe(true);
     expect(text).not.toContain("Сегодня");
     expect(text).toContain("Peony · верхняя");
     expect(text).toContain("Azilea · нижняя");
@@ -550,6 +582,7 @@ describe("formatMenuMessage", () => {
     expect(text).toContain(NO_MENU_INFO);
     expect(text).not.toContain("1)");
     expect(text).not.toContain("выходной");
+    expect(text).not.toContain(STILL_UPDATING);
   });
 
   it("groups mains vs staples and prints description as stored", () => {
@@ -561,6 +594,7 @@ describe("formatMenuMessage", () => {
         ],
       },
       null,
+      formatOpts,
     );
     expect(text).toContain("<i>Горячее</i>\n<b>찜닭</b> — <i>тушёная курица</i> 🌶2");
     expect(text).toContain("<i>Ещё</i>\n<b>쌀밥</b>");
@@ -598,6 +632,7 @@ describe("formatMenuMessage", () => {
           { name: "포기김치", description: "кимчи", spiciness: 3 },
         ],
       },
+      formatOpts,
     );
     expect(text).toContain(
       "<i>Горячее</i>\n<b>순살찜닭덮밥</b> — <i>рис с тушёной курицей</i> 🌶2\n<b>버터갈릭감자튀김</b> — <i>картофель фри с чесноком</i>",
@@ -636,9 +671,12 @@ describe("formatMenuMessage", () => {
           { name: "요구르트", description: "йогурт", spiciness: 0 },
         ],
       },
+      formatOpts,
     );
     expect(text).toBe(
       [
+        "5 сен",
+        "",
         "<b>🌸 Peony · верхняя</b>",
         "<i>Горячее</i>",
         "<b>찜닭</b> — <i>тушёная курица</i> 🌶2",
@@ -676,6 +714,7 @@ describe("formatMenuMessage", () => {
         ],
       },
       null,
+      formatOpts,
     );
     expect(text).toContain(
       "<b>치킨까스*치폴레S</b> — <i>котлета A &amp; B</i> 🌶2",
@@ -685,12 +724,88 @@ describe("formatMenuMessage", () => {
 
   it("shows a posted closed notice instead of no-info, without chili", () => {
     const text = formatMenuMessage(
-      { dishes: [{ name: "추석 연휴 휴무", description: "", spiciness: 0 }] },
+      {
+        source: "live",
+        fetchedAt: SEP5_0914,
+        dishes: [{ name: "추석 연휴 휴무", description: "", spiciness: 0 }],
+      },
       null,
+      formatOpts,
     );
+    expect(text.startsWith("5 сен · 09:14\n\n")).toBe(true);
     expect(text).toContain("추석 연휴 휴무");
     expect(text).not.toContain("🌶");
+    expect(text).not.toContain(STILL_UPDATING);
     expect(text).toMatch(/Peony[\s\S]*추석 연휴 휴무[\s\S]*Azilea[\s\S]*Нет информации/);
+  });
+
+  const completeTray = {
+    source: "live" as const,
+    fetchedAt: SEP5_0914,
+    dishes: [
+      { name: "찜닭", description: "тушёная курица", spiciness: 2 },
+      { name: "쌀밥", description: "рис", spiciness: 0 },
+      { name: "미역국", description: "суп из вакаме", spiciness: 0 },
+      { name: "생선까스", description: "рыбная котлета", spiciness: 0 },
+      { name: "무생채", description: "салат из редьки", spiciness: 2 },
+    ],
+  };
+  const stubTray = {
+    source: "live" as const,
+    fetchedAt: SEP5_0914,
+    dishes: [
+      { name: "오므라이스", description: "омлет с рисом", spiciness: 0 },
+      { name: "추가밥", description: "добавка риса", spiciness: 0 },
+    ],
+  };
+
+  it("adds a date+clock header on a complete tray and skips the updating hint", () => {
+    const text = formatMenuMessage(completeTray, completeTray, formatOpts);
+    expect(text.startsWith("5 сен · 09:14\n\n")).toBe(true);
+    expect(text).not.toContain(STILL_UPDATING);
+    expect(isUpdatingStub(completeTray, SEP5_NOON)).toBe(false);
+  });
+
+  it("marks a live stub as still updating before 12:30 KST", () => {
+    const text = formatMenuMessage(completeTray, stubTray, formatOpts);
+    expect(text).toContain(
+      "<b>🌺 Azilea · нижняя</b>\n<i>Горячее</i>\n<b>오므라이스</b> — <i>омлет с рисом</i>\n<i>Ещё</i>\n<b>추가밥</b>\n<i>ещё обновляется</i>",
+    );
+    expect(text.split(STILL_UPDATING)).toHaveLength(2);
+    expect(text).not.toMatch(/Peony[\s\S]*ещё обновляется[\s\S]*Azilea/);
+    expect(isUpdatingStub(stubTray, SEP5_NOON)).toBe(true);
+  });
+
+  it("drops the updating hint at the 12:30 KST cutoff", () => {
+    const text = formatMenuMessage(completeTray, stubTray, {
+      date: "2026-09-05",
+      nowMs: SEP5_CUTOFF,
+    });
+    expect(text).toContain("<b>오므라이스</b>");
+    expect(text).not.toContain(STILL_UPDATING);
+    expect(isUpdatingStub(stubTray, SEP5_CUTOFF)).toBe(false);
+  });
+
+  it("keeps empty and no_info as Нет информации without an updating hint", () => {
+    const empty = {
+      source: "no_info" as const,
+      fetchedAt: SEP5_0914,
+      dishes: [] as { name: string; description: string; spiciness: number }[],
+    };
+    const text = formatMenuMessage(empty, null, formatOpts);
+    expect(text).toBe(
+      [
+        "5 сен · 09:14",
+        "",
+        "<b>🌸 Peony · верхняя</b>",
+        `<i>${NO_MENU_INFO}</i>`,
+        "",
+        "<b>🌺 Azilea · нижняя</b>",
+        `<i>${NO_MENU_INFO}</i>`,
+      ].join("\n"),
+    );
+    expect(isUpdatingStub(empty, SEP5_NOON)).toBe(false);
+    expect(isUpdatingStub(null, SEP5_NOON)).toBe(false);
   });
 });
 
@@ -1438,6 +1553,7 @@ describe("telegram button e2e", () => {
       getTodayMenus: async () => ({ peony: null, azilea: null }),
       sendMessage,
       answerCallbackQuery,
+      editMessageReplyMarkup,
       isSubscribed: async (chatId: number) => chats.has(chatId),
       subscribe: async (chatId: number) => {
         chats.add(chatId);
@@ -1453,13 +1569,20 @@ describe("telegram button e2e", () => {
           callback_query: {
             id: "cb-sub",
             data: SUBSCRIBE_CALLBACK,
-            message: { chat: { id: 42 } },
+            message: { chat: { id: 42 }, message_id: 1001 },
           },
         },
         deps,
       );
       expect(chats.has(42)).toBe(true);
-      expect(calls[1].body.text).toBe(SUBSCRIBED_MESSAGE);
+      expect(calls.map((c) => c.method)).toEqual([
+        "answerCallbackQuery",
+        "editMessageReplyMarkup",
+      ]);
+      expect(calls[0].body.callback_query_id).toBe("cb-sub");
+      expect(calls[0].body.text).toBe(SUBSCRIBED_MESSAGE);
+      expect(calls[1].body.chat_id).toBe(42);
+      expect(calls[1].body.message_id).toBe(1001);
       expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard(true));
       expect(JSON.stringify(calls[1].body.reply_markup)).toContain(
         UNSUBSCRIBE_BUTTON_LABEL,
@@ -1473,6 +1596,7 @@ describe("telegram button e2e", () => {
         { message: { chat: { id: 42 }, text: "hi" } },
         deps,
       );
+      expect(calls[0].method).toBe("sendMessage");
       expect(calls[0].body.reply_markup).toEqual(todayMenuKeyboard(true));
 
       calls.length = 0;
@@ -1481,31 +1605,39 @@ describe("telegram button e2e", () => {
           callback_query: {
             id: "cb-unsub",
             data: UNSUBSCRIBE_CALLBACK,
-            message: { chat: { id: 42 } },
+            message: { chat: { id: 42 }, message_id: 1001 },
           },
         },
         deps,
       );
       expect(chats.has(42)).toBe(false);
-      expect(calls[1].body.text).toBe(UNSUBSCRIBED_MESSAGE);
+      expect(calls.map((c) => c.method)).toEqual([
+        "answerCallbackQuery",
+        "editMessageReplyMarkup",
+      ]);
+      expect(calls[0].body.text).toBe(UNSUBSCRIBED_MESSAGE);
       expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard(false));
+      expect(JSON.stringify(calls[1].body.reply_markup)).toContain(
+        SUBSCRIBE_BUTTON_LABEL,
+      );
     });
   });
 
-  it("subscribe/unsubscribe errors keep a static keyboard without looking up prefs", async () => {
+  it("subscribe/unsubscribe errors toast without a new message or prefs lookup", async () => {
     await withMockTelegram(async (calls) => {
       await processTelegramUpdate(
         {
           callback_query: {
             id: "cb-sub-fail",
             data: SUBSCRIBE_CALLBACK,
-            message: { chat: { id: 7 } },
+            message: { chat: { id: 7 }, message_id: 9 },
           },
         },
         {
           getTodayMenus: async () => ({ peony: null, azilea: null }),
           sendMessage,
           answerCallbackQuery,
+          editMessageReplyMarkup,
           isSubscribed: async () => {
             throw new Error("prefs lookup should not run");
           },
@@ -1514,12 +1646,8 @@ describe("telegram button e2e", () => {
           },
         },
       );
-      expect(calls.map((c) => c.method)).toEqual([
-        "answerCallbackQuery",
-        "sendMessage",
-      ]);
-      expect(String(calls[1].body.text)).toContain("Не удалось подписаться");
-      expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard(false));
+      expect(calls.map((c) => c.method)).toEqual(["answerCallbackQuery"]);
+      expect(String(calls[0].body.text)).toBe(SUBSCRIBE_FAILED_MESSAGE);
 
       calls.length = 0;
       await processTelegramUpdate(
@@ -1527,13 +1655,14 @@ describe("telegram button e2e", () => {
           callback_query: {
             id: "cb-unsub-fail",
             data: UNSUBSCRIBE_CALLBACK,
-            message: { chat: { id: 7 } },
+            message: { chat: { id: 7 }, message_id: 9 },
           },
         },
         {
           getTodayMenus: async () => ({ peony: null, azilea: null }),
           sendMessage,
           answerCallbackQuery,
+          editMessageReplyMarkup,
           isSubscribed: async () => {
             throw new Error("prefs lookup should not run");
           },
@@ -1542,9 +1671,72 @@ describe("telegram button e2e", () => {
           },
         },
       );
-      expect(String(calls[1].body.text)).toContain("Не удалось отписаться");
-      expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard(true));
+      expect(calls.map((c) => c.method)).toEqual(["answerCallbackQuery"]);
+      expect(String(calls[0].body.text)).toBe(UNSUBSCRIBE_FAILED_MESSAGE);
     });
+  });
+
+  it("toasts subscribe without editing when the callback has no message_id", async () => {
+    await withMockTelegram(async (calls) => {
+      await processTelegramUpdate(
+        {
+          callback_query: {
+            id: "cb-sub-no-mid",
+            data: SUBSCRIBE_CALLBACK,
+            message: { chat: { id: 42 } },
+          },
+        },
+        {
+          getTodayMenus: async () => ({ peony: null, azilea: null }),
+          sendMessage,
+          answerCallbackQuery,
+          editMessageReplyMarkup,
+          subscribe: async () => undefined,
+        },
+      );
+      expect(calls.map((c) => c.method)).toEqual(["answerCallbackQuery"]);
+      expect(calls[0].body.text).toBe(SUBSCRIBED_MESSAGE);
+    });
+  });
+
+  it("still toasts and skips extra text when the keyboard cannot be edited", async () => {
+    await withMockTelegram(
+      async (calls) => {
+        await processTelegramUpdate(
+          {
+            callback_query: {
+              id: "cb-sub-stale",
+              data: SUBSCRIBE_CALLBACK,
+              message: { chat: { id: 42 }, message_id: 77 },
+            },
+          },
+          {
+            getTodayMenus: async () => ({ peony: null, azilea: null }),
+            sendMessage,
+            answerCallbackQuery,
+            editMessageReplyMarkup,
+            subscribe: async () => undefined,
+          },
+        );
+        expect(calls.map((c) => c.method)).toEqual([
+          "answerCallbackQuery",
+          "editMessageReplyMarkup",
+        ]);
+        expect(calls[0].body.text).toBe(SUBSCRIBED_MESSAGE);
+        expect(calls.some((c) => c.method === "sendMessage")).toBe(false);
+      },
+      {
+        respond: (call) => {
+          if (call.method === "editMessageReplyMarkup") {
+            return {
+              status: 400,
+              body: { ok: false, description: "message can't be edited" },
+            };
+          }
+          return { status: 200, body: { ok: true } };
+        },
+      },
+    );
   });
 });
 
@@ -1586,16 +1778,25 @@ describe("morning push", () => {
     expect(isKstWeekend(monday)).toBe(false);
   });
 
-  it("pushes only a complete live tray on weekdays", () => {
+  it("pushes only when both halls are settled on weekdays", () => {
     expect(isPushableFoodMenu(tray)).toBe(true);
     expect(isPushableFoodMenu(stub)).toBe(false);
     expect(isPushableFoodMenu(notice)).toBe(false);
     expect(isPushableFoodMenu(noInfo)).toBe(false);
     expect(
-      shouldSendMorningPush({ today: monday, peony: tray, azilea: stub }),
+      shouldSendMorningPush({ today: monday, peony: tray, azilea: tray }),
     ).toBe(true);
     expect(
+      shouldSendMorningPush({ today: monday, peony: tray, azilea: stub }),
+    ).toBe(false);
+    expect(
+      shouldSendMorningPush({ today: monday, peony: stub, azilea: tray }),
+    ).toBe(false);
+    expect(
       shouldSendMorningPush({ today: monday, peony: tray, azilea: notice }),
+    ).toBe(true);
+    expect(
+      shouldSendMorningPush({ today: monday, peony: notice, azilea: tray }),
     ).toBe(true);
     expect(
       shouldSendMorningPush({ today: monday, peony: notice, azilea: noInfo }),
@@ -1604,7 +1805,64 @@ describe("morning push", () => {
       shouldSendMorningPush({ today: monday, peony: stub, azilea: stub }),
     ).toBe(false);
     expect(
+      shouldSendMorningPush({ today: monday, peony: notice, azilea: notice }),
+    ).toBe(false);
+    expect(
       shouldSendMorningPush({ today: saturday, peony: tray, azilea: tray }),
+    ).toBe(false);
+  });
+
+  it("does not treat 5+ as a combined count across halls", () => {
+    const three = {
+      source: "live" as const,
+      dishes: [{ name: "A" }, { name: "B" }, { name: "C" }],
+      fetchedAt: 1,
+    };
+    expect(
+      shouldSendMorningPush({ today: monday, peony: three, azilea: three }),
+    ).toBe(false);
+  });
+
+  it("on the last attempt sends even if one hall is empty", () => {
+    expect(
+      shouldSendMorningPush({
+        today: monday,
+        peony: tray,
+        azilea: noInfo,
+        lastAttempt: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldSendMorningPush({
+        today: monday,
+        peony: tray,
+        azilea: stub,
+        lastAttempt: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldSendMorningPush({
+        today: monday,
+        peony: noInfo,
+        azilea: tray,
+        lastAttempt: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldSendMorningPush({
+        today: monday,
+        peony: noInfo,
+        azilea: noInfo,
+        lastAttempt: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldSendMorningPush({
+        today: saturday,
+        peony: tray,
+        azilea: noInfo,
+        lastAttempt: true,
+      }),
     ).toBe(false);
   });
 
@@ -1615,7 +1873,7 @@ describe("morning push", () => {
     const summary = await deliverMorningPushes({
       today: monday,
       peony: tray,
-      azilea: noInfo,
+      azilea: tray,
       menuText: "menu",
       subscribers: [
         { chatId: 1 },
@@ -1640,6 +1898,39 @@ describe("morning push", () => {
     expect(dropped).toEqual([1]);
     expect(marked).toEqual([4]);
     expect(summary).toEqual({ sent: 1, failed: 1, skipped: 1, dropped: 1 });
+  });
+
+  it("does not send while either hall is still a stub", async () => {
+    const send = vi.fn(async () => ({ ok: true }));
+    const summary = await deliverMorningPushes({
+      today: monday,
+      peony: tray,
+      azilea: stub,
+      menuText: "partial",
+      subscribers: [{ chatId: 1 }],
+      send,
+      markPushed: async () => undefined,
+      dropSubscriber: async () => undefined,
+    });
+    expect(send).not.toHaveBeenCalled();
+    expect(summary.sent).toBe(0);
+  });
+
+  it("sends on the last attempt even if one hall is empty", async () => {
+    const send = vi.fn(async () => ({ ok: true }));
+    const summary = await deliverMorningPushes({
+      today: monday,
+      peony: tray,
+      azilea: noInfo,
+      lastAttempt: true,
+      menuText: "last try",
+      subscribers: [{ chatId: 1 }],
+      send,
+      markPushed: async () => undefined,
+      dropSubscriber: async () => undefined,
+    });
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(summary.sent).toBe(1);
   });
 
   it("does not send on a closed day even if chats are opted in", async () => {

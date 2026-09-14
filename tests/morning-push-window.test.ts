@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inMorningPushWindow } from "../convex/refreshPolicy";
+import { inMorningPushWindow, pastCutoff } from "../convex/refreshPolicy";
 
 describe("inMorningPushWindow", () => {
   it("is false before 09:00 KST", () => {
@@ -12,6 +12,8 @@ describe("inMorningPushWindow", () => {
 
   it("is true at 12:30 KST (last fetch attempt)", () => {
     expect(inMorningPushWindow(12, 30)).toBe(true);
+    expect(pastCutoff(12, 29)).toBe(false);
+    expect(pastCutoff(12, 30)).toBe(true);
   });
 
   it("is false after 12:30 KST", () => {

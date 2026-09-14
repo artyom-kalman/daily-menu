@@ -3,7 +3,7 @@ import { internal } from "./_generated/api";
 import { kstHourMinute } from "./dates";
 import { formatMenuMessage } from "./format";
 import { shouldSendMorningPush } from "./morningPushPolicy";
-import { inMorningPushWindow } from "./refreshPolicy";
+import { inMorningPushWindow, pastCutoff } from "./refreshPolicy";
 import { sendMessageResult } from "./telegramClient";
 import { deliverMorningPushes } from "./telegramHandlers";
 
@@ -21,15 +21,19 @@ export const pushIfReady = internalAction({
     const today = await ctx.runQuery(internal.menus.getTodayBoth, {});
     const peony = today.peony;
     const azilea = today.azilea;
+    const lastAttempt = pastCutoff(hour, minute);
 
     if (
       !shouldSendMorningPush({
         today: today.date,
         peony,
         azilea,
+        lastAttempt,
       })
     ) {
-      console.log(`morningPush: skip date=${today.date}`);
+      console.log(
+        `morningPush: skip date=${today.date} lastAttempt=${lastAttempt}`,
+      );
       return { sent: 0, failed: 0, skipped: 0, dropped: 0 };
     }
 
@@ -39,6 +43,7 @@ export const pushIfReady = internalAction({
       today: today.date,
       peony,
       azilea,
+      lastAttempt,
       subscribers: subscribers.map((row: { chatId: number; lastPushedDate?: string }) => ({
         chatId: row.chatId,
         lastPushedDate: row.lastPushedDate,
@@ -78,7 +83,7 @@ export const pushIfReady = internalAction({
       },
     });
     console.log(
-      `morningPush: date=${today.date} sent=${summary.sent} failed=${summary.failed} skipped=${summary.skipped} dropped=${summary.dropped}`,
+      `morningPush: date=${today.date} lastAttempt=${lastAttempt} sent=${summary.sent} failed=${summary.failed} skipped=${summary.skipped} dropped=${summary.dropped}`,
     );
     return summary;
   },
