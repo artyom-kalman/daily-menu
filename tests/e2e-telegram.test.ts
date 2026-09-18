@@ -76,6 +76,9 @@ import {
   UNSUBSCRIBED_MESSAGE,
   TODAY_MENU_BUTTON_LABEL,
   TODAY_MENU_CALLBACK,
+  CHANGE_LANGUAGE_CALLBACK,
+  LANGUAGE_PROMPT,
+  languagePickerKeyboard,
   deliverMorningPushes,
   formatAdminStatus,
   formatRefetchSummary,
@@ -500,7 +503,7 @@ describe("aptabase analytics", () => {
       const pending = trackAptabaseEvent(EVENT_START, undefined, {
         appKey: "A-EU-0000000000",
         fetchImpl: ((_url, init) => {
-          signal = init?.signal;
+          signal = init?.signal ?? undefined;
           return new Promise((_resolve, reject) => {
             signal?.addEventListener("abort", () => {
               reject(new DOMException("The operation was aborted.", "AbortError"));
@@ -534,6 +537,8 @@ describe("openrouter model", () => {
     expect(SYSTEM_PROMPT).toMatch(/тушёная курица/);
     expect(SYSTEM_PROMPT).toMatch(/Не транслитерируй хангыль/);
     expect(SYSTEM_PROMPT).toMatch(/Не перечисляй скрытые ингредиенты/);
+    expect(SYSTEM_PROMPT).toMatch(/gloss\.ru/);
+    expect(SYSTEM_PROMPT).toMatch(/gloss\.en/);
     expect(SYSTEM_PROMPT).not.toMatch(/сначала как это говорят/);
     expect(SYSTEM_PROMPT).not.toMatch(/максимум 2 предложения/);
     expect(SYSTEM_PROMPT).not.toMatch(/6–10 слов/);
@@ -560,6 +565,7 @@ describe("formatMenuMessage", () => {
     expect(formatMenuDateLine("2026-09-09", SEP5_0914)).toBe("9 сен · 09:14");
     expect(formatMenuDateLine("2026-05-08")).toBe("8 мая");
     expect(formatMenuDateLine("2026-01-01")).toBe("1 янв");
+    expect(formatMenuDateLine("2026-09-18", null, "en")).toBe("18 Sep");
     expect(kstYmdFromMs(SEP5_0914)).toBe("2026-09-05");
     expect(kstHourMinuteFromMs(SEP5_CUTOFF)).toEqual({ hour: 12, minute: 30 });
   });
@@ -583,6 +589,29 @@ describe("formatMenuMessage", () => {
     expect(text).not.toContain("1)");
     expect(text).not.toContain("выходной");
     expect(text).not.toContain(STILL_UPDATING);
+  });
+
+  it("uses English hall Hangul, gloss, and tray labels", () => {
+    const text = formatMenuMessage(
+      {
+        dishes: [
+          {
+            name: "찜닭",
+            gloss: { ru: "тушёная курица", en: "braised chicken" },
+            spiciness: 2,
+          },
+        ],
+      },
+      { dishes: [] },
+      { ...formatOpts, locale: "en" },
+    );
+    expect(text.startsWith("5 Sep\n\n")).toBe(true);
+    expect(text).toContain("🌸 피오니 · 지운관");
+    expect(text).toContain("🌺 아질리아 · 창조관");
+    expect(text).not.toContain("верхняя");
+    expect(text).toContain("<i>Hot</i>\n<b>찜닭</b> — <i>braised chicken</i> 🌶2");
+    expect(text).toContain("No information");
+    expect(text).not.toContain("тушёная курица");
   });
 
   it("groups mains vs staples and prints description as stored", () => {
@@ -1177,6 +1206,142 @@ describe("telegram button e2e", () => {
       expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard());
       expect(tracked).toEqual([EVENT_START, EVENT_TODAY_MENU]);
     });
+  });
+
+  it("asks for a language on first start when no prefs row exists", async () => {
+    await withMockTelegram(async (calls) => {
+      const result = await processTelegramUpdate(
+        { message: { chat: { id: 42 }, text: "/start" } },
+        {
+          getTodayMenus: async () => ({ peony: null, azilea: null }),
+          sendMessage,
+          answerCallbackQuery,
+          getLocale: async () => null,
+        },
+      );
+      expect(result).toBe("ok");
+      expect(calls).toHaveLength(1);
+      expect(calls[0].body.text).toBe(LANGUAGE_PROMPT);
+      expect(calls[0].body.reply_markup).toEqual(languagePickerKeyboard());
+    });
+  });
+
+  it("stores English and resends the menu after a locale tap", async () => {
+    await withMockTelegram(async (calls) => {
+      let stored: string | null = null;
+      const menus = {
+        peony: {
+          dishes: [
+            {
+              name: "찜닭",
+              gloss: { ru: "тушёная курица", en: "braised chicken" },
+              spiciness: 2,
+            },
+          ],
+        },
+        azilea: { dishes: [] },
+      };
+      await processTelegramUpdate(
+        {
+          callback_query: {
+            id: "cb-en",
+            data: "locale_en",
+            message: { chat: { id: 42 }, message_id: 9 },
+          },
+        },
+        {
+          getTodayMenus: async () => menus,
+          sendMessage,
+          answerCallbackQuery,
+          getLocale: async () => stored,
+          setLocale: async (_chatId, locale) => {
+            stored = locale;
+          },
+        },
+      );
+      expect(stored).toBe("en");
+      expect(calls.map((c) => c.method)).toEqual([
+        "answerCallbackQuery",
+        "sendMessage",
+      ]);
+      expect(calls[1].body.text).toBe(
+        formatMenuMessage(menus.peony, menus.azilea, { locale: "en" }),
+      );
+      expect(String(calls[1].body.text)).toContain("피오니 · 지운관");
+      expect(String(calls[1].body.text)).toContain("braised chicken");
+      expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard(false, "en"));
+    });
+  });
+
+  it("turns Change language into the picker on the same message", async () => {
+    await withMockTelegram(async (calls) => {
+      await processTelegramUpdate(
+        {
+          callback_query: {
+            id: "cb-lang",
+            data: CHANGE_LANGUAGE_CALLBACK,
+            message: { chat: { id: 42 }, message_id: 11 },
+          },
+        },
+        {
+          getTodayMenus: async () => ({ peony: null, azilea: null }),
+          sendMessage,
+          answerCallbackQuery,
+          editMessageReplyMarkup,
+          getLocale: async () => "ru",
+        },
+      );
+      expect(calls.map((c) => c.method)).toEqual([
+        "answerCallbackQuery",
+        "editMessageReplyMarkup",
+      ]);
+      expect(calls[1].body.message_id).toBe(11);
+      expect(calls[1].body.reply_markup).toEqual(languagePickerKeyboard());
+    });
+  });
+
+  it("morning push creates a ru prefs row and formats each chat's locale", async () => {
+    const created: number[] = [];
+    const sent: Array<{ chatId: number; text: string }> = [];
+    const tray = {
+      source: "live" as const,
+      dishes: [
+        { name: "눈꽃치즈닭갈비덮밥" },
+        { name: "미역국" },
+        { name: "피자고로케&케찹" },
+        { name: "어묵채볶음" },
+        { name: "숙주나물" },
+      ],
+      fetchedAt: 1,
+    };
+    const locales = new Map<number, string>([[2, "en"]]);
+    const summary = await deliverMorningPushes({
+      today: "2026-09-07",
+      peony: tray,
+      azilea: tray,
+      menuText: "ru-menu",
+      menuTextForLocale: (locale) => (locale === "en" ? "en-menu" : "ru-menu"),
+      ensureLocale: async (chatId) => {
+        const existing = locales.get(chatId);
+        if (existing) return existing;
+        created.push(chatId);
+        locales.set(chatId, "ru");
+        return "ru";
+      },
+      subscribers: [{ chatId: 1 }, { chatId: 2 }],
+      send: async (chatId, text) => {
+        sent.push({ chatId, text });
+        return { ok: true };
+      },
+      markPushed: async () => {},
+      dropSubscriber: async () => {},
+    });
+    expect(summary.sent).toBe(2);
+    expect(created).toEqual([1]);
+    expect(sent).toEqual([
+      { chatId: 1, text: "ru-menu" },
+      { chatId: 2, text: "en-menu" },
+    ]);
   });
 
   it("replies immediately when today's menu is not ready yet; repeats do not scrape", async () => {
@@ -2005,9 +2170,12 @@ describe("morning push", () => {
     expect(morningPush).toMatch(
       /deliverChannelPost\(\{[\s\S]*?lastAttempt,/,
     );
-    expect(todayMenuKeyboard(false).inline_keyboard).toHaveLength(2);
+    expect(todayMenuKeyboard(false).inline_keyboard).toHaveLength(3);
     expect(todayMenuKeyboard(true).inline_keyboard[1][0].text).toBe(
       UNSUBSCRIBE_BUTTON_LABEL,
+    );
+    expect(todayMenuKeyboard(false).inline_keyboard[2][0].callback_data).toBe(
+      CHANGE_LANGUAGE_CALLBACK,
     );
   });
 });

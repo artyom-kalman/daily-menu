@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { dishDoc } from "./dishDoc";
 
 export default defineSchema({
   appConfig: defineTable({
@@ -11,13 +12,7 @@ export default defineSchema({
   menus: defineTable({
     date: v.string(), // YYYY-MM-DD in KST
     cafeteria: v.union(v.literal("peony"), v.literal("azilea")),
-    dishes: v.array(
-      v.object({
-        name: v.string(),
-        description: v.string(),
-        spiciness: v.number(),
-      }),
-    ),
+    dishes: v.array(dishDoc),
     fetchedAt: v.number(),
     source: v.union(
       v.literal("live"),
@@ -46,6 +41,15 @@ export default defineSchema({
     updateId: v.number(),
     claimedAt: v.number(),
   }).index("by_updateId", ["updateId"]),
+
+  // Per-chat settings (locale now; hall preference later).
+  // Independent of morning `subscribers` — unsubscribe must not wipe locale.
+  chatPrefs: defineTable({
+    chatId: v.number(),
+    locale: v.string(), // "ru" | "en" today; string so later locales fit
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_chatId", ["chatId"]),
 
   // Opt-in morning push. A row means subscribed; unsubscribe deletes it.
   // chatId stays in Convex only — never sent to Aptabase.

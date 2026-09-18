@@ -4,42 +4,39 @@ import {
   kstYmdFromMs,
   todayKst,
 } from "./dates";
+import {
+  DEFAULT_LOCALE,
+  t,
+  type Locale,
+} from "./i18n";
 import { looksLikeCafeteriaNotice } from "./notices";
 import {
   MIN_READY_DISH_COUNT,
   pastCutoff,
   type MenuSource,
 } from "./refreshPolicy";
-import type { Dish } from "./types";
+import { dishGloss, type Dish } from "./types";
 
-export const NO_MENU_INFO = "Нет информации";
-export const STILL_UPDATING = "ещё обновляется";
-
-const MONTHS_RU = [
-  "янв",
-  "фев",
-  "мар",
-  "апр",
-  "мая",
-  "июн",
-  "июл",
-  "авг",
-  "сен",
-  "окт",
-  "ноя",
-  "дек",
-] as const;
+export const NO_MENU_INFO = t("ru").noMenuInfo;
+export const STILL_UPDATING = t("ru").stillUpdating;
 
 export type Course = "hot" | "soup" | "salad" | "side";
 
 const COURSE_ORDER: Course[] = ["hot", "soup", "salad", "side"];
 
-const COURSE_HEADING: Record<Course, string> = {
-  hot: "Горячее",
-  soup: "Суп",
-  salad: "Салат",
-  side: "Ещё",
-};
+function courseHeading(course: Course, locale: Locale): string {
+  const copy = t(locale);
+  switch (course) {
+    case "hot":
+      return copy.courseHot;
+    case "soup":
+      return copy.courseSoup;
+    case "salad":
+      return copy.courseSalad;
+    case "side":
+      return copy.courseSide;
+  }
+}
 
 export type FormatMenuLike = {
   dishes: Dish[];
@@ -53,6 +50,7 @@ export type FormatMenuOptions = {
   date?: string;
   /** Epoch ms used for the 12:30 KST stub cutoff and a missing date. */
   nowMs?: number;
+  locale?: Locale;
 };
 
 /** Escape dish names for Telegram `parse_mode: HTML`. */
@@ -94,10 +92,10 @@ export function inferCourse(name: string): Course {
   return "hot";
 }
 
-function formatMainLine(dish: Dish): string {
+function formatMainLine(dish: Dish, locale: Locale): string {
   const spice = formatSpiciness(dish.spiciness);
   const name = bold(dish.name);
-  const desc = dish.description.trim();
+  const desc = dishGloss(dish, locale);
   if (desc) return `${name} — ${italic(desc)}${spice}`;
   return `${name}${spice}`;
 }
@@ -106,9 +104,9 @@ function formatSideItem(dish: Dish): string {
   return `${bold(dish.name)}${formatSpiciness(dish.spiciness)}`;
 }
 
-function formatBlock(menu: FormatMenuLike): string {
+function formatBlock(menu: FormatMenuLike, locale: Locale): string {
   if (!menu || menu.dishes.length === 0) {
-    return italic(NO_MENU_INFO);
+    return italic(t(locale).noMenuInfo);
   }
   const names = menu.dishes.map((d) => d.name);
   if (looksLikeCafeteriaNotice(names)) {
@@ -129,12 +127,12 @@ function formatBlock(menu: FormatMenuLike): string {
   for (const course of COURSE_ORDER) {
     const dishes = groups[course];
     if (dishes.length === 0) continue;
-    parts.push(italic(COURSE_HEADING[course]));
+    parts.push(italic(courseHeading(course, locale)));
     if (course === "side") {
       parts.push(dishes.map(formatSideItem).join(" · "));
     } else {
       for (const dish of dishes) {
-        parts.push(formatMainLine(dish));
+        parts.push(formatMainLine(dish, locale));
       }
     }
   }
@@ -145,13 +143,14 @@ function formatBlock(menu: FormatMenuLike): string {
 export function formatMenuDateLine(
   ymd: string,
   fetchedAt?: number | null,
+  locale: Locale = DEFAULT_LOCALE,
 ): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
   if (!match) {
     throw new Error(`Invalid YYYY-MM-DD: ${ymd}`);
   }
   const day = Number(match[3]);
-  const monthName = MONTHS_RU[Number(match[2]) - 1];
+  const monthName = t(locale).months[Number(match[2]) - 1];
   if (!monthName) {
     throw new Error(`Invalid YYYY-MM-DD: ${ymd}`);
   }
@@ -200,10 +199,15 @@ export function isUpdatingStub(
   return names.length < MIN_READY_DISH_COUNT;
 }
 
-function formatHall(heading: string, menu: FormatMenuLike, nowMs: number): string {
-  const parts = [`${bold(heading)}`, formatBlock(menu)];
+function formatHall(
+  heading: string,
+  menu: FormatMenuLike,
+  nowMs: number,
+  locale: Locale,
+): string {
+  const parts = [`${bold(heading)}`, formatBlock(menu, locale)];
   if (isUpdatingStub(menu, nowMs)) {
-    parts.push(italic(STILL_UPDATING));
+    parts.push(italic(t(locale).stillUpdating));
   }
   return parts.join("\n");
 }
@@ -214,12 +218,14 @@ export function formatMenuMessage(
   options?: FormatMenuOptions,
 ): string {
   const nowMs = options?.nowMs ?? Date.now();
+  const locale = options?.locale ?? DEFAULT_LOCALE;
+  const copy = t(locale);
   const date = menuCalendarDate(peony, azilea, options);
-  const header = formatMenuDateLine(date, latestFetchedAt(peony, azilea));
+  const header = formatMenuDateLine(date, latestFetchedAt(peony, azilea), locale);
   return (
     `${escapeHtml(header)}\n\n` +
-    formatHall("🌸 Peony · верхняя", peony, nowMs) +
+    formatHall(copy.hallPeony, peony, nowMs, locale) +
     "\n\n" +
-    formatHall("🌺 Azilea · нижняя", azilea, nowMs)
+    formatHall(copy.hallAzilea, azilea, nowMs, locale)
   );
 }

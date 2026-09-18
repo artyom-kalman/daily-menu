@@ -39,7 +39,9 @@ export const pushIfReady = internalAction({
     }
 
     const subscribers = await ctx.runQuery(internal.subscribers.listAll, {});
-    const menuText = formatMenuMessage(today.peony, today.azilea);
+    const menuText = formatMenuMessage(today.peony, today.azilea, {
+      locale: "ru",
+    });
     const summary = await deliverMorningPushes({
       today: today.date,
       peony,
@@ -50,6 +52,14 @@ export const pushIfReady = internalAction({
         lastPushedDate: row.lastPushedDate,
       })),
       menuText,
+      menuTextForLocale: (locale) =>
+        formatMenuMessage(today.peony, today.azilea, { locale }),
+      ensureLocale: async (chatId) => {
+        const result = await ctx.runMutation(internal.chatPrefs.ensureLocale, {
+          chatId,
+        });
+        return result.locale;
+      },
       send: async (chatId, text, options) =>
         sendMessageResult(chatId, text, options),
       markPushed: async (chatId) => {
