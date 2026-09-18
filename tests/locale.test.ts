@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  ensureLocaleWrite,
+  setLocaleWrite,
+} from "../convex/chatPrefsPolicy";
+import {
   DEFAULT_LOCALE,
   isLocale,
   localeCallback,
@@ -64,5 +68,30 @@ describe("locale helpers", () => {
     expect(t("en").hallAzilea).toBe("🌺 아질리아 · 창조관");
     expect(t("ru").hallPeony).toBe("🌸 Peony · верхняя");
     expect(t("ru").hallAzilea).toBe("🌺 Azilea · нижняя");
+  });
+
+  it("creates a chatPrefs write when the chat has no row", () => {
+    const inserted = setLocaleWrite(null, "en", 1000);
+    expect(inserted).toEqual({
+      created: true,
+      locale: "en",
+      insert: { locale: "en", createdAt: 1000, updatedAt: 1000 },
+    });
+    const patched = setLocaleWrite({ locale: "en" }, "ru", 2000);
+    expect(patched).toEqual({
+      created: false,
+      locale: "ru",
+      patch: { locale: "ru", updatedAt: 2000 },
+    });
+    const grandfather = ensureLocaleWrite(null, undefined, 3000);
+    expect(grandfather).toEqual({
+      created: true,
+      locale: "ru",
+      insert: { locale: "ru", createdAt: 3000, updatedAt: 3000 },
+    });
+    expect(ensureLocaleWrite({ locale: "en" }, "ru", 4000)).toEqual({
+      created: false,
+      locale: "en",
+    });
   });
 });

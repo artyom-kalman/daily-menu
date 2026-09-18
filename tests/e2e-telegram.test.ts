@@ -1208,27 +1208,58 @@ describe("telegram button e2e", () => {
     });
   });
 
+  function memoryChatPrefs(seed?: Array<[number, string]>) {
+    const rows = new Map<number, string>(seed);
+    const created: number[] = [];
+    return {
+      rows,
+      created,
+      getLocale: async (chatId: number) => rows.get(chatId) ?? null,
+      setLocale: async (chatId: number, locale: string) => {
+        if (!rows.has(chatId)) created.push(chatId);
+        rows.set(chatId, locale);
+      },
+      ensureLocale: async (chatId: number) => {
+        const existing = rows.get(chatId);
+        if (existing) return existing;
+        created.push(chatId);
+        rows.set(chatId, "ru");
+        return "ru";
+      },
+    };
+  }
+
   it("asks for a language on first start when no prefs row exists", async () => {
     await withMockTelegram(async (calls) => {
+      const prefs = memoryChatPrefs();
       const result = await processTelegramUpdate(
-        { message: { chat: { id: 42 }, text: "/start" } },
+        {
+          message: {
+            chat: { id: 42 },
+            from: { language_code: "en" },
+            text: "/start",
+          },
+        },
         {
           getTodayMenus: async () => ({ peony: null, azilea: null }),
           sendMessage,
           answerCallbackQuery,
-          getLocale: async () => null,
+          getLocale: prefs.getLocale,
+          setLocale: prefs.setLocale,
         },
       );
       expect(result).toBe("ok");
       expect(calls).toHaveLength(1);
       expect(calls[0].body.text).toBe(LANGUAGE_PROMPT);
       expect(calls[0].body.reply_markup).toEqual(languagePickerKeyboard());
+      expect(prefs.created).toEqual([]);
+      expect(prefs.rows.size).toBe(0);
     });
   });
 
   it("stores English and resends the menu after a locale tap", async () => {
     await withMockTelegram(async (calls) => {
-      let stored: string | null = null;
+      const prefs = memoryChatPrefs();
       const menus = {
         peony: {
           dishes: [
@@ -1253,13 +1284,12 @@ describe("telegram button e2e", () => {
           getTodayMenus: async () => menus,
           sendMessage,
           answerCallbackQuery,
-          getLocale: async () => stored,
-          setLocale: async (_chatId, locale) => {
-            stored = locale;
-          },
+          getLocale: prefs.getLocale,
+          setLocale: prefs.setLocale,
         },
       );
-      expect(stored).toBe("en");
+      expect(prefs.rows.get(42)).toBe("en");
+      expect(prefs.created).toEqual([42]);
       expect(calls.map((c) => c.method)).toEqual([
         "answerCallbackQuery",
         "sendMessage",
@@ -1270,6 +1300,65 @@ describe("telegram button e2e", () => {
       expect(String(calls[1].body.text)).toContain("피오니 · 지운관");
       expect(String(calls[1].body.text)).toContain("braised chicken");
       expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard(false, "en"));
+    });
+  });
+
+  it("creates a prefs row on the first locale tap, then patches when switching back", async () => {
+    await withMockTelegram(async (calls) => {
+      const prefs = memoryChatPrefs();
+      const menus = {
+        peony: {
+          dishes: [
+            {
+              name: "찜닭",
+              gloss: { ru: "тушёная курица", en: "braised chicken" },
+              spiciness: 2,
+            },
+          ],
+        },
+        azilea: { dishes: [] },
+      };
+      const deps = {
+        getTodayMenus: async () => menus,
+        sendMessage,
+        answerCallbackQuery,
+        getLocale: prefs.getLocale,
+        setLocale: prefs.setLocale,
+      };
+      await processTelegramUpdate(
+        {
+          callback_query: {
+            id: "cb-en",
+            data: "locale_en",
+            message: { chat: { id: 7 }, message_id: 3 },
+          },
+        },
+        deps,
+      );
+      expect(prefs.created).toEqual([7]);
+      expect(prefs.rows.get(7)).toBe("en");
+
+      calls.length = 0;
+      await processTelegramUpdate(
+        {
+          callback_query: {
+            id: "cb-ru",
+            data: "locale_ru",
+            message: { chat: { id: 7 }, message_id: 4 },
+          },
+        },
+        deps,
+      );
+      expect(prefs.created).toEqual([7]);
+      expect(prefs.rows.get(7)).toBe("ru");
+      expect(calls.map((c) => c.method)).toEqual([
+        "answerCallbackQuery",
+        "sendMessage",
+      ]);
+      expect(String(calls[1].body.text)).toContain("Peony · верхняя");
+      expect(String(calls[1].body.text)).toContain("тушёная курица");
+      expect(String(calls[1].body.text)).not.toContain("braised chicken");
+      expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard(false, "ru"));
     });
   });
 
@@ -1301,8 +1390,12 @@ describe("telegram button e2e", () => {
   });
 
   it("morning push creates a ru prefs row and formats each chat's locale", async () => {
-    const created: number[] = [];
-    const sent: Array<{ chatId: number; text: string }> = [];
+    const prefs = memoryChatPrefs([[2, "en"]]);
+    const sent: Array<{
+      chatId: number;
+      text: string;
+      reply_markup: unknown;
+    }> = [];
     const tray = {
       source: "live" as const,
       dishes: [
@@ -1314,34 +1407,90 @@ describe("telegram button e2e", () => {
       ],
       fetchedAt: 1,
     };
-    const locales = new Map<number, string>([[2, "en"]]);
     const summary = await deliverMorningPushes({
       today: "2026-09-07",
       peony: tray,
       azilea: tray,
       menuText: "ru-menu",
       menuTextForLocale: (locale) => (locale === "en" ? "en-menu" : "ru-menu"),
-      ensureLocale: async (chatId) => {
-        const existing = locales.get(chatId);
-        if (existing) return existing;
-        created.push(chatId);
-        locales.set(chatId, "ru");
-        return "ru";
-      },
+      ensureLocale: prefs.ensureLocale,
       subscribers: [{ chatId: 1 }, { chatId: 2 }],
-      send: async (chatId, text) => {
-        sent.push({ chatId, text });
+      send: async (chatId, text, options) => {
+        sent.push({
+          chatId,
+          text,
+          reply_markup: options?.reply_markup,
+        });
         return { ok: true };
       },
       markPushed: async () => {},
       dropSubscriber: async () => {},
     });
     expect(summary.sent).toBe(2);
-    expect(created).toEqual([1]);
+    expect(prefs.created).toEqual([1]);
+    expect(prefs.rows.get(1)).toBe("ru");
+    expect(prefs.rows.get(2)).toBe("en");
     expect(sent).toEqual([
-      { chatId: 1, text: "ru-menu" },
-      { chatId: 2, text: "en-menu" },
+      {
+        chatId: 1,
+        text: "ru-menu",
+        reply_markup: todayMenuKeyboard(true, "ru"),
+      },
+      {
+        chatId: 2,
+        text: "en-menu",
+        reply_markup: todayMenuKeyboard(true, "en"),
+      },
     ]);
+  });
+
+  it("admin /refetch creates a ru prefs row when the admin chat has none", async () => {
+    await withMockTelegram(async (calls) => {
+      const prefs = memoryChatPrefs();
+      const menus = {
+        peony: {
+          dishes: [
+            {
+              name: "찜닭",
+              gloss: { ru: "тушёная курица", en: "braised chicken" },
+              spiciness: 2,
+            },
+          ],
+        },
+        azilea: { dishes: [] },
+      };
+      await processTelegramUpdate(
+        { message: { chat: { id: 99 }, text: "/refetch" } },
+        {
+          getTodayMenus: async () => menus,
+          sendMessage,
+          answerCallbackQuery,
+          adminChatId: "99",
+          getLocale: prefs.getLocale,
+          ensureLocale: prefs.ensureLocale,
+          refetchToday: async () => ({
+            date: "2026-09-05",
+            results: {
+              peony: { ok: true, dishCount: 1 },
+              azilea: { ok: true, dishCount: 0 },
+            },
+            telegramMessage: "unused",
+            peony: menus.peony,
+            azilea: menus.azilea,
+          }),
+        },
+      );
+      expect(prefs.created).toEqual([99]);
+      expect(prefs.rows.get(99)).toBe("ru");
+      expect(calls.map((c) => c.body.text)).toEqual([
+        REFETCHING_MESSAGE,
+        formatRefetchSummary("2026-09-05", {
+          peony: { ok: true, dishCount: 1 },
+          azilea: { ok: true, dishCount: 0 },
+        }),
+        formatMenuMessage(menus.peony, menus.azilea, { locale: "ru" }),
+      ]);
+    });
   });
 
   it("replies immediately when today's menu is not ready yet; repeats do not scrape", async () => {
@@ -2170,6 +2319,13 @@ describe("morning push", () => {
     expect(morningPush).toMatch(
       /deliverChannelPost\(\{[\s\S]*?lastAttempt,/,
     );
+    expect(morningPush).toContain("internal.chatPrefs.ensureLocale");
+    const telegram = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "../convex/telegram.ts"),
+      "utf8",
+    );
+    expect(telegram).toContain("internal.chatPrefs.setLocale");
+    expect(telegram).toContain("internal.chatPrefs.ensureLocale");
     expect(todayMenuKeyboard(false).inline_keyboard).toHaveLength(3);
     expect(todayMenuKeyboard(true).inline_keyboard[1][0].text).toBe(
       UNSUBSCRIBE_BUTTON_LABEL,

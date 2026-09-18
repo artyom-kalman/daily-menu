@@ -163,6 +163,22 @@ async function localeForChat(
   return parseLocale(stored);
 }
 
+/** Send paths that skip the picker must persist a row (ru if none exists). */
+async function localeOrEnsure(
+  chatId: number,
+  deps: TelegramDeps,
+): Promise<Locale> {
+  const stored = await localeForChat(chatId, deps);
+  if (stored) return stored;
+  if (!deps.ensureLocale) return DEFAULT_LOCALE;
+  try {
+    return parseLocale(await deps.ensureLocale(chatId));
+  } catch (err) {
+    console.error(`ensureLocale ${chatId} failed: ${(err as Error).message}`);
+    return DEFAULT_LOCALE;
+  }
+}
+
 async function keyboardFor(
   chatId: number,
   deps: TelegramDeps,
@@ -806,7 +822,7 @@ async function handleAdminCommand(
       chatId,
       formatRefetchSummary(result.date, result.results),
     );
-    const locale = (await localeForChat(chatId, deps)) ?? DEFAULT_LOCALE;
+    const locale = await localeOrEnsure(chatId, deps);
     const menuText =
       result.peony !== undefined || result.azilea !== undefined
         ? formatMenuMessage(result.peony ?? null, result.azilea ?? null, {

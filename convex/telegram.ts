@@ -156,6 +156,12 @@ export const handleWebhook = httpAction(async (ctx, request) => {
     setLocale: async (chatId, locale) => {
       await ctx.runMutation(internal.chatPrefs.setLocale, { chatId, locale });
     },
+    ensureLocale: async (chatId) => {
+      const result = await ctx.runMutation(internal.chatPrefs.ensureLocale, {
+        chatId,
+      });
+      return result.locale;
+    },
   });
 
   return new Response("ok", { status: 200 });
