@@ -614,6 +614,38 @@ describe("formatMenuMessage", () => {
     expect(text).not.toContain("тушёная курица");
   });
 
+  it("formats a stored live tray: RU uses description, EN keeps Hangul halls without cross-fallback", () => {
+    const peony = {
+      source: "live" as const,
+      fetchedAt: Date.parse("2026-09-18T00:00:00.000Z"),
+      dishes: [
+        { name: "돈육김치볶음", description: "жаркое из свинины с кимчи", spiciness: 3 },
+        { name: "쌀밥", description: "рис", spiciness: 0 },
+        { name: "닭곰탕", description: "куриный суп", spiciness: 0 },
+        { name: "군만두", description: "жареные пельмени", spiciness: 0 },
+        { name: "오이부추무침", description: "салат из огурцов с луком", spiciness: 2 },
+        { name: "깍두기", description: "кимчи из редьки", spiciness: 3 },
+        { name: "요구르트", description: "йогурт", spiciness: 0 },
+      ],
+    };
+    const ru = formatMenuMessage(peony, null, {
+      date: "2026-09-18",
+      nowMs: Date.parse("2026-09-18T04:00:00.000Z"),
+      locale: "ru",
+    });
+    const en = formatMenuMessage(peony, null, {
+      date: "2026-09-18",
+      nowMs: Date.parse("2026-09-18T04:00:00.000Z"),
+      locale: "en",
+    });
+    expect(ru).toContain("Peony · верхняя");
+    expect(ru).toContain("жаркое из свинины с кимчи");
+    expect(en).toContain("🌸 피오니 · 지운관");
+    expect(en).toContain("<b>돈육김치볶음</b>");
+    expect(en).not.toContain("жаркое из свинины с кимчи");
+    expect(en).toContain("No information");
+  });
+
   it("groups mains vs staples and prints description as stored", () => {
     const text = formatMenuMessage(
       {
@@ -1934,6 +1966,52 @@ describe("telegram button e2e", () => {
       expect(JSON.stringify(calls[1].body.reply_markup)).toContain(
         SUBSCRIBE_BUTTON_LABEL,
       );
+    });
+  });
+
+  it("uses English subscribe copy and keeps prefs after unsubscribe", async () => {
+    const prefs = memoryChatPrefs([[42, "en"]]);
+    const chats = new Set<number>();
+    const deps = {
+      getTodayMenus: async () => ({ peony: null, azilea: null }),
+      sendMessage,
+      answerCallbackQuery,
+      editMessageReplyMarkup,
+      getLocale: prefs.getLocale,
+      setLocale: prefs.setLocale,
+      isSubscribed: async (chatId: number) => chats.has(chatId),
+      subscribe: async (chatId: number) => {
+        chats.add(chatId);
+      },
+      unsubscribe: async (chatId: number) => {
+        chats.delete(chatId);
+      },
+    };
+    await withMockTelegram(async (calls) => {
+      await processTelegramUpdate(
+        {
+          callback_query: {
+            id: "cb-sub-en",
+            data: SUBSCRIBE_CALLBACK,
+            message: { chat: { id: 42 }, message_id: 5 },
+          },
+        },
+        deps,
+      );
+      expect(calls[0].body.text).toBe("I'll send the menu in the morning.");
+      expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard(true, "en"));
+      await processTelegramUpdate(
+        {
+          callback_query: {
+            id: "cb-unsub-en",
+            data: UNSUBSCRIBE_CALLBACK,
+            message: { chat: { id: 42 }, message_id: 5 },
+          },
+        },
+        deps,
+      );
+      expect(prefs.rows.get(42)).toBe("en");
+      expect(chats.has(42)).toBe(false);
     });
   });
 
