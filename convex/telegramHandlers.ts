@@ -2,28 +2,36 @@ import type { TrackEvent } from "./analytics";
 import { EVENT_CHANNEL_POST, EVENT_START, EVENT_TODAY_MENU } from "./analytics";
 import { formatKstClock } from "./dates";
 import { formatMenuMessage, type FormatMenuLike } from "./format";
+import {
+  DEFAULT_LOCALE,
+  LANGUAGE_PROMPT,
+  localeCallback,
+  localeFromCallback,
+  parseLocale,
+  t,
+  type Locale,
+} from "./i18n";
 import { shouldSendMorningPush } from "./morningPushPolicy";
 import type { StoredMenuLike } from "./refreshPolicy";
 import type { Cafeteria, ScrapeResult } from "./types";
 import { TELEGRAM_SEND_TIMEOUT_MS, type InlineKeyboardMarkup } from "./telegramClient";
 import { isTimeoutError, withTimeout } from "./asyncTimeout";
 
+export { LANGUAGE_PROMPT } from "./i18n";
+
 export const TODAY_MENU_CALLBACK = "today_menu";
-export const TODAY_MENU_BUTTON_LABEL = "Сегодняшнее меню";
+export const CHANGE_LANGUAGE_CALLBACK = "change_language";
+export const TODAY_MENU_BUTTON_LABEL = t("ru").todayMenu;
 export const SUBSCRIBE_CALLBACK = "morning_subscribe";
 export const UNSUBSCRIBE_CALLBACK = "morning_unsubscribe";
-export const SUBSCRIBE_BUTTON_LABEL = "Присылать утром";
-export const UNSUBSCRIBE_BUTTON_LABEL = "Отписаться";
-export const SUBSCRIBED_MESSAGE = "Буду присылать меню по утрам.";
-export const UNSUBSCRIBED_MESSAGE = "Больше не буду присылать утром.";
-export const SUBSCRIBE_FAILED_MESSAGE =
-  "Не удалось подписаться. Попробуйте позже.";
-export const UNSUBSCRIBE_FAILED_MESSAGE =
-  "Не удалось отписаться. Попробуйте позже.";
-export const MENU_UNAVAILABLE_MESSAGE =
-  "Не удалось получить меню. Попробуйте позже.";
-export const MENU_NOT_READY_MESSAGE =
-  "Меню ещё не выложили. Попробуйте позже.";
+export const SUBSCRIBE_BUTTON_LABEL = t("ru").subscribe;
+export const UNSUBSCRIBE_BUTTON_LABEL = t("ru").unsubscribe;
+export const SUBSCRIBED_MESSAGE = t("ru").subscribed;
+export const UNSUBSCRIBED_MESSAGE = t("ru").unsubscribed;
+export const SUBSCRIBE_FAILED_MESSAGE = t("ru").subscribeFailed;
+export const UNSUBSCRIBE_FAILED_MESSAGE = t("ru").unsubscribeFailed;
+export const MENU_UNAVAILABLE_MESSAGE = t("ru").menuUnavailable;
+export const MENU_NOT_READY_MESSAGE = t("ru").menuNotReady;
 
 export const REFETCHING_MESSAGE = "Refetching…";
 export const STATS_UNSET_MESSAGE = "APTABASE_DASHBOARD_URL is not set";
@@ -68,6 +76,8 @@ export type AdminRefetchResult = {
   date: string;
   results: Record<Cafeteria, ScrapeResult>;
   telegramMessage: string;
+  peony?: FormatMenuLike;
+  azilea?: FormatMenuLike;
 };
 
 export type TelegramDeps = {
@@ -96,35 +106,88 @@ export type TelegramDeps = {
   isSubscribed?: (chatId: number) => Promise<boolean>;
   subscribe?: (chatId: number) => Promise<void>;
   unsubscribe?: (chatId: number) => Promise<void>;
+  /** Stored locale, or null when the chat has not chosen yet. Omit in tests to treat as ru. */
+  getLocale?: (chatId: number) => Promise<string | null>;
+  setLocale?: (chatId: number, locale: string) => Promise<void>;
+  /** Insert ru if no row exists (morning push). */
+  ensureLocale?: (chatId: number) => Promise<string>;
 };
 
-export function todayMenuKeyboard(subscribed = false): InlineKeyboardMarkup {
+export function todayMenuKeyboard(
+  subscribed = false,
+  locale: Locale = DEFAULT_LOCALE,
+): InlineKeyboardMarkup {
+  const copy = t(locale);
   return {
     inline_keyboard: [
-      [{ text: TODAY_MENU_BUTTON_LABEL, callback_data: TODAY_MENU_CALLBACK }],
+      [{ text: copy.todayMenu, callback_data: TODAY_MENU_CALLBACK }],
       [
         subscribed
           ? {
-              text: UNSUBSCRIBE_BUTTON_LABEL,
+              text: copy.unsubscribe,
               callback_data: UNSUBSCRIBE_CALLBACK,
             }
           : {
-              text: SUBSCRIBE_BUTTON_LABEL,
+              text: copy.subscribe,
               callback_data: SUBSCRIBE_CALLBACK,
             },
+      ],
+      [
+        {
+          text: copy.changeLanguage,
+          callback_data: CHANGE_LANGUAGE_CALLBACK,
+        },
       ],
     ],
   };
 }
 
+export function languagePickerKeyboard(): InlineKeyboardMarkup {
+  return {
+    inline_keyboard: [
+      [
+        { text: t("ru").localeName, callback_data: localeCallback("ru") },
+        { text: t("en").localeName, callback_data: localeCallback("en") },
+      ],
+    ],
+  };
+}
+
+async function localeForChat(
+  chatId: number,
+  deps: TelegramDeps,
+): Promise<Locale | null> {
+  if (!deps.getLocale) return DEFAULT_LOCALE;
+  const stored = await deps.getLocale(chatId);
+  if (stored == null || stored === "") return null;
+  return parseLocale(stored);
+}
+
+/** Send paths that skip the picker must persist a row (ru if none exists). */
+async function localeOrEnsure(
+  chatId: number,
+  deps: TelegramDeps,
+): Promise<Locale> {
+  const stored = await localeForChat(chatId, deps);
+  if (stored) return stored;
+  if (!deps.ensureLocale) return DEFAULT_LOCALE;
+  try {
+    return parseLocale(await deps.ensureLocale(chatId));
+  } catch (err) {
+    console.error(`ensureLocale ${chatId} failed: ${(err as Error).message}`);
+    return DEFAULT_LOCALE;
+  }
+}
+
 async function keyboardFor(
   chatId: number,
   deps: TelegramDeps,
+  locale: Locale,
 ): Promise<InlineKeyboardMarkup> {
   const subscribed = deps.isSubscribed
     ? await deps.isSubscribed(chatId)
     : false;
-  return todayMenuKeyboard(subscribed);
+  return todayMenuKeyboard(subscribed, locale);
 }
 
 function callbackMessageId(
@@ -155,13 +218,14 @@ async function flipMorningKeyboard(
   chatId: number,
   messageId: number | undefined,
   subscribed: boolean,
+  locale: Locale,
 ): Promise<void> {
   if (messageId == null || !deps.editMessageReplyMarkup) return;
   try {
     await deps.editMessageReplyMarkup(
       chatId,
       messageId,
-      todayMenuKeyboard(subscribed),
+      todayMenuKeyboard(subscribed, locale),
     );
   } catch (err) {
     console.warn(
@@ -170,23 +234,56 @@ async function flipMorningKeyboard(
   }
 }
 
+async function sendLanguagePicker(
+  chatId: number,
+  deps: TelegramDeps,
+): Promise<void> {
+  await deps.sendMessage(chatId, LANGUAGE_PROMPT, {
+    reply_markup: languagePickerKeyboard(),
+  });
+}
+
+async function showLanguagePickerOnMessage(
+  deps: TelegramDeps,
+  chatId: number,
+  messageId: number | undefined,
+): Promise<void> {
+  if (messageId != null && deps.editMessageReplyMarkup) {
+    try {
+      await deps.editMessageReplyMarkup(
+        chatId,
+        messageId,
+        languagePickerKeyboard(),
+      );
+      return;
+    } catch (err) {
+      console.warn(
+        `editMessageReplyMarkup language picker failed: ${(err as Error).message}`,
+      );
+    }
+  }
+  await sendLanguagePicker(chatId, deps);
+}
+
 async function sendTodayMenu(
   chatId: number,
   deps: TelegramDeps,
   logLabel: string,
+  locale: Locale,
 ): Promise<void> {
+  const copy = t(locale);
   try {
     const today = await deps.getTodayMenus();
     const text = today.awaitingTodaysMenu
-      ? MENU_NOT_READY_MESSAGE
-      : formatMenuMessage(today.peony, today.azilea);
+      ? copy.menuNotReady
+      : formatMenuMessage(today.peony, today.azilea, { locale });
     await deps.sendMessage(chatId, text, {
-      reply_markup: await keyboardFor(chatId, deps),
+      reply_markup: await keyboardFor(chatId, deps, locale),
     });
   } catch (err) {
     console.error(`${logLabel} failed: ${(err as Error).message}`);
-    await deps.sendMessage(chatId, MENU_UNAVAILABLE_MESSAGE, {
-      reply_markup: await keyboardFor(chatId, deps),
+    await deps.sendMessage(chatId, copy.menuUnavailable, {
+      reply_markup: await keyboardFor(chatId, deps, locale),
     });
   }
 }
@@ -388,6 +485,10 @@ export async function deliverMorningPushes(args: {
   markPushed: (chatId: number) => Promise<void>;
   dropSubscriber: (chatId: number) => Promise<void>;
   menuText: string;
+  /** When set, used instead of the shared `menuText` after locale resolve. */
+  menuTextForLocale?: (locale: Locale) => string;
+  /** Insert a ru prefs row when the chat has none. */
+  ensureLocale?: (chatId: number) => Promise<string>;
   sendTimeoutMs?: number;
   /** Atomically claim this chat for today. When set, replaces lastPushedDate skip. */
   claimDelivery?: (chatId: number) => Promise<boolean>;
@@ -415,8 +516,6 @@ export async function deliverMorningPushes(args: {
     return summary;
   }
 
-  const text = args.menuText;
-  const keyboard = todayMenuKeyboard(true);
   const sendTimeoutMs = args.sendTimeoutMs ?? TELEGRAM_SEND_TIMEOUT_MS;
 
   const releaseIfNeeded = async (chatId: number) => {
@@ -453,6 +552,18 @@ export async function deliverMorningPushes(args: {
       continue;
     }
     try {
+      let locale = DEFAULT_LOCALE;
+      if (args.ensureLocale) {
+        try {
+          locale = parseLocale(await args.ensureLocale(subscriber.chatId));
+        } catch (err) {
+          console.error(
+            `morning push ensureLocale ${subscriber.chatId} failed: ${(err as Error).message}`,
+          );
+        }
+      }
+      const text = args.menuTextForLocale?.(locale) ?? args.menuText;
+      const keyboard = todayMenuKeyboard(true, locale);
       const result = await withTimeout(
         args.send(subscriber.chatId, text, {
           reply_markup: keyboard,
@@ -711,7 +822,14 @@ async function handleAdminCommand(
       chatId,
       formatRefetchSummary(result.date, result.results),
     );
-    await deps.sendMessage(chatId, result.telegramMessage);
+    const locale = await localeOrEnsure(chatId, deps);
+    const menuText =
+      result.peony !== undefined || result.azilea !== undefined
+        ? formatMenuMessage(result.peony ?? null, result.azilea ?? null, {
+            locale,
+          })
+        : result.telegramMessage;
+    await deps.sendMessage(chatId, menuText);
   } catch (err) {
     console.error(`/refetch failed: ${(err as Error).message}`);
     await deps.sendMessage(chatId, `Refetch failed: ${(err as Error).message}`);
@@ -720,13 +838,16 @@ async function handleAdminCommand(
 
 /**
  * Stateless Telegram bot logic:
- * - any student DM → today's Peony + Azilea menus + keyboard
+ * - first student DM with no locale → language picker
+ * - after a locale is stored, any student DM → today's menus + keyboard
  *   (or «меню ещё не выложили» when a weekday fetch is still pending)
  * - group / supergroup / channel inbound updates are ignored
  * - ADMIN_CHAT_ID only: /status, /refetch, /stats
  * - callback "today_menu" → same menu (refresh, including stub trays;
  *   weekday empty-DB before cutoff sends «меню ещё не выложили» instead)
  * - callback morning_subscribe / morning_unsubscribe → toast + flip keyboard
+ * - callback change_language → locale picker on that message
+ * - callback locale_ru / locale_en → store locale and resend the menu
  */
 export async function processTelegramUpdate(
   update: unknown,
@@ -762,14 +883,59 @@ export async function processTelegramUpdate(
       return "ignored";
     }
 
+    const picked = localeFromCallback(callback.data);
+    if (picked) {
+      try {
+        if (deps.setLocale) await deps.setLocale(chatId, picked);
+      } catch (err) {
+        console.error(`setLocale failed: ${(err as Error).message}`);
+      }
+      try {
+        await deps.answerCallbackQuery(callbackId);
+      } catch (err) {
+        console.warn(
+          `locale pick ack failed: ${(err as Error).message}`,
+        );
+      }
+      await sendTodayMenu(chatId, deps, "locale menu", picked);
+      return "ok";
+    }
+
+    if (callback.data === CHANGE_LANGUAGE_CALLBACK) {
+      try {
+        await deps.answerCallbackQuery(callbackId);
+      } catch (err) {
+        console.warn(
+          `answerCallbackQuery change_language failed: ${(err as Error).message}`,
+        );
+      }
+      await showLanguagePickerOnMessage(deps, chatId, messageId);
+      return "ok";
+    }
+
+    const locale = await localeForChat(chatId, deps);
+    if (locale == null) {
+      try {
+        await deps.answerCallbackQuery(callbackId);
+      } catch (err) {
+        console.warn(
+          `answerCallbackQuery picker failed: ${(err as Error).message}`,
+        );
+      }
+      await sendLanguagePicker(chatId, deps);
+      return "ok";
+    }
+
+    const copy = t(locale);
+
     if (callback.data === SUBSCRIBE_CALLBACK) {
       try {
         if (deps.subscribe) await deps.subscribe(chatId);
-        await toastMorningToggle(deps, callbackId, SUBSCRIBED_MESSAGE);
-        await flipMorningKeyboard(deps, chatId, messageId, true);
+        await toastMorningToggle(deps, callbackId, copy.subscribed);
+        await flipMorningKeyboard(deps, chatId, messageId, true, locale);
       } catch (err) {
         console.error(`morning_subscribe failed: ${(err as Error).message}`);
-        await toastMorningToggle(deps, callbackId, SUBSCRIBE_FAILED_MESSAGE);
+        await toastMorningToggle(deps, callbackId, copy.subscribeFailed);
       }
       return "ok";
     }
@@ -777,11 +943,11 @@ export async function processTelegramUpdate(
     if (callback.data === UNSUBSCRIBE_CALLBACK) {
       try {
         if (deps.unsubscribe) await deps.unsubscribe(chatId);
-        await toastMorningToggle(deps, callbackId, UNSUBSCRIBED_MESSAGE);
-        await flipMorningKeyboard(deps, chatId, messageId, false);
+        await toastMorningToggle(deps, callbackId, copy.unsubscribed);
+        await flipMorningKeyboard(deps, chatId, messageId, false, locale);
       } catch (err) {
         console.error(`morning_unsubscribe failed: ${(err as Error).message}`);
-        await toastMorningToggle(deps, callbackId, UNSUBSCRIBE_FAILED_MESSAGE);
+        await toastMorningToggle(deps, callbackId, copy.unsubscribeFailed);
       }
       return "ok";
     }
@@ -793,7 +959,7 @@ export async function processTelegramUpdate(
     }
 
     await safeTrack(deps.trackEvent, EVENT_TODAY_MENU);
-    await sendTodayMenu(chatId, deps, "today_menu handler");
+    await sendTodayMenu(chatId, deps, "today_menu handler", locale);
     return "ok";
   }
 
@@ -811,7 +977,14 @@ export async function processTelegramUpdate(
     return "ok";
   }
 
-  await sendTodayMenu(chatId, deps, "start menu");
+  const locale = await localeForChat(chatId, deps);
+  if (locale == null) {
+    await sendLanguagePicker(chatId, deps);
+    await safeTrack(deps.trackEvent, EVENT_START);
+    return "ok";
+  }
+
+  await sendTodayMenu(chatId, deps, "start menu", locale);
   await safeTrack(deps.trackEvent, EVENT_START);
   return "ok";
 }

@@ -21,6 +21,7 @@ import {
   sameDishNames,
 } from "./refreshPolicy";
 import { scrapeCafeteriasSafely } from "./scrapeAll";
+import { dishDoc } from "./dishDoc";
 import type { Cafeteria, Dish, ScrapeResult } from "./types";
 
 const CAFETERIAS: Cafeteria[] = ["peony", "azilea"];
@@ -32,14 +33,30 @@ const MENU_SOURCE = v.union(
 );
 
 function bareDishes(names: string[]): Dish[] {
-  return names.map((name) => ({ name, description: "", spiciness: 0 }));
+  return names.map((name) => ({ name, spiciness: 0, gloss: {} }));
 }
 
 // ---------- Queries ----------
 
 export const getTodayBoth = internalQuery({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx): Promise<{
+    date: string;
+    peony: {
+      date: string;
+      cafeteria: Cafeteria;
+      dishes: Dish[];
+      fetchedAt: number;
+      source: "live" | "fallback" | "holiday" | "no_info";
+    } | null;
+    azilea: {
+      date: string;
+      cafeteria: Cafeteria;
+      dishes: Dish[];
+      fetchedAt: number;
+      source: "live" | "fallback" | "holiday" | "no_info";
+    } | null;
+  }> => {
     const date = todayKst();
     const rows = await ctx.db
       .query("menus")
@@ -53,7 +70,13 @@ export const getTodayBoth = internalQuery({
 
 export const getMenuForDate = internalQuery({
   args: { date: v.string(), cafeteria: v.string() },
-  handler: async (ctx, { date, cafeteria }) => {
+  handler: async (ctx, { date, cafeteria }): Promise<{
+    date: string;
+    cafeteria: Cafeteria;
+    dishes: Dish[];
+    fetchedAt: number;
+    source: "live" | "fallback" | "holiday" | "no_info";
+  } | null> => {
     return await ctx.db
       .query("menus")
       .withIndex("by_date_cafeteria", (q) =>
@@ -65,7 +88,14 @@ export const getMenuForDate = internalQuery({
 
 export const listAttemptsForDate = internalQuery({
   args: { date: v.string() },
-  handler: async (ctx, { date }) => {
+  handler: async (ctx, { date }): Promise<
+    Array<{
+      cafeteria: string;
+      status: "success" | "empty" | "error";
+      attemptedAt: number;
+      error?: string;
+    }>
+  > => {
     return await ctx.db
       .query("fetchAttempts")
       .withIndex("by_date", (q) => q.eq("date", date))
@@ -79,13 +109,7 @@ export const upsertMenu = internalMutation({
   args: {
     date: v.string(),
     cafeteria: v.union(v.literal("peony"), v.literal("azilea")),
-    dishes: v.array(
-      v.object({
-        name: v.string(),
-        description: v.string(),
-        spiciness: v.number(),
-      }),
-    ),
+    dishes: v.array(dishDoc),
     fetchedAt: v.number(),
     source: MENU_SOURCE,
   },
@@ -154,20 +178,8 @@ async function recordAttemptAndTrack(
 /** Seed today's menus for E2E / manual checks without scraping. */
 export const seedToday = internalMutation({
   args: {
-    peonyDishes: v.array(
-      v.object({
-        name: v.string(),
-        description: v.string(),
-        spiciness: v.number(),
-      }),
-    ),
-    azileaDishes: v.array(
-      v.object({
-        name: v.string(),
-        description: v.string(),
-        spiciness: v.number(),
-      }),
-    ),
+    peonyDishes: v.array(dishDoc),
+    azileaDishes: v.array(dishDoc),
   },
   handler: async (ctx, { peonyDishes, azileaDishes }) => {
     const date = todayKst();
@@ -438,7 +450,25 @@ export const fetchAllForToday = internalAction({
 /** Internal scrape so we can re-run enrichment after changing OPENROUTER_MODEL. */
 export const refetchToday = internalAction({
   args: { force: v.optional(v.boolean()) },
-  handler: async (ctx, { force }) => {
+  handler: async (ctx, { force }): Promise<{
+    results: Record<Cafeteria, ScrapeResult>;
+    date: string;
+    telegramMessage: string;
+    peony: {
+      date: string;
+      cafeteria: Cafeteria;
+      dishes: Dish[];
+      fetchedAt: number;
+      source: "live" | "fallback" | "holiday" | "no_info";
+    } | null;
+    azilea: {
+      date: string;
+      cafeteria: Cafeteria;
+      dishes: Dish[];
+      fetchedAt: number;
+      source: "live" | "fallback" | "holiday" | "no_info";
+    } | null;
+  }> => {
     const shouldForce = force ?? true;
     const results = await scrapeCafeteriasSafely(async (cafeteria) =>
       ctx.runAction(internal.menus.scrapeAndEnrich, {

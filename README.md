@@ -1,7 +1,7 @@
 # daily-menu
 
 Convex backend that scrapes two Korean university cafeteria menus (Peony / Azilea),
-enriches each dish with a Russian description and spiciness rating via OpenRouter,
+enriches each dish with a short translation (Russian + English) and spiciness rating via OpenRouter,
 and serves them through a Telegram bot: «Сегодняшнее меню», an opt-in morning push,
 and an optional daily post to a Telegram channel.
 
@@ -17,7 +17,7 @@ and an optional daily post to a Telegram channel.
 
 ```
 convex/
-  schema.ts            tables: appConfig, menus, fetchAttempts, telegramUpdates, subscribers, channelPush
+  schema.ts            tables: appConfig, menus, fetchAttempts, telegramUpdates, subscribers, channelPush, chatPrefs
   appConfig.ts         singleton peonyUrl / azileaUrl
   crons.ts             daily 09:00 KST fetch; 00:00 KST prune
   prune.ts             delete menus / fetchAttempts older than 30 days
@@ -25,6 +25,8 @@ convex/
   morningPush.ts       fan-out to opted-in chats + optional channel after a ready fetch
   morningPushPolicy.ts weekday / complete-tray gate (testable)
   subscribers.ts       opt-in rows; delete on unsubscribe or blocked chat
+  chatPrefs.ts         per-chat locale (and later hall preference)
+  i18n.ts              ru/en UI chrome; dish gloss is on each menu dish
   channelPush.ts       singleton lastPostedDate for the daily channel post
   http.ts              /telegram/webhook
   telegram.ts          webhook httpAction + setWebhook / getWebhookInfo
@@ -36,7 +38,7 @@ convex/
   menus.ts             scrape / enrich / seed
   scraper.ts           fetch + parse
   openrouter.ts        LLM enrichment
-  format.ts            Russian message formatter
+  format.ts            Russian and English menu formatter
   dates.ts             KST helpers
   types.ts             shared types
 tests/
@@ -45,9 +47,9 @@ tests/
 
 ## Bot UX
 
-1. User sends any message (e.g. `/start`) → bot replies with today's Peony + Azilea menu. **Сегодняшнее меню** and **Присылать утром** stay on that message. If it is a weekday before 12:30 KST and today's menus are still missing, the reply is «Меню ещё не выложили. Попробуйте позже.» instead of scraping on that request.
-2. User taps **Сегодняшнее меню** → the same formatted menu again (refresh, including stub trays), except on a weekday before 12:30 KST with no today's rows: that tap also sends the not-ready copy and does not scrape. A KST date line (`9 сен · 09:14`) sits above Peony; incomplete live trays add italic *ещё обновляется* under that hall until 12:30 KST. Peony + Azilea grouped by tray slot (горячее / суп / салат / ещё). No «🍽️ Сегодня». Telegram HTML: bold names, italic gloss and section labels, compact chili. Staples bunch on one line. Both buttons stay on the menu.
-3. **Присылать утром** stores that `chatId` in Convex and toasts confirmation on the same message (the button flips to **Отписаться**; no extra chat bubble). After a weekday scrape when **both** halls are settled (each 5+ live dishes, or a closed notice), opted-in chats get the same menu once. A stub on either side waits until the last 12:30 KST attempt, which sends anyway even if one hall is empty. **Отписаться** deletes the row (stops the next day) the same way. No student commands; no weekly reminder.
+1. First private message with no stored locale → language picker (`Language / Язык`, **Русский** / **English**). After a locale is stored, any message (e.g. `/start`) → today's Peony + Azilea menu with **Сегодняшнее меню** / **Today's menu**, morning opt-in, and **Сменить язык** / **Change language**. If it is a weekday before 12:30 KST and today's menus are still missing, the reply is the localized not-ready copy instead of scraping on that request.
+2. User taps **Сегодняшнее меню** / **Today's menu** → the same formatted menu again (refresh, including stub trays), except on a weekday before 12:30 KST with no today's rows: that tap also sends the not-ready copy and does not scrape. A KST date line (`9 сен · 09:14` / `9 Sep · 09:14`) sits above Peony; incomplete live trays add italic still-updating copy under that hall until 12:30 KST. Russian hall lines keep `Peony · верхняя` / `Azilea · нижняя`; English uses `피오니 · 지운관` / `아질리아 · 창조관`. Hangul names stay; gloss comes from `gloss[locale]`. Peony + Azilea grouped by tray slot. Telegram HTML: bold names, italic gloss and section labels, compact chili. Staples bunch on one line. All three buttons stay on the menu.
+3. **Присылать утром** / **Send in the morning** stores that `chatId` in Convex and toasts confirmation on the same message (the button flips to **Отписаться** / **Unsubscribe**; no extra chat bubble). After a weekday scrape when **both** halls are settled, opted-in chats get the menu once in that chat's locale. A missing `chatPrefs` row is created as `ru` so existing subscribers still get Russian. **Change language** edits the keyboard into Русский / English, then resends the menu. The channel post stays Russian with no keyboard.
 4. If `TELEGRAM_CHANNEL_CHAT_ID` is set, that same weekday menu is posted once to the channel (no inline keyboard). Comments and photos belong in a Telegram discussion group linked to the channel — the bot does not ingest them. Group / channel inbound updates are ignored so the bot never replies there.
 
 `ADMIN_CHAT_ID` can also use English admin commands (anyone else who types them still gets today's menu):
