@@ -3,6 +3,16 @@ import { EVENT_CHANNEL_POST, EVENT_START, EVENT_TODAY_MENU } from "./analytics";
 import { formatKstClock } from "./dates";
 import { formatMenuMessage, type FormatMenuLike } from "./format";
 import {
+  DEFAULT_HALL_PREF,
+  HALL_AZILEA_CALLBACK,
+  HALL_PEONY_CALLBACK,
+  hallFromCallback,
+  includesHall,
+  parseHallPref,
+  toggleHall,
+  type HallPref,
+} from "./halls";
+import {
   DEFAULT_LOCALE,
   LANGUAGE_PROMPT,
   localeCallback,
@@ -10,6 +20,7 @@ import {
   parseLocale,
   t,
   type Locale,
+  type UiStrings,
 } from "./i18n";
 import { shouldSendMorningPush } from "./morningPushPolicy";
 import type { StoredMenuLike } from "./refreshPolicy";
@@ -18,6 +29,7 @@ import { TELEGRAM_SEND_TIMEOUT_MS, type InlineKeyboardMarkup } from "./telegramC
 import { isTimeoutError, withTimeout } from "./asyncTimeout";
 
 export { LANGUAGE_PROMPT } from "./i18n";
+export { HALL_AZILEA_CALLBACK, HALL_PEONY_CALLBACK } from "./halls";
 
 export const TODAY_MENU_CALLBACK = "today_menu";
 export const CHANGE_LANGUAGE_CALLBACK = "change_language";
@@ -111,11 +123,30 @@ export type TelegramDeps = {
   setLocale?: (chatId: number, locale: string) => Promise<void>;
   /** Insert ru if no row exists (morning push). */
   ensureLocale?: (chatId: number) => Promise<string>;
+  /** Stored halls, or null when unset (treat as both). */
+  getHalls?: (chatId: number) => Promise<string | null>;
+  setHalls?: (chatId: number, halls: string) => Promise<void>;
 };
+
+function hallButtonLabel(
+  copy: UiStrings,
+  halls: HallPref,
+  hall: "peony" | "azilea",
+): string {
+  const name = hall === "peony" ? copy.hallPeony : copy.hallAzilea;
+  return includesHall(halls, hall) ? `✓ ${name}` : name;
+}
+
+function hallsToast(copy: UiStrings, pref: HallPref): string {
+  if (pref === "peony") return copy.hallsPeony;
+  if (pref === "azilea") return copy.hallsAzilea;
+  return copy.hallsBoth;
+}
 
 export function todayMenuKeyboard(
   subscribed = false,
   locale: Locale = DEFAULT_LOCALE,
+  halls: HallPref = DEFAULT_HALL_PREF,
 ): InlineKeyboardMarkup {
   const copy = t(locale);
   return {
@@ -131,6 +162,16 @@ export function todayMenuKeyboard(
               text: copy.subscribe,
               callback_data: SUBSCRIBE_CALLBACK,
             },
+      ],
+      [
+        {
+          text: hallButtonLabel(copy, halls, "peony"),
+          callback_data: HALL_PEONY_CALLBACK,
+        },
+        {
+          text: hallButtonLabel(copy, halls, "azilea"),
+          callback_data: HALL_AZILEA_CALLBACK,
+        },
       ],
       [
         {
@@ -179,6 +220,19 @@ async function localeOrEnsure(
   }
 }
 
+async function hallsForChat(
+  chatId: number,
+  deps: TelegramDeps,
+): Promise<HallPref> {
+  if (!deps.getHalls) return DEFAULT_HALL_PREF;
+  try {
+    return parseHallPref(await deps.getHalls(chatId));
+  } catch (err) {
+    console.error(`getHalls ${chatId} failed: ${(err as Error).message}`);
+    return DEFAULT_HALL_PREF;
+  }
+}
+
 async function keyboardFor(
   chatId: number,
   deps: TelegramDeps,
@@ -187,7 +241,8 @@ async function keyboardFor(
   const subscribed = deps.isSubscribed
     ? await deps.isSubscribed(chatId)
     : false;
-  return todayMenuKeyboard(subscribed, locale);
+  const halls = await hallsForChat(chatId, deps);
+  return todayMenuKeyboard(subscribed, locale, halls);
 }
 
 function callbackMessageId(
@@ -222,10 +277,11 @@ async function flipMorningKeyboard(
 ): Promise<void> {
   if (messageId == null || !deps.editMessageReplyMarkup) return;
   try {
+    const halls = await hallsForChat(chatId, deps);
     await deps.editMessageReplyMarkup(
       chatId,
       messageId,
-      todayMenuKeyboard(subscribed, locale),
+      todayMenuKeyboard(subscribed, locale, halls),
     );
   } catch (err) {
     console.warn(
@@ -274,9 +330,10 @@ async function sendTodayMenu(
   const copy = t(locale);
   try {
     const today = await deps.getTodayMenus();
+    const halls = await hallsForChat(chatId, deps);
     const text = today.awaitingTodaysMenu
       ? copy.menuNotReady
-      : formatMenuMessage(today.peony, today.azilea, { locale });
+      : formatMenuMessage(today.peony, today.azilea, { locale, halls });
     await deps.sendMessage(chatId, text, {
       reply_markup: await keyboardFor(chatId, deps, locale),
     });
@@ -486,9 +543,11 @@ export async function deliverMorningPushes(args: {
   dropSubscriber: (chatId: number) => Promise<void>;
   menuText: string;
   /** When set, used instead of the shared `menuText` after locale resolve. */
-  menuTextForLocale?: (locale: Locale) => string;
+  menuTextForLocale?: (locale: Locale, halls?: HallPref) => string;
   /** Insert a ru prefs row when the chat has none. */
   ensureLocale?: (chatId: number) => Promise<string>;
+  /** Missing / unknown halls means both. */
+  getHalls?: (chatId: number) => Promise<string | null>;
   sendTimeoutMs?: number;
   /** Atomically claim this chat for today. When set, replaces lastPushedDate skip. */
   claimDelivery?: (chatId: number) => Promise<boolean>;
@@ -562,8 +621,18 @@ export async function deliverMorningPushes(args: {
           );
         }
       }
-      const text = args.menuTextForLocale?.(locale) ?? args.menuText;
-      const keyboard = todayMenuKeyboard(true, locale);
+      let halls = DEFAULT_HALL_PREF;
+      if (args.getHalls) {
+        try {
+          halls = parseHallPref(await args.getHalls(subscriber.chatId));
+        } catch (err) {
+          console.error(
+            `morning push getHalls ${subscriber.chatId} failed: ${(err as Error).message}`,
+          );
+        }
+      }
+      const text = args.menuTextForLocale?.(locale, halls) ?? args.menuText;
+      const keyboard = todayMenuKeyboard(true, locale, halls);
       const result = await withTimeout(
         args.send(subscriber.chatId, text, {
           reply_markup: keyboard,
@@ -827,6 +896,7 @@ async function handleAdminCommand(
       result.peony !== undefined || result.azilea !== undefined
         ? formatMenuMessage(result.peony ?? null, result.azilea ?? null, {
             locale,
+            halls: await hallsForChat(chatId, deps),
           })
         : result.telegramMessage;
     await deps.sendMessage(chatId, menuText);
@@ -846,6 +916,7 @@ async function handleAdminCommand(
  * - callback "today_menu" → same menu (refresh, including stub trays;
  *   weekday empty-DB before cutoff sends «меню ещё не выложили» instead)
  * - callback morning_subscribe / morning_unsubscribe → toast + flip keyboard
+ * - callback hall_peony / hall_azilea → toast + resend filtered menu
  * - callback change_language → locale picker on that message
  * - callback locale_ru / locale_en → store locale and resend the menu
  */
@@ -948,6 +1019,25 @@ export async function processTelegramUpdate(
       } catch (err) {
         console.error(`morning_unsubscribe failed: ${(err as Error).message}`);
         await toastMorningToggle(deps, callbackId, copy.unsubscribeFailed);
+      }
+      return "ok";
+    }
+
+    const hallTap = hallFromCallback(callback.data);
+    if (hallTap) {
+      const current = await hallsForChat(chatId, deps);
+      const { pref, changed } = toggleHall(current, hallTap);
+      if (!changed) {
+        await toastMorningToggle(deps, callbackId, copy.hallsNeedOne);
+        return "ok";
+      }
+      try {
+        if (deps.setHalls) await deps.setHalls(chatId, pref);
+        await toastMorningToggle(deps, callbackId, hallsToast(copy, pref));
+        await sendTodayMenu(chatId, deps, "hall menu", locale);
+      } catch (err) {
+        console.error(`setHalls failed: ${(err as Error).message}`);
+        await toastMorningToggle(deps, callbackId, copy.hallsFailed);
       }
       return "ok";
     }

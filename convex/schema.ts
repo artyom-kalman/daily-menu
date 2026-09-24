@@ -42,11 +42,15 @@ export default defineSchema({
     claimedAt: v.number(),
   }).index("by_updateId", ["updateId"]),
 
-  // Per-chat settings (locale now; hall preference later).
-  // Independent of morning `subscribers` — unsubscribe must not wipe locale.
+  // Per-chat settings. Independent of morning `subscribers` —
+  // unsubscribe must not wipe locale or halls.
   chatPrefs: defineTable({
     chatId: v.number(),
     locale: v.string(), // "ru" | "en" today; string so later locales fit
+    // Missing / unknown means both halls.
+    halls: v.optional(
+      v.union(v.literal("both"), v.literal("peony"), v.literal("azilea")),
+    ),
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_chatId", ["chatId"]),

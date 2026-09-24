@@ -1,6 +1,11 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
-import { ensureLocaleWrite, setLocaleWrite } from "./chatPrefsPolicy";
+import { parseHallPref } from "./halls";
+import {
+  ensureLocaleWrite,
+  setHallsWrite,
+  setLocaleWrite,
+} from "./chatPrefsPolicy";
 
 export const getByChatId = internalQuery({
   args: { chatId: v.number() },
@@ -50,6 +55,30 @@ export const ensureLocale = internalMutation({
     if (write.created) {
       await ctx.db.insert("chatPrefs", { chatId, ...write.insert });
     }
-    return { created: write.created, locale: write.locale };
+    return {
+      created: write.created,
+      locale: write.locale,
+      halls: parseHallPref(existing?.halls),
+    };
+  },
+});
+
+export const setHalls = internalMutation({
+  args: { chatId: v.number(), halls: v.string() },
+  handler: async (ctx, { chatId, halls }) => {
+    const existing = await ctx.db
+      .query("chatPrefs")
+      .withIndex("by_chatId", (q) => q.eq("chatId", chatId))
+      .unique();
+    const write = setHallsWrite(existing, halls, Date.now());
+    if (!write.created) {
+      if (!existing) {
+        throw new Error("setHallsWrite patch without chatPrefs row");
+      }
+      await ctx.db.patch(existing._id, write.patch);
+      return { created: false, halls: write.halls };
+    }
+    await ctx.db.insert("chatPrefs", { chatId, ...write.insert });
+    return { created: true, halls: write.halls };
   },
 });

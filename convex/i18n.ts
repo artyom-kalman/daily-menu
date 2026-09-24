@@ -44,6 +44,11 @@ export type UiStrings = {
   courseSide: string;
   hallPeony: string;
   hallAzilea: string;
+  hallsNeedOne: string;
+  hallsPeony: string;
+  hallsAzilea: string;
+  hallsBoth: string;
+  hallsFailed: string;
   months: readonly [
     string,
     string,
@@ -81,6 +86,11 @@ export const UI: Record<Locale, UiStrings> = {
     courseSide: "Ещё",
     hallPeony: "🌸 Peony · верхняя",
     hallAzilea: "🌺 Azilea · нижняя",
+    hallsNeedOne: "Нужен хотя бы один зал.",
+    hallsPeony: "Показываю Peony.",
+    hallsAzilea: "Показываю Azilea.",
+    hallsBoth: "Показываю оба зала.",
+    hallsFailed: "Не удалось сохранить выбор.",
     months: [
       "янв",
       "фев",
@@ -116,6 +126,11 @@ export const UI: Record<Locale, UiStrings> = {
     courseSide: "More",
     hallPeony: "🌸 피오니 · 지운관",
     hallAzilea: "🌺 아질리아 · 창조관",
+    hallsNeedOne: "Keep at least one hall.",
+    hallsPeony: "Showing Peony.",
+    hallsAzilea: "Showing Azilea.",
+    hallsBoth: "Showing both halls.",
+    hallsFailed: "Couldn't save that choice.",
     months: [
       "Jan",
       "Feb",

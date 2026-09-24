@@ -77,6 +77,8 @@ import {
   TODAY_MENU_BUTTON_LABEL,
   TODAY_MENU_CALLBACK,
   CHANGE_LANGUAGE_CALLBACK,
+  HALL_AZILEA_CALLBACK,
+  HALL_PEONY_CALLBACK,
   LANGUAGE_PROMPT,
   languagePickerKeyboard,
   deliverMorningPushes,
@@ -612,6 +614,36 @@ describe("formatMenuMessage", () => {
     expect(text).toContain("<i>Hot</i>\n<b>찜닭</b> — <i>braised chicken</i> 🌶2");
     expect(text).toContain("No information");
     expect(text).not.toContain("тушёная курица");
+  });
+
+  it("omits the hidden hall instead of showing it empty", () => {
+    const peony = {
+      source: "live" as const,
+      fetchedAt: Date.parse("2026-09-05T00:14:00.000Z"),
+      dishes: [{ name: "찜닭", description: "тушёная курица", spiciness: 2 }],
+    };
+    const azilea = {
+      source: "live" as const,
+      fetchedAt: Date.parse("2026-09-05T00:40:00.000Z"),
+      dishes: [{ name: "돈육김치볶음", description: "жаркое", spiciness: 3 }],
+    };
+    const peonyOnly = formatMenuMessage(peony, azilea, {
+      ...formatOpts,
+      halls: "peony",
+    });
+    expect(peonyOnly).toContain("Peony · верхняя");
+    expect(peonyOnly).toContain("찜닭");
+    expect(peonyOnly).toContain("09:14");
+    expect(peonyOnly).not.toContain("Azilea");
+    expect(peonyOnly).not.toContain("돈육김치볶음");
+    expect(peonyOnly).not.toContain("09:40");
+    const azileaOnly = formatMenuMessage(peony, azilea, {
+      ...formatOpts,
+      halls: "azilea",
+    });
+    expect(azileaOnly).toContain("Azilea · нижняя");
+    expect(azileaOnly).not.toContain("Peony");
+    expect(azileaOnly).not.toContain("찜닭");
   });
 
   it("formats a stored live tray: RU uses description, EN keeps Hangul halls without cross-fallback", () => {
@@ -1242,9 +1274,11 @@ describe("telegram button e2e", () => {
 
   function memoryChatPrefs(seed?: Array<[number, string]>) {
     const rows = new Map<number, string>(seed);
+    const halls = new Map<number, string>();
     const created: number[] = [];
     return {
       rows,
+      halls,
       created,
       getLocale: async (chatId: number) => rows.get(chatId) ?? null,
       setLocale: async (chatId: number, locale: string) => {
@@ -1257,6 +1291,14 @@ describe("telegram button e2e", () => {
         created.push(chatId);
         rows.set(chatId, "ru");
         return "ru";
+      },
+      getHalls: async (chatId: number) => halls.get(chatId) ?? null,
+      setHalls: async (chatId: number, value: string) => {
+        if (!rows.has(chatId)) {
+          created.push(chatId);
+          rows.set(chatId, "ru");
+        }
+        halls.set(chatId, value);
       },
     };
   }
@@ -1472,6 +1514,120 @@ describe("telegram button e2e", () => {
         chatId: 2,
         text: "en-menu",
         reply_markup: todayMenuKeyboard(true, "en"),
+      },
+    ]);
+  });
+
+  it("toggles halls with a toast and resends only the chosen hall", async () => {
+    await withMockTelegram(async (calls) => {
+      const prefs = memoryChatPrefs([[42, "ru"]]);
+      const menus = {
+        peony: {
+          dishes: [{ name: "찜닭", description: "тушёная курица", spiciness: 2 }],
+        },
+        azilea: {
+          dishes: [{ name: "돈육김치볶음", description: "жаркое", spiciness: 3 }],
+        },
+      };
+      const deps = {
+        getTodayMenus: async () => menus,
+        sendMessage,
+        answerCallbackQuery,
+        getLocale: prefs.getLocale,
+        getHalls: prefs.getHalls,
+        setHalls: prefs.setHalls,
+      };
+      await processTelegramUpdate(
+        {
+          callback_query: {
+            id: "cb-hall-azilea",
+            data: HALL_AZILEA_CALLBACK,
+            message: { chat: { id: 42 }, message_id: 9 },
+          },
+        },
+        deps,
+      );
+      expect(prefs.halls.get(42)).toBe("peony");
+      expect(calls.map((c) => c.method)).toEqual([
+        "answerCallbackQuery",
+        "sendMessage",
+      ]);
+      expect(calls[0].body.text).toBe("Показываю Peony.");
+      expect(calls[1].body.text).toBe(
+        formatMenuMessage(menus.peony, menus.azilea, {
+          halls: "peony",
+        }),
+      );
+      expect(calls[1].body.text).toContain("찜닭");
+      expect(calls[1].body.text).not.toContain("Azilea");
+      expect(calls[1].body.reply_markup).toEqual(
+        todayMenuKeyboard(false, "ru", "peony"),
+      );
+
+      calls.length = 0;
+      await processTelegramUpdate(
+        {
+          callback_query: {
+            id: "cb-hall-peony",
+            data: HALL_PEONY_CALLBACK,
+            message: { chat: { id: 42 }, message_id: 9 },
+          },
+        },
+        deps,
+      );
+      expect(prefs.halls.get(42)).toBe("peony");
+      expect(calls.map((c) => c.method)).toEqual(["answerCallbackQuery"]);
+      expect(calls[0].body.text).toBe("Нужен хотя бы один зал.");
+    });
+  });
+
+  it("morning push formats each chat's halls without changing the campus gate", async () => {
+    const prefs = memoryChatPrefs([[1, "ru"], [2, "en"]]);
+    prefs.halls.set(2, "azilea");
+    const sent: Array<{ chatId: number; text: string; reply_markup: unknown }> =
+      [];
+    const tray = {
+      source: "live" as const,
+      dishes: [
+        { name: "눈꽃치즈닭갈비덮밥" },
+        { name: "미역국" },
+        { name: "피자고로케&케찹" },
+        { name: "어묵채볶음" },
+        { name: "숙주나물" },
+      ],
+      fetchedAt: 1,
+    };
+    const summary = await deliverMorningPushes({
+      today: "2026-09-07",
+      peony: tray,
+      azilea: tray,
+      menuText: "unused",
+      menuTextForLocale: (locale, halls) => `${locale}:${halls ?? "both"}`,
+      ensureLocale: prefs.ensureLocale,
+      getHalls: prefs.getHalls,
+      subscribers: [{ chatId: 1 }, { chatId: 2 }],
+      send: async (chatId, text, options) => {
+        sent.push({
+          chatId,
+          text,
+          reply_markup: options?.reply_markup,
+        });
+        return { ok: true };
+      },
+      markPushed: async () => {},
+      dropSubscriber: async () => {},
+    });
+    expect(summary.sent).toBe(2);
+    expect(sent).toEqual([
+      {
+        chatId: 1,
+        text: "ru:both",
+        reply_markup: todayMenuKeyboard(true, "ru"),
+      },
+      {
+        chatId: 2,
+        text: "en:azilea",
+        reply_markup: todayMenuKeyboard(true, "en", "azilea"),
       },
     ]);
   });
@@ -2398,17 +2554,31 @@ describe("morning push", () => {
       /deliverChannelPost\(\{[\s\S]*?lastAttempt,/,
     );
     expect(morningPush).toContain("internal.chatPrefs.ensureLocale");
+    expect(morningPush).toContain("internal.chatPrefs.getByChatId");
     const telegram = readFileSync(
       join(dirname(fileURLToPath(import.meta.url)), "../convex/telegram.ts"),
       "utf8",
     );
     expect(telegram).toContain("internal.chatPrefs.setLocale");
     expect(telegram).toContain("internal.chatPrefs.ensureLocale");
-    expect(todayMenuKeyboard(false).inline_keyboard).toHaveLength(3);
+    expect(telegram).toContain("internal.chatPrefs.setHalls");
+    expect(todayMenuKeyboard(false).inline_keyboard).toHaveLength(4);
     expect(todayMenuKeyboard(true).inline_keyboard[1][0].text).toBe(
       UNSUBSCRIBE_BUTTON_LABEL,
     );
     expect(todayMenuKeyboard(false).inline_keyboard[2][0].callback_data).toBe(
+      HALL_PEONY_CALLBACK,
+    );
+    expect(todayMenuKeyboard(false).inline_keyboard[2][1].callback_data).toBe(
+      HALL_AZILEA_CALLBACK,
+    );
+    expect(todayMenuKeyboard(false, "ru", "peony").inline_keyboard[2][0].text).toBe(
+      "✓ 🌸 Peony · верхняя",
+    );
+    expect(todayMenuKeyboard(false, "ru", "peony").inline_keyboard[2][1].text).toBe(
+      "🌺 Azilea · нижняя",
+    );
+    expect(todayMenuKeyboard(false).inline_keyboard[3][0].callback_data).toBe(
       CHANGE_LANGUAGE_CALLBACK,
     );
   });
