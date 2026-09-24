@@ -5,6 +5,12 @@ import {
   todayKst,
 } from "./dates";
 import {
+  DEFAULT_HALL_PREF,
+  includesHall,
+  parseHallPref,
+  type HallPref,
+} from "./halls";
+import {
   DEFAULT_LOCALE,
   t,
   type Locale,
@@ -51,6 +57,8 @@ export type FormatMenuOptions = {
   /** Epoch ms used for the 12:30 KST stub cutoff and a missing date. */
   nowMs?: number;
   locale?: Locale;
+  /** Missing / unknown means both halls. Hidden hall is omitted. */
+  halls?: HallPref | string | null;
 };
 
 /** Escape dish names for Telegram `parse_mode: HTML`. */
@@ -174,10 +182,23 @@ function menuCalendarDate(
 function latestFetchedAt(
   peony: FormatMenuLike,
   azilea: FormatMenuLike,
+  halls: HallPref,
 ): number | null {
-  const times = [peony?.fetchedAt, azilea?.fetchedAt].filter(
-    (ms): ms is number => typeof ms === "number" && ms > 0,
-  );
+  const times: number[] = [];
+  if (
+    includesHall(halls, "peony") &&
+    typeof peony?.fetchedAt === "number" &&
+    peony.fetchedAt > 0
+  ) {
+    times.push(peony.fetchedAt);
+  }
+  if (
+    includesHall(halls, "azilea") &&
+    typeof azilea?.fetchedAt === "number" &&
+    azilea.fetchedAt > 0
+  ) {
+    times.push(azilea.fetchedAt);
+  }
   if (times.length === 0) return null;
   return Math.max(...times);
 }
@@ -219,13 +240,20 @@ export function formatMenuMessage(
 ): string {
   const nowMs = options?.nowMs ?? Date.now();
   const locale = options?.locale ?? DEFAULT_LOCALE;
+  const halls = parseHallPref(options?.halls ?? DEFAULT_HALL_PREF);
   const copy = t(locale);
   const date = menuCalendarDate(peony, azilea, options);
-  const header = formatMenuDateLine(date, latestFetchedAt(peony, azilea), locale);
-  return (
-    `${escapeHtml(header)}\n\n` +
-    formatHall(copy.hallPeony, peony, nowMs, locale) +
-    "\n\n" +
-    formatHall(copy.hallAzilea, azilea, nowMs, locale)
+  const header = formatMenuDateLine(
+    date,
+    latestFetchedAt(peony, azilea, halls),
+    locale,
   );
+  const blocks = [escapeHtml(header)];
+  if (includesHall(halls, "peony")) {
+    blocks.push(formatHall(copy.hallPeony, peony, nowMs, locale));
+  }
+  if (includesHall(halls, "azilea")) {
+    blocks.push(formatHall(copy.hallAzilea, azilea, nowMs, locale));
+  }
+  return blocks.join("\n\n");
 }

@@ -1,6 +1,7 @@
+import { parseHallPref, type HallPref } from "./halls";
 import { DEFAULT_LOCALE, parseLocale, type Locale } from "./i18n";
 
-export type ChatPrefsLocaleRow = { locale: string };
+export type ChatPrefsLocaleRow = { locale: string; halls?: string };
 
 export type SetLocaleWrite =
   | {
@@ -21,6 +22,23 @@ export type EnsureLocaleWrite =
       insert: { locale: Locale; createdAt: number; updatedAt: number };
     }
   | { created: false; locale: Locale };
+
+export type SetHallsWrite =
+  | {
+      created: true;
+      halls: HallPref;
+      insert: {
+        locale: Locale;
+        halls: HallPref;
+        createdAt: number;
+        updatedAt: number;
+      };
+    }
+  | {
+      created: false;
+      halls: HallPref;
+      patch: { halls: HallPref; updatedAt: number };
+    };
 
 /** Insert a prefs row when the chat has none; otherwise patch locale. */
 export function setLocaleWrite(
@@ -60,5 +78,31 @@ export function ensureLocaleWrite(
     created: true,
     locale,
     insert: { locale, createdAt: now, updatedAt: now },
+  };
+}
+
+/** Insert a prefs row when the chat has none; otherwise patch halls. */
+export function setHallsWrite(
+  existing: ChatPrefsLocaleRow | null,
+  halls: string,
+  now: number,
+): SetHallsWrite {
+  const parsed = parseHallPref(halls);
+  if (existing) {
+    return {
+      created: false,
+      halls: parsed,
+      patch: { halls: parsed, updatedAt: now },
+    };
+  }
+  return {
+    created: true,
+    halls: parsed,
+    insert: {
+      locale: DEFAULT_LOCALE,
+      halls: parsed,
+      createdAt: now,
+      updatedAt: now,
+    },
   };
 }

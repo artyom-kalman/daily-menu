@@ -162,6 +162,13 @@ export const handleWebhook = httpAction(async (ctx, request) => {
       });
       return result.locale;
     },
+    getHalls: async (chatId) => {
+      const row = await ctx.runQuery(internal.chatPrefs.getByChatId, { chatId });
+      return row?.halls ?? null;
+    },
+    setHalls: async (chatId, halls) => {
+      await ctx.runMutation(internal.chatPrefs.setHalls, { chatId, halls });
+    },
   });
 
   return new Response("ok", { status: 200 });

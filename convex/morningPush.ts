@@ -52,13 +52,19 @@ export const pushIfReady = internalAction({
         lastPushedDate: row.lastPushedDate,
       })),
       menuText,
-      menuTextForLocale: (locale) =>
-        formatMenuMessage(today.peony, today.azilea, { locale }),
+      menuTextForLocale: (locale, halls) =>
+        formatMenuMessage(today.peony, today.azilea, { locale, halls }),
       ensureLocale: async (chatId) => {
         const result = await ctx.runMutation(internal.chatPrefs.ensureLocale, {
           chatId,
         });
         return result.locale;
+      },
+      getHalls: async (chatId) => {
+        const row = await ctx.runQuery(internal.chatPrefs.getByChatId, {
+          chatId,
+        });
+        return row?.halls ?? null;
       },
       send: async (chatId, text, options) =>
         sendMessageResult(chatId, text, options),
