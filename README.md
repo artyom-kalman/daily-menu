@@ -38,7 +38,7 @@ convex/
   menus.ts             scrape / enrich / seed
   scraper.ts           fetch + parse
   openrouter.ts        LLM enrichment
-  format.ts            Russian message formatter
+  format.ts            Russian and English menu formatter
   dates.ts             KST helpers
   types.ts             shared types
 tests/
