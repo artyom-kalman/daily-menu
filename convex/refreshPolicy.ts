@@ -6,6 +6,7 @@ export const FETCH_START_MINUTE = 0;
 export const CUTOFF_HOUR = 12;
 export const CUTOFF_MINUTE = 30;
 export const RETRY_DELAY_MS = 30 * 60 * 1000;
+export const STUDENT_REFRESH_COOLDOWN_MS = 5 * 60 * 1000;
 
 /** Typical tray is 6–8 items. Count is per cafeteria, never summed across halls. Fewer than 5 is still a stub (오므라이스, or 잔치국수+추가밥). */
 export const MIN_READY_DISH_COUNT = 5;

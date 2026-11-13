@@ -7,6 +7,7 @@ import {
   escapeHtml,
   formatMenuDateLine,
   formatMenuMessage,
+  formatMenuUnavailable,
   formatSpiciness,
   inferCourse,
   isUpdatingStub,
@@ -14,6 +15,7 @@ import {
   STILL_UPDATING,
 } from "../convex/format";
 import { looksLikeCafeteriaNotice } from "../convex/notices";
+import { t } from "../convex/i18n";
 import { DEFAULT_MODEL, SYSTEM_PROMPT } from "../convex/openrouter";
 import { shouldSendMorningPush, isPushableFoodMenu } from "../convex/morningPushPolicy";
 import {
@@ -581,7 +583,6 @@ describe("formatMenuMessage", () => {
       formatOpts,
     );
     expect(text.startsWith("5 сен\n\n")).toBe(true);
-    expect(text).not.toContain("Сегодня");
     expect(text).toContain("Peony · верхняя");
     expect(text).toContain("Azilea · нижняя");
     expect(text).toContain("<i>Суп</i>\n<b>김치찌개</b> — <i>острый суп</i> 🌶3");
@@ -610,7 +611,7 @@ describe("formatMenuMessage", () => {
     expect(text).toContain("🌺 아질리아 · 창조관");
     expect(text).not.toContain("верхняя");
     expect(text).toContain("<i>Hot</i>\n<b>찜닭</b> — <i>braised chicken</i> 🌶2");
-    expect(text).toContain("No information");
+    expect(text).toContain(t("en").menuUnavailable);
     expect(text).not.toContain("тушёная курица");
   });
 
@@ -643,7 +644,7 @@ describe("formatMenuMessage", () => {
     expect(en).toContain("🌸 피오니 · 지운관");
     expect(en).toContain("<b>돈육김치볶음</b>");
     expect(en).not.toContain("жаркое из свинины с кимчи");
-    expect(en).toContain("No information");
+    expect(en).toContain(t("en").menuUnavailable);
   });
 
   it("groups mains vs staples and prints description as stored", () => {
@@ -797,7 +798,8 @@ describe("formatMenuMessage", () => {
     expect(text).toContain("추석 연휴 휴무");
     expect(text).not.toContain("🌶");
     expect(text).not.toContain(STILL_UPDATING);
-    expect(text).toMatch(/Peony[\s\S]*추석 연휴 휴무[\s\S]*Azilea[\s\S]*Нет информации/);
+    expect(text).toMatch(/Peony[\s\S]*추석 연휴 휴무[\s\S]*Azilea/);
+    expect(text).toContain(NO_MENU_INFO);
   });
 
   const completeTray = {
@@ -847,7 +849,7 @@ describe("formatMenuMessage", () => {
     expect(isUpdatingStub(stubTray, SEP5_CUTOFF)).toBe(false);
   });
 
-  it("keeps empty and no_info as Нет информации without an updating hint", () => {
+  it("shows the unavailable fallback for empty and no_info without an updating hint", () => {
     const empty = {
       source: "no_info" as const,
       fetchedAt: SEP5_0914,
@@ -859,10 +861,10 @@ describe("formatMenuMessage", () => {
         "5 сен · 09:14",
         "",
         "<b>🌸 Peony · верхняя</b>",
-        `<i>${NO_MENU_INFO}</i>`,
+        formatMenuUnavailable("ru", "peony"),
         "",
         "<b>🌺 Azilea · нижняя</b>",
-        `<i>${NO_MENU_INFO}</i>`,
+        formatMenuUnavailable("ru", "azilea"),
       ].join("\n"),
     );
     expect(isUpdatingStub(empty, SEP5_NOON)).toBe(false);
@@ -1575,9 +1577,9 @@ describe("telegram button e2e", () => {
         .filter((c) => c.method === "sendMessage")
         .map((c) => c.body.text);
       expect(texts).toEqual([
-        MENU_NOT_READY_MESSAGE,
-        MENU_NOT_READY_MESSAGE,
-        MENU_NOT_READY_MESSAGE,
+        formatMenuUnavailable(),
+        formatMenuUnavailable(),
+        formatMenuUnavailable(),
       ]);
       expect(texts[0]).not.toBe(formatMenuMessage(null, null));
       expect(calls.find((c) => c.method === "sendMessage")?.body.reply_markup).toEqual(
@@ -1587,7 +1589,7 @@ describe("telegram button e2e", () => {
     });
   });
 
-  it("empty stored menus without awaitingTodaysMenu still show Нет информации", async () => {
+  it("empty stored menus show a friendly fallback and KBU link", async () => {
     await withMockTelegram(async (calls) => {
       await processTelegramUpdate(
         { message: { chat: { id: 7 }, text: "hi" } },
@@ -1597,7 +1599,7 @@ describe("telegram button e2e", () => {
           answerCallbackQuery,
         },
       );
-      expect(calls[0].body.text).toBe(formatMenuMessage(null, null));
+      expect(calls[0].body.text).toBe(formatMenuUnavailable());
       expect(calls[0].body.text).not.toBe(MENU_NOT_READY_MESSAGE);
     });
   });
@@ -1624,7 +1626,7 @@ describe("telegram button e2e", () => {
         "answerCallbackQuery",
         "sendMessage",
       ]);
-      expect(String(calls[1].body.text)).toBe(MENU_UNAVAILABLE_MESSAGE);
+      expect(String(calls[1].body.text)).toBe(formatMenuUnavailable());
       expect(calls[1].body.reply_markup).toEqual(todayMenuKeyboard());
     });
   });
@@ -1843,7 +1845,7 @@ describe("telegram button e2e", () => {
         },
       );
       expect(refetchCalls).toBe(0);
-      expect(calls[0].body.text).toBe(formatMenuMessage(null, null));
+      expect(calls[0].body.text).toBe(formatMenuUnavailable());
       expect(calls[0].body.reply_markup).toEqual(todayMenuKeyboard());
     });
   });
@@ -1864,7 +1866,7 @@ describe("telegram button e2e", () => {
       expect(result).toBe("ok");
       expect(calls).toHaveLength(1);
       expect(calls[0].method).toBe("sendMessage");
-      expect(calls[0].body.text).toBe(formatMenuMessage(null, null));
+      expect(calls[0].body.text).toBe(formatMenuUnavailable());
       expect(calls[0].body.reply_markup).toEqual(todayMenuKeyboard());
     });
   });
@@ -1887,7 +1889,7 @@ describe("telegram button e2e", () => {
       );
       expect(result).toBe("ok");
       expect(calls).toHaveLength(1);
-      expect(calls[0].body.text).toBe(MENU_UNAVAILABLE_MESSAGE);
+      expect(calls[0].body.text).toBe(formatMenuUnavailable());
       expect(calls[0].body.reply_markup).toEqual(todayMenuKeyboard());
       expect(tracked).toEqual([EVENT_START]);
     });
