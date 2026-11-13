@@ -19,7 +19,7 @@ import {
   needsCronRetry,
   nextRetryDelayMs,
   sameDishNames,
-  STUDENT_REFRESH_COOLDOWN_MS,
+  canRequestStudentRefresh,
 } from "./refreshPolicy";
 import { scrapeCafeteriasSafely } from "./scrapeAll";
 import { dishDoc } from "./dishDoc";
@@ -119,10 +119,7 @@ export const requestStaleRefreshForToday = internalMutation({
     if (!config) return false;
 
     const now = Date.now();
-    if (
-      config.studentRefreshRequestedAt != null &&
-      now - config.studentRefreshRequestedAt < STUDENT_REFRESH_COOLDOWN_MS
-    ) {
+    if (!canRequestStudentRefresh(config.studentRefreshRequestedAt, now)) {
       return false;
     }
 
