@@ -15,10 +15,25 @@ import {
   pastCutoff,
   type MenuSource,
 } from "./refreshPolicy";
-import { dishGloss, type Dish } from "./types";
+import { dishGloss, type Cafeteria, type Dish } from "./types";
 
-export const NO_MENU_INFO = t("ru").noMenuInfo;
+export const NO_MENU_INFO = t("ru").menuUnavailable;
 export const STILL_UPDATING = t("ru").stillUpdating;
+
+const KBU_MENU_URL =
+  "https://www.kbu.ac.kr/kor/CMS/DietMenuMgr/list.do?mCode=MN203";
+
+export function formatMenuUnavailable(
+  locale: Locale = DEFAULT_LOCALE,
+  cafeteria?: Cafeteria,
+): string {
+  const copy = t(locale);
+  const category = cafeteria === "peony" ? "4" : "5";
+  const url = cafeteria
+    ? `${KBU_MENU_URL}&searchDietCategory=${category}`
+    : KBU_MENU_URL;
+  return `${escapeHtml(copy.menuUnavailable)}\n<a href="${escapeHtml(url)}">${escapeHtml(copy.openKbuMenu)}</a>`;
+}
 
 export type Course = "hot" | "soup" | "salad" | "side";
 
@@ -104,10 +119,7 @@ function formatSideItem(dish: Dish): string {
   return `${bold(dish.name)}${formatSpiciness(dish.spiciness)}`;
 }
 
-function formatBlock(menu: FormatMenuLike, locale: Locale): string {
-  if (!menu || menu.dishes.length === 0) {
-    return italic(t(locale).noMenuInfo);
-  }
+function formatBlock(menu: NonNullable<FormatMenuLike>, locale: Locale): string {
   const names = menu.dishes.map((d) => d.name);
   if (looksLikeCafeteriaNotice(names)) {
     return names.map(escapeHtml).join("\n");
@@ -200,11 +212,15 @@ export function isUpdatingStub(
 }
 
 function formatHall(
+  cafeteria: Cafeteria,
   heading: string,
   menu: FormatMenuLike,
   nowMs: number,
   locale: Locale,
 ): string {
+  if (!menu || menu.dishes.length === 0) {
+    return `${bold(heading)}\n${formatMenuUnavailable(locale, cafeteria)}`;
+  }
   const parts = [`${bold(heading)}`, formatBlock(menu, locale)];
   if (isUpdatingStub(menu, nowMs)) {
     parts.push(italic(t(locale).stillUpdating));
@@ -224,8 +240,8 @@ export function formatMenuMessage(
   const header = formatMenuDateLine(date, latestFetchedAt(peony, azilea), locale);
   return (
     `${escapeHtml(header)}\n\n` +
-    formatHall(copy.hallPeony, peony, nowMs, locale) +
+    formatHall("peony", copy.hallPeony, peony, nowMs, locale) +
     "\n\n" +
-    formatHall(copy.hallAzilea, azilea, nowMs, locale)
+    formatHall("azilea", copy.hallAzilea, azilea, nowMs, locale)
   );
 }

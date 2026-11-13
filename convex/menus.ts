@@ -19,10 +19,12 @@ import {
   needsCronRetry,
   nextRetryDelayMs,
   sameDishNames,
+  canRequestStudentRefresh,
 } from "./refreshPolicy";
 import { scrapeCafeteriasSafely } from "./scrapeAll";
 import { dishDoc } from "./dishDoc";
 import type { Cafeteria, Dish, ScrapeResult } from "./types";
+import { APP_CONFIG_KEY } from "./appConfig";
 
 const CAFETERIAS: Cafeteria[] = ["peony", "azilea"];
 const MENU_SOURCE = v.union(
@@ -104,6 +106,43 @@ export const listAttemptsForDate = internalQuery({
 });
 
 // ---------- Mutations ----------
+
+/** Atomically coalesce student taps while KBU is unavailable. */
+export const requestStaleRefreshForToday = internalMutation({
+  args: {},
+  returns: v.boolean(),
+  handler: async (ctx) => {
+    const config = await ctx.db
+      .query("appConfig")
+      .withIndex("by_key", (q) => q.eq("key", APP_CONFIG_KEY))
+      .unique();
+    if (!config) return false;
+
+    const now = Date.now();
+    if (!canRequestStudentRefresh(config.studentRefreshRequestedAt, now)) {
+      return false;
+    }
+
+    const date = todayKst();
+    const menus = await ctx.db
+      .query("menus")
+      .withIndex("by_date", (q) => q.eq("date", date))
+      .take(2);
+    if (
+      CAFETERIAS.every((cafeteria) =>
+        isFreshForServing(
+          menus.find((menu) => menu.cafeteria === cafeteria) ?? null,
+        ),
+      )
+    ) {
+      return false;
+    }
+
+    await ctx.db.patch(config._id, { studentRefreshRequestedAt: now });
+    await ctx.scheduler.runAfter(0, internal.menus.refreshStaleForToday, {});
+    return true;
+  },
+});
 
 export const upsertMenu = internalMutation({
   args: {

@@ -35,6 +35,7 @@ export type UiStrings = {
   subscribeFailed: string;
   unsubscribeFailed: string;
   menuUnavailable: string;
+  openKbuMenu: string;
   menuNotReady: string;
   noMenuInfo: string;
   stillUpdating: string;
@@ -71,7 +72,8 @@ export const UI: Record<Locale, UiStrings> = {
     unsubscribed: "Больше не буду присылать утром.",
     subscribeFailed: "Не удалось подписаться. Попробуйте позже.",
     unsubscribeFailed: "Не удалось отписаться. Попробуйте позже.",
-    menuUnavailable: "Не удалось получить меню. Попробуйте позже.",
+    menuUnavailable: "Сегодняшнее меню пока недоступно. Попробуйте позже.",
+    openKbuMenu: "Меню на сайте KBU",
     menuNotReady: "Меню ещё не выложили. Попробуйте позже.",
     noMenuInfo: "Нет информации",
     stillUpdating: "ещё обновляется",
@@ -106,7 +108,8 @@ export const UI: Record<Locale, UiStrings> = {
     unsubscribed: "I won't send the morning menu anymore.",
     subscribeFailed: "Couldn't subscribe. Try again later.",
     unsubscribeFailed: "Couldn't unsubscribe. Try again later.",
-    menuUnavailable: "Couldn't get the menu. Try again later.",
+    menuUnavailable: "Today's menu is temporarily unavailable. Please try again later.",
+    openKbuMenu: "Menu on KBU's website",
     menuNotReady: "Menu isn't posted yet. Try later.",
     noMenuInfo: "No information",
     stillUpdating: "still updating",

@@ -7,6 +7,7 @@ export default defineSchema({
     key: v.string(), // singleton: "default"
     peonyUrl: v.string(),
     azileaUrl: v.string(),
+    studentRefreshRequestedAt: v.optional(v.number()),
   }).index("by_key", ["key"]),
 
   menus: defineTable({

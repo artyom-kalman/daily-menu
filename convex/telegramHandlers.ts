@@ -1,7 +1,11 @@
 import type { TrackEvent } from "./analytics";
 import { EVENT_CHANNEL_POST, EVENT_START, EVENT_TODAY_MENU } from "./analytics";
 import { formatKstClock } from "./dates";
-import { formatMenuMessage, type FormatMenuLike } from "./format";
+import {
+  formatMenuMessage,
+  formatMenuUnavailable,
+  type FormatMenuLike,
+} from "./format";
 import {
   DEFAULT_LOCALE,
   LANGUAGE_PROMPT,
@@ -41,8 +45,6 @@ export type AdminCommand = "status" | "refetch" | "stats";
 export type TodayMenus = {
   peony: FormatMenuLike;
   azilea: FormatMenuLike;
-  /** Weekday, before cutoff, no today's rows — skip scrape, send try-later. */
-  awaitingTodaysMenu?: boolean;
 };
 
 export type AdminMenuLike = {
@@ -271,18 +273,20 @@ async function sendTodayMenu(
   logLabel: string,
   locale: Locale,
 ): Promise<void> {
-  const copy = t(locale);
   try {
     const today = await deps.getTodayMenus();
-    const text = today.awaitingTodaysMenu
-      ? copy.menuNotReady
-      : formatMenuMessage(today.peony, today.azilea, { locale });
+    const hasMenu =
+      (today.peony?.dishes.length ?? 0) > 0 ||
+      (today.azilea?.dishes.length ?? 0) > 0;
+    const text = hasMenu
+      ? formatMenuMessage(today.peony, today.azilea, { locale })
+      : formatMenuUnavailable(locale);
     await deps.sendMessage(chatId, text, {
       reply_markup: await keyboardFor(chatId, deps, locale),
     });
   } catch (err) {
     console.error(`${logLabel} failed: ${(err as Error).message}`);
-    await deps.sendMessage(chatId, copy.menuUnavailable, {
+    await deps.sendMessage(chatId, formatMenuUnavailable(locale), {
       reply_markup: await keyboardFor(chatId, deps, locale),
     });
   }
